@@ -84,54 +84,57 @@
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-dark-200 text-gray-800 dark:text-gray-200 min-h-screen transition-colors duration-300">
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden relative">
         <!-- 侧边栏 -->
-        <aside id="sidebar" class="w-16 md:w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transition-all duration-300 ease-in-out">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50">
             <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-200">
                 <div class="flex items-center space-x-3">
                     <div class="text-primary text-2xl font-bold">
                         <i class="fa fa-exchange"></i>
                     </div>
-                    <h1 class="text-lg font-bold hidden md:block">MinGo API网关</h1>
+                    <h1 class="text-lg font-bold">MinGo API网关</h1>
                 </div>
-                <button id="sidebar-toggle" class="md:hidden sidebar-icon">
-                    <i class="fa fa-bars"></i>
+                <button id="sidebar-close" class="sidebar-icon">
+                    <i class="fa fa-times"></i>
                 </button>
             </div>
             <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
                 <a href="#dashboard" class="sidebar-item active" data-page="dashboard">
                     <i class="fa fa-tachometer w-6 text-center"></i>
-                    <span class="hidden md:block">仪表盘</span>
+                    <span>仪表盘</span>
                 </a>
                 <a href="#routes" class="sidebar-item" data-page="routes">
                     <i class="fa fa-random w-6 text-center"></i>
-                    <span class="hidden md:block">路由管理</span>
+                    <span>路由管理</span>
                 </a>
                 <a href="#clusters" class="sidebar-item" data-page="clusters">
                     <i class="fa fa-server w-6 text-center"></i>
-                    <span class="hidden md:block">集群管理</span>
+                    <span>集群管理</span>
                 </a>
                 <a href="#security" class="sidebar-item" data-page="security">
                     <i class="fa fa-shield w-6 text-center"></i>
-                    <span class="hidden md:block">安全管理</span>
+                    <span>安全管理</span>
                 </a>
                 <a href="#monitoring" class="sidebar-item" data-page="monitoring">
                     <i class="fa fa-line-chart w-6 text-center"></i>
-                    <span class="hidden md:block">监控</span>
+                    <span>监控</span>
                 </a>
                 <a href="#logs" class="sidebar-item" data-page="logs">
                     <i class="fa fa-list-alt w-6 text-center"></i>
-                    <span class="hidden md:block">日志管理</span>
+                    <span>日志管理</span>
                 </a>
                 <a href="#settings" class="sidebar-item" data-page="settings">
                     <i class="fa fa-cog w-6 text-center"></i>
-                    <span class="hidden md:block">设置</span>
+                    <span>设置</span>
                 </a>
             </nav>
             <div class="p-4 border-t border-gray-200 dark:border-dark-200">
                 <!-- 用户信息已移至顶部导航栏 -->
             </div>
         </aside>
+        
+        <!-- 侧边栏遮罩 -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
 
         <!-- 主内容区 -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -888,22 +891,34 @@
             localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
         });
 
-        // 移动端菜单切换
+        // 侧边栏控制
         const mobileMenuButton = document.getElementById('mobile-menu-button');
         const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarClose = document.getElementById('sidebar-close');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
 
-        function toggleSidebar() {
-            sidebar.classList.toggle('w-16');
-            sidebar.classList.toggle('w-64');
+        function openSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            sidebarOverlay.classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('translate-x-0');
+            sidebarOverlay.classList.add('hidden');
         }
 
         if (mobileMenuButton) {
-            mobileMenuButton.addEventListener('click', toggleSidebar);
+            mobileMenuButton.addEventListener('click', openSidebar);
         }
 
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', toggleSidebar);
+        if (sidebarClose) {
+            sidebarClose.addEventListener('click', closeSidebar);
+        }
+
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
         }
 
         // 页面导航
@@ -919,10 +934,7 @@
                 item.classList.add('active');
                 
                 // 在移动设备上点击菜单项后关闭侧边栏
-                if (window.innerWidth < 768) {
-                    sidebar.classList.add('w-16');
-                    sidebar.classList.remove('w-64');
-                }
+                closeSidebar();
                 
                 // 显示对应页面
                 pages.forEach(page => {
@@ -940,18 +952,9 @@
 
         // 响应式处理
         function handleResize() {
-            if (window.innerWidth < 768) {
-                sidebar.classList.add('w-16');
-                sidebar.classList.remove('w-64');
-            } else {
-                sidebar.classList.remove('w-16');
-                sidebar.classList.add('w-64');
-            }
+            // 响应式处理已通过CSS媒体查询实现
         }
 
-        // 初始加载时处理
-        handleResize();
-        
         // 窗口大小变化时处理
         window.addEventListener('resize', handleResize);
 
