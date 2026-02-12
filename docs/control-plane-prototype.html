@@ -84,103 +84,94 @@
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-dark-200 text-gray-800 dark:text-gray-200 min-h-screen transition-colors duration-300">
-    <div class="flex h-screen overflow-hidden relative">
-        <!-- 侧边栏 -->
-        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50">
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-200">
-                <div class="flex items-center space-x-3">
-                    <div class="text-primary text-2xl font-bold">
-                        <i class="fa fa-exchange"></i>
-                    </div>
-                    <h1 class="text-lg font-bold">MinGo API网关</h1>
-                </div>
-                <button id="sidebar-close" class="sidebar-icon">
-                    <i class="fa fa-times"></i>
+    <div class="h-screen flex flex-col overflow-hidden relative">
+        <!-- 顶部导航栏 -->
+        <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
+            <div class="flex items-center space-x-3">
+                <button id="mobile-menu-button" class="md:hidden text-gray-500 dark:text-gray-400">
+                    <i class="fa fa-bars text-xl"></i>
                 </button>
+                <div class="flex items-center space-x-3">
+                    <h1 class="text-lg md:text-xl font-semibold">MinGo API网关</h1>
+                    <span class="badge badge-success">运行中</span>
+                </div>
             </div>
-            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-                <a href="#dashboard" class="sidebar-item active" data-page="dashboard">
-                    <i class="fa fa-tachometer w-6 text-center"></i>
-                    <span>仪表盘</span>
-                </a>
-                <a href="#routes" class="sidebar-item" data-page="routes">
-                    <i class="fa fa-random w-6 text-center"></i>
-                    <span>路由管理</span>
-                </a>
-                <a href="#clusters" class="sidebar-item" data-page="clusters">
-                    <i class="fa fa-server w-6 text-center"></i>
-                    <span>集群管理</span>
-                </a>
-                <a href="#security" class="sidebar-item" data-page="security">
-                    <i class="fa fa-shield w-6 text-center"></i>
-                    <span>安全管理</span>
-                </a>
-                <a href="#monitoring" class="sidebar-item" data-page="monitoring">
-                    <i class="fa fa-line-chart w-6 text-center"></i>
-                    <span>监控</span>
-                </a>
-                <a href="#logs" class="sidebar-item" data-page="logs">
-                    <i class="fa fa-list-alt w-6 text-center"></i>
-                    <span>日志管理</span>
-                </a>
-                <a href="#settings" class="sidebar-item" data-page="settings">
-                    <i class="fa fa-cog w-6 text-center"></i>
-                    <span>设置</span>
-                </a>
-            </nav>
-            <div class="p-4 border-t border-gray-200 dark:border-dark-200">
-                <!-- 用户信息已移至顶部导航栏 -->
+            <div class="flex items-center space-x-3">
+                <div class="relative hidden md:block">
+                    <input type="text" placeholder="搜索..." class="input pl-10 pr-4 py-1 w-64">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <div class="relative md:hidden">
+                    <input type="text" placeholder="搜索..." class="input pl-10 pr-4 py-1 w-40">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <button id="theme-toggle" class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                        <i class="fa fa-moon-o dark:hidden text-xl transition-opacity duration-500"></i>
+                        <i class="fa fa-sun-o hidden dark:block text-xl transition-opacity duration-500"></i>
+                    </button>
+                <div class="md:hidden">
+                        <button class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                            <i class="fa fa-bell text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="hidden md:flex items-center space-x-3">
+                        <button class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                            <i class="fa fa-bell text-xl"></i>
+                        </button>
+                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                        <i class="fa fa-user"></i>
+                    </div>
+                    <span class="font-medium">管理员</span>
+                </div>
             </div>
-        </aside>
+        </header>
         
-        <!-- 侧边栏遮罩 -->
-        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
-
-        <!-- 主内容区 -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-            <!-- 顶部导航栏 -->
-            <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <button id="mobile-menu-button" class="md:hidden text-gray-500 dark:text-gray-400">
-                        <i class="fa fa-bars text-xl"></i>
-                    </button>
-                    <div class="flex items-center space-x-3">
-                        <h1 class="text-lg md:text-xl font-semibold">MinGo API网关</h1>
-                        <span class="badge badge-success">运行中</span>
-                    </div>
+        <!-- 主容器 -->
+        <div class="flex flex-1 overflow-hidden relative">
+            <!-- 侧边栏 -->
+            <aside id="sidebar" class="fixed inset-y-0 left-0 top-[61px] w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40">
+                <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <a href="#dashboard" class="sidebar-item active" data-page="dashboard">
+                        <i class="fa fa-tachometer w-6 text-center"></i>
+                        <span>仪表盘</span>
+                    </a>
+                    <a href="#routes" class="sidebar-item" data-page="routes">
+                        <i class="fa fa-random w-6 text-center"></i>
+                        <span>路由管理</span>
+                    </a>
+                    <a href="#clusters" class="sidebar-item" data-page="clusters">
+                        <i class="fa fa-server w-6 text-center"></i>
+                        <span>集群管理</span>
+                    </a>
+                    <a href="#security" class="sidebar-item" data-page="security">
+                        <i class="fa fa-shield w-6 text-center"></i>
+                        <span>安全管理</span>
+                    </a>
+                    <a href="#monitoring" class="sidebar-item" data-page="monitoring">
+                        <i class="fa fa-line-chart w-6 text-center"></i>
+                        <span>监控</span>
+                    </a>
+                    <a href="#logs" class="sidebar-item" data-page="logs">
+                        <i class="fa fa-list-alt w-6 text-center"></i>
+                        <span>日志管理</span>
+                    </a>
+                    <a href="#settings" class="sidebar-item" data-page="settings">
+                        <i class="fa fa-cog w-6 text-center"></i>
+                        <span>设置</span>
+                    </a>
+                </nav>
+                <div class="p-4 border-t border-gray-200 dark:border-dark-200">
+                    <!-- 用户信息已移至顶部导航栏 -->
                 </div>
-                <div class="flex items-center space-x-3">
-                    <div class="relative hidden md:block">
-                        <input type="text" placeholder="搜索..." class="input pl-10 pr-4 py-1 w-64">
-                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    </div>
-                    <div class="relative md:hidden">
-                        <input type="text" placeholder="搜索..." class="input pl-10 pr-4 py-1 w-40">
-                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    </div>
-                    <button id="theme-toggle" class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-100 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-dark-200 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                        <i class="fa fa-moon-o dark:hidden text-primary transition-opacity duration-500"></i>
-                        <i class="fa fa-sun-o hidden dark:block text-warning transition-opacity duration-500"></i>
-                    </button>
-                    <div class="md:hidden">
-                        <button class="sidebar-icon">
-                            <i class="fa fa-bell"></i>
-                        </button>
-                    </div>
-                    <div class="hidden md:flex items-center space-x-2">
-                        <button class="sidebar-icon">
-                            <i class="fa fa-bell"></i>
-                        </button>
-                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                            <i class="fa fa-user"></i>
-                        </div>
-                        <span class="font-medium">管理员</span>
-                    </div>
-                </div>
-            </header>
+            </aside>
+            
+            <!-- 侧边栏遮罩 -->
+            <div id="sidebar-overlay" class="fixed inset-0 top-[61px] bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
 
-            <!-- 内容区域 -->
-            <main class="flex-1 overflow-y-auto p-6">
+            <!-- 主内容区 -->
+            <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
+                <!-- 内容区域 -->
+                <main class="flex-1 overflow-y-auto p-6">
                 <!-- 仪表盘页面 -->
                 <div id="dashboard-page" class="page active">
                     <div class="mb-6">
