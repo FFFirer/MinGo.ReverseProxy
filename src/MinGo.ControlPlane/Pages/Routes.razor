@@ -1,0 +1,84 @@
+@page "/routes"
+
+<PageTitle>路由管理 - MinGo API网关</PageTitle>
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-bold mb-2">路由管理</h2>
+        <p class="text-secondary">配置和管理API路由规则</p>
+    </div>
+    <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100">
+        <i class="fa fa-plus mr-2"></i>添加路由
+    </button>
+</div>
+
+<div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
+        <div class="relative flex-1 max-w-md">
+            <input type="text" placeholder="搜索路由..." class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 pl-10">
+            <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        </div>
+        <div class="flex space-x-2">
+            <select class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 py-1">
+                <option>所有状态</option>
+                <option>启用</option>
+                <option>禁用</option>
+            </select>
+            <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                <i class="fa fa-filter mr-2"></i>筛选
+            </button>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-200 dark:border-dark-200">
+                    <th class="text-left py-3 px-4 font-medium text-secondary">路由名称</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">集群</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4 font-medium">用户服务路由</td>
+                    <td class="py-3 px-4">/api/users/{*path}</td>
+                    <td class="py-3 px-4">user-cluster</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">启用</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex space-x-2">
+                            <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
+                            <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4 font-medium">产品服务路由</td>
+                    <td class="py-3 px-4">/api/products/{*path}</td>
+                    <td class="py-3 px-4">product-cluster</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">启用</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex space-x-2">
+                            <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
+                            <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4 font-medium">订单服务路由</td>
+                    <td class="py-3 px-4">/api/orders/{*path}</td>
+                    <td class="py-3 px-4">order-cluster</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-warning/10 text-warning">禁用</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex space-x-2">
+                            <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
+                            <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

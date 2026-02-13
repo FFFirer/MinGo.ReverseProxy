@@ -1,0 +1,97 @@
+@page "/clusters"
+
+<PageTitle>集群管理 - MinGo API网关</PageTitle>
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-bold mb-2">集群管理</h2>
+        <p class="text-secondary">配置和管理后端服务集群</p>
+    </div>
+    <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100">
+        <i class="fa fa-plus mr-2"></i>添加集群
+    </button>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">user-cluster</h3>
+            <span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">健康</span>
+        </div>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                <div>
+                    <p class="font-medium">User Service 1</p>
+                    <p class="text-sm text-secondary">http://localhost:5001</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">在线</span>
+                    <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                <div>
+                    <p class="font-medium">User Service 2</p>
+                    <p class="text-sm text-secondary">http://localhost:5002</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">在线</span>
+                    <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-end space-x-2">
+            <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                <i class="fa fa-edit mr-2"></i>编辑
+            </button>
+            <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100">
+                <i class="fa fa-plus mr-2"></i>添加目标
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">product-cluster</h3>
+            <span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">健康</span>
+        </div>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                <div>
+                    <p class="font-medium">Product Service 1</p>
+                    <p class="text-sm text-secondary">http://localhost:6001</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">在线</span>
+                    <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                <div>
+                    <p class="font-medium">Product Service 2</p>
+                    <p class="text-sm text-secondary">http://localhost:6002</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-warning/10 text-warning">离线</span>
+                    <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-end space-x-2">
+            <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                <i class="fa fa-edit mr-2"></i>编辑
+            </button>
+            <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100">
+                <i class="fa fa-plus mr-2"></i>添加目标
+            </button>
+        </div>
+    </div>
+</div>
