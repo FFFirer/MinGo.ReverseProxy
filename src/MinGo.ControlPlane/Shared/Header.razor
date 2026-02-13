@@ -1,43 +1,5 @@
 @inject IJSRuntime JSRuntime
 
-@code {
-    private bool isDarkMode = false;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            var savedTheme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
-            var prefersDark = await JSRuntime.InvokeAsync<bool>("eval", "window.matchMedia('(prefers-color-scheme: dark)').matches");
-            
-            isDarkMode = savedTheme == "dark" || (string.IsNullOrEmpty(savedTheme) && prefersDark);
-            
-            if (isDarkMode)
-            {
-                await JSRuntime.InvokeVoidAsync("eval", "document.documentElement.classList.add('dark')");
-            }
-            
-            StateHasChanged();
-        }
-    }
-
-    private async Task ToggleTheme()
-    {
-        isDarkMode = !isDarkMode;
-        
-        if (isDarkMode)
-        {
-            await JSRuntime.InvokeVoidAsync("eval", "document.documentElement.classList.add('dark')");
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "theme", "dark");
-        }
-        else
-        {
-            await JSRuntime.InvokeVoidAsync("eval", "document.documentElement.classList.remove('dark')");
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "theme", "light");
-        }
-    }
-}
-
 <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
     <div class="flex items-center space-x-3">
         <button @onclick="ToggleMobileMenu" class="md:hidden text-gray-500 dark:text-gray-400">
@@ -92,6 +54,22 @@
 @code {
     [Parameter]
     public EventCallback OnToggleMobileMenu { get; set; }
+
+    private bool isDarkMode = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isDarkMode = await JSRuntime.InvokeAsync<bool>("theme.init");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = await JSRuntime.InvokeAsync<bool>("theme.toggle");
+    }
 
     private async Task ToggleMobileMenu()
     {
