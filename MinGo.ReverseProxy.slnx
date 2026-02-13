@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MinGo.ControlPlane/MinGo.ControlPlane.csproj" />
+    <Project Path="src/MinGo.Gateway/MinGo.Gateway.csproj" />
+    <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" />
+  </Folder>
+</Solution>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -83,10 +84,12 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-50 dark:bg-dark-200 text-gray-800 dark:text-gray-200 min-h-screen transition-colors duration-300">
     <div class="h-screen flex flex-col overflow-hidden relative">
         <!-- 顶部导航栏 -->
-        <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
+        <header
+            class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
             <div class="flex items-center space-x-3">
                 <button id="mobile-menu-button" class="md:hidden text-gray-500 dark:text-gray-400">
                     <i class="fa fa-bars text-xl"></i>
@@ -105,19 +108,22 @@
                     <input type="text" placeholder="搜索..." class="input pl-10 pr-4 py-1 w-40">
                     <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
-                <button id="theme-toggle" class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
-                        <i class="fa fa-moon-o dark:hidden text-xl transition-opacity duration-500"></i>
-                        <i class="fa fa-sun-o hidden dark:block text-xl transition-opacity duration-500"></i>
-                    </button>
+                <button id="theme-toggle"
+                    class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                    <i class="fa fa-moon-o dark:hidden text-xl transition-opacity duration-500"></i>
+                    <i class="fa fa-sun-o hidden dark:block text-xl transition-opacity duration-500"></i>
+                </button>
                 <div class="md:hidden">
-                        <button class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
-                            <i class="fa fa-bell text-xl"></i>
-                        </button>
-                    </div>
-                    <div class="hidden md:flex items-center space-x-3">
-                        <button class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
-                            <i class="fa fa-bell text-xl"></i>
-                        </button>
+                    <button
+                        class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                        <i class="fa fa-bell text-xl"></i>
+                    </button>
+                </div>
+                <div class="hidden md:flex items-center space-x-3">
+                    <button
+                        class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full">
+                        <i class="fa fa-bell text-xl"></i>
+                    </button>
                     <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
                         <i class="fa fa-user"></i>
                     </div>
@@ -125,11 +131,12 @@
                 </div>
             </div>
         </header>
-        
+
         <!-- 主容器 -->
         <div class="flex flex-1 overflow-hidden relative">
             <!-- 侧边栏 -->
-            <aside id="sidebar" class="fixed inset-y-0 left-0 top-[61px] w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40">
+            <aside id="sidebar"
+                class="fixed inset-y-0 left-0 top-[61px] w-64 bg-white dark:bg-dark-100 border-r border-gray-200 dark:border-dark-200 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40">
                 <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
                     <a href="#dashboard" class="sidebar-item active" data-page="dashboard">
                         <i class="fa fa-tachometer w-6 text-center"></i>
@@ -164,825 +171,872 @@
                     <!-- 用户信息已移至顶部导航栏 -->
                 </div>
             </aside>
-            
+
             <!-- 侧边栏遮罩 -->
-            <div id="sidebar-overlay" class="fixed inset-0 top-[61px] bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+            <div id="sidebar-overlay" class="fixed inset-0 top-[61px] bg-black bg-opacity-50 z-30 hidden md:hidden">
+            </div>
 
             <!-- 主内容区 -->
             <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
                 <!-- 内容区域 -->
                 <main class="flex-1 overflow-y-auto p-6">
-                <!-- 仪表盘页面 -->
-                <div id="dashboard-page" class="page active">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold mb-2">仪表盘</h2>
-                        <p class="text-secondary">实时监控网关运行状态</p>
-                    </div>
+                    <!-- 仪表盘页面 -->
+                    <div id="dashboard-page" class="page active">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold mb-2">仪表盘</h2>
+                            <p class="text-secondary">实时监控网关运行状态</p>
+                        </div>
 
-                    <!-- 统计卡片 -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                        <div class="card">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-secondary text-sm">总请求数</p>
-                                    <h3 class="text-2xl font-bold">12,458</h3>
-                                    <p class="text-success text-sm mt-1"><i class="fa fa-arrow-up"></i> 12.5%</p>
-                                </div>
-                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                    <i class="fa fa-refresh"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-secondary text-sm">错误率</p>
-                                    <h3 class="text-2xl font-bold">1.2%</h3>
-                                    <p class="text-danger text-sm mt-1"><i class="fa fa-arrow-up"></i> 0.3%</p>
-                                </div>
-                                <div class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
-                                    <i class="fa fa-exclamation-circle"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-secondary text-sm">平均响应时间</p>
-                                    <h3 class="text-2xl font-bold">45ms</h3>
-                                    <p class="text-success text-sm mt-1"><i class="fa fa-arrow-down"></i> 5.2%</p>
-                                </div>
-                                <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
-                                    <i class="fa fa-clock-o"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-secondary text-sm">活跃服务</p>
-                                    <h3 class="text-2xl font-bold">8/10</h3>
-                                    <p class="text-success text-sm mt-1">全部正常</p>
-                                </div>
-                                <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning">
-                                    <i class="fa fa-server"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 图表区域 -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <div class="card">
-                            <h3 class="font-semibold mb-4">请求趋势</h3>
-                            <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-                                <p class="text-secondary">请求趋势图表</p>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <h3 class="font-semibold mb-4">服务状态</h3>
-                            <div class="space-y-4">
+                        <!-- 统计卡片 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                            <div class="card">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-3 h-3 rounded-full bg-success"></div>
-                                        <span>Service A</span>
-                                    </div>
-                                    <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                        <div class="bg-success h-2 rounded-full" style="width: 95%"></div>
-                                    </div>
-                                    <span class="text-sm">95%</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-3 h-3 rounded-full bg-success"></div>
-                                        <span>Service B</span>
-                                    </div>
-                                    <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                        <div class="bg-success h-2 rounded-full" style="width: 92%"></div>
-                                    </div>
-                                    <span class="text-sm">92%</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-3 h-3 rounded-full bg-warning"></div>
-                                        <span>Service C</span>
-                                    </div>
-                                    <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                        <div class="bg-warning h-2 rounded-full" style="width: 75%"></div>
-                                    </div>
-                                    <span class="text-sm">75%</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-3 h-3 rounded-full bg-success"></div>
-                                        <span>Service D</span>
-                                    </div>
-                                    <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                        <div class="bg-success h-2 rounded-full" style="width: 98%"></div>
-                                    </div>
-                                    <span class="text-sm">98%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 最近请求 -->
-                    <div class="card">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="font-semibold">最近请求</h3>
-                            <button class="btn btn-secondary text-sm py-1">查看全部</button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b border-gray-200 dark:border-dark-200">
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">时间</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">方法</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">状态码</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">响应时间</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4">2026-02-12 23:45</td>
-                                        <td class="py-3 px-4">/api/users</td>
-                                        <td class="py-3 px-4">GET</td>
-                                        <td class="py-3 px-4"><span class="badge badge-success">200</span></td>
-                                        <td class="py-3 px-4">32ms</td>
-                                    </tr>
-                                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4">2026-02-12 23:44</td>
-                                        <td class="py-3 px-4">/api/products</td>
-                                        <td class="py-3 px-4">POST</td>
-                                        <td class="py-3 px-4"><span class="badge badge-success">201</span></td>
-                                        <td class="py-3 px-4">45ms</td>
-                                    </tr>
-                                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4">2026-02-12 23:43</td>
-                                        <td class="py-3 px-4">/api/orders</td>
-                                        <td class="py-3 px-4">GET</td>
-                                        <td class="py-3 px-4"><span class="badge badge-warning">401</span></td>
-                                        <td class="py-3 px-4">18ms</td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4">2026-02-12 23:42</td>
-                                        <td class="py-3 px-4">/api/payments</td>
-                                        <td class="py-3 px-4">POST</td>
-                                        <td class="py-3 px-4"><span class="badge badge-danger">500</span></td>
-                                        <td class="py-3 px-4">120ms</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 路由管理页面 -->
-                <div id="routes-page" class="page hidden">
-                    <div class="mb-6 flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold mb-2">路由管理</h2>
-                            <p class="text-secondary">配置和管理API路由规则</p>
-                        </div>
-                        <button class="btn btn-primary">
-                            <i class="fa fa-plus mr-2"></i>添加路由
-                        </button>
-                    </div>
-
-                    <div class="card mb-6">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
-                            <div class="relative flex-1 max-w-md">
-                                <input type="text" placeholder="搜索路由..." class="input pl-10">
-                                <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            </div>
-                            <div class="flex space-x-2">
-                                <select class="input py-1">
-                                    <option>所有状态</option>
-                                    <option>启用</option>
-                                    <option>禁用</option>
-                                </select>
-                                <button class="btn btn-secondary">
-                                    <i class="fa fa-filter mr-2"></i>筛选
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b border-gray-200 dark:border-dark-200">
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">路由名称</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">集群</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
-                                        <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4 font-medium">用户服务路由</td>
-                                        <td class="py-3 px-4">/api/users/{*path}</td>
-                                        <td class="py-3 px-4">user-cluster</td>
-                                        <td class="py-3 px-4"><span class="badge badge-success">启用</span></td>
-                                        <td class="py-3 px-4">
-                                            <div class="flex space-x-2">
-                                                <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
-                                                <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4 font-medium">产品服务路由</td>
-                                        <td class="py-3 px-4">/api/products/{*path}</td>
-                                        <td class="py-3 px-4">product-cluster</td>
-                                        <td class="py-3 px-4"><span class="badge badge-success">启用</span></td>
-                                        <td class="py-3 px-4">
-                                            <div class="flex space-x-2">
-                                                <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
-                                                <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                                        <td class="py-3 px-4 font-medium">订单服务路由</td>
-                                        <td class="py-3 px-4">/api/orders/{*path}</td>
-                                        <td class="py-3 px-4">order-cluster</td>
-                                        <td class="py-3 px-4"><span class="badge badge-warning">禁用</span></td>
-                                        <td class="py-3 px-4">
-                                            <div class="flex space-x-2">
-                                                <button class="text-primary hover:text-primary/80"><i class="fa fa-edit"></i></button>
-                                                <button class="text-danger hover:text-danger/80"><i class="fa fa-trash"></i></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 集群管理页面 -->
-                <div id="clusters-page" class="page hidden">
-                    <div class="mb-6 flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold mb-2">集群管理</h2>
-                            <p class="text-secondary">配置和管理后端服务集群</p>
-                        </div>
-                        <button class="btn btn-primary">
-                            <i class="fa fa-plus mr-2"></i>添加集群
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="card">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="font-semibold">user-cluster</h3>
-                                <span class="badge badge-success">健康</span>
-                            </div>
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
                                     <div>
-                                        <p class="font-medium">User Service 1</p>
-                                        <p class="text-sm text-secondary">http://localhost:5001</p>
+                                        <p class="text-secondary text-sm">总请求数</p>
+                                        <h3 class="text-2xl font-bold">12,458</h3>
+                                        <p class="text-success text-sm mt-1"><i class="fa fa-arrow-up"></i> 12.5%</p>
                                     </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="badge badge-success">在线</span>
-                                        <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
-                                            <i class="fa fa-ellipsis-v"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <div>
-                                        <p class="font-medium">User Service 2</p>
-                                        <p class="text-sm text-secondary">http://localhost:5002</p>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="badge badge-success">在线</span>
-                                        <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
-                                            <i class="fa fa-ellipsis-v"></i>
-                                        </button>
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                        <i class="fa fa-refresh"></i>
                                     </div>
                                 </div>
                             </div>
-                            <div class="mt-4 flex justify-end space-x-2">
-                                <button class="btn btn-secondary">
-                                    <i class="fa fa-edit mr-2"></i>编辑
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fa fa-plus mr-2"></i>添加目标
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="font-semibold">product-cluster</h3>
-                                <span class="badge badge-success">健康</span>
-                            </div>
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <div>
-                                        <p class="font-medium">Product Service 1</p>
-                                        <p class="text-sm text-secondary">http://localhost:6001</p>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="badge badge-success">在线</span>
-                                        <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
-                                            <i class="fa fa-ellipsis-v"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <div>
-                                        <p class="font-medium">Product Service 2</p>
-                                        <p class="text-sm text-secondary">http://localhost:6002</p>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="badge badge-warning">离线</span>
-                                        <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
-                                            <i class="fa fa-ellipsis-v"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-4 flex justify-end space-x-2">
-                                <button class="btn btn-secondary">
-                                    <i class="fa fa-edit mr-2"></i>编辑
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fa fa-plus mr-2"></i>添加目标
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 安全管理页面 -->
-                <div id="security-page" class="page hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold mb-2">安全管理</h2>
-                        <p class="text-secondary">配置和管理安全策略</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="card">
-                            <h3 class="font-semibold mb-4">API密钥管理</h3>
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <div>
-                                        <p class="font-medium">service-api-key</p>
-                                        <p class="text-sm text-secondary">服务调用密钥</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">过期时间: 2026-12-31</p>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <button class="text-primary hover:text-primary/80 text-sm">
-                                            <i class="fa fa-refresh mr-1"></i>刷新
-                                        </button>
-                                        <button class="text-danger hover:text-danger/80 text-sm">
-                                            <i class="fa fa-trash mr-1"></i>删除
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <div>
-                                        <p class="font-medium">client-api-key</p>
-                                        <p class="text-sm text-secondary">客户端调用密钥</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">过期时间: 2026-06-30</p>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <button class="text-primary hover:text-primary/80 text-sm">
-                                            <i class="fa fa-refresh mr-1"></i>刷新
-                                        </button>
-                                        <button class="text-danger hover:text-danger/80 text-sm">
-                                            <i class="fa fa-trash mr-1"></i>删除
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-4">
-                                <button class="btn btn-primary w-full">
-                                    <i class="fa fa-plus mr-2"></i>生成新API密钥
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <h3 class="font-semibold mb-4">IP访问控制</h3>
-                            <div class="space-y-6">
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h4 class="font-medium">IP白名单</h4>
-                                        <button class="text-primary hover:text-primary/80 text-sm">
-                                            <i class="fa fa-plus mr-1"></i>添加
-                                        </button>
-                                    </div>
-                                    <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                        <p class="text-sm">192.168.1.0/24</p>
-                                        <p class="text-sm mt-1">10.0.0.1</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h4 class="font-medium">IP黑名单</h4>
-                                        <button class="text-primary hover:text-primary/80 text-sm">
-                                            <i class="fa fa-plus mr-1"></i>添加
-                                        </button>
-                                    </div>
-                                    <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                        <p class="text-sm">172.16.0.1</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card lg:col-span-2">
-                            <h3 class="font-semibold mb-4">速率限制</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <h4 class="font-medium mb-2">全局限制</h4>
-                                    <div class="space-y-3">
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">请求/秒</label>
-                                            <input type="number" value="1000" class="input">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">并发连接</label>
-                                            <input type="number" value="500" class="input">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <h4 class="font-medium mb-2">按IP限制</h4>
-                                    <div class="space-y-3">
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">请求/秒</label>
-                                            <input type="number" value="100" class="input">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">并发连接</label>
-                                            <input type="number" value="50" class="input">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <h4 class="font-medium mb-2">按API密钥限制</h4>
-                                    <div class="space-y-3">
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">请求/秒</label>
-                                            <input type="number" value="50" class="input">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm text-secondary mb-1">并发连接</label>
-                                            <input type="number" value="25" class="input">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-4 flex justify-end">
-                                <button class="btn btn-primary">
-                                    <i class="fa fa-save mr-2"></i>保存配置
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 监控页面 -->
-                <div id="monitoring-page" class="page hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold mb-2">监控</h2>
-                        <p class="text-secondary">查看网关运行指标和告警</p>
-                    </div>
-
-                    <div class="card mb-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="font-semibold">系统指标</h3>
-                            <div class="flex space-x-2">
-                                <select class="input py-1">
-                                    <option>最近1小时</option>
-                                    <option>最近6小时</option>
-                                    <option>最近24小时</option>
-                                    <option>最近7天</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-                                <p class="text-secondary">请求量趋势图表</p>
-                            </div>
-                            <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-                                <p class="text-secondary">响应时间趋势图表</p>
-                            </div>
-                            <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-                                <p class="text-secondary">错误率趋势图表</p>
-                            </div>
-                            <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-                                <p class="text-secondary">系统资源使用图表</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h3 class="font-semibold mb-4">告警记录</h3>
-                        <div class="space-y-4">
-                            <div class="p-4 border-l-4 border-danger bg-danger/5 dark:bg-danger/10 rounded-r-lg">
+                            <div class="card">
                                 <div class="flex items-center justify-between">
-                                    <h4 class="font-medium">服务不可用</h4>
-                                    <span class="text-sm text-secondary">2026-02-12 23:00</span>
-                                </div>
-                                <p class="text-sm mt-1">订单服务(order-cluster)健康检查失败</p>
-                                <div class="mt-2 flex space-x-2">
-                                    <button class="text-sm text-primary hover:text-primary/80">
-                                        <i class="fa fa-eye mr-1"></i>查看详情
-                                    </button>
-                                    <button class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
-                                        <i class="fa fa-check mr-1"></i>标记已处理
-                                    </button>
+                                    <div>
+                                        <p class="text-secondary text-sm">错误率</p>
+                                        <h3 class="text-2xl font-bold">1.2%</h3>
+                                        <p class="text-danger text-sm mt-1"><i class="fa fa-arrow-up"></i> 0.3%</p>
+                                    </div>
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
+                                        <i class="fa fa-exclamation-circle"></i>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="p-4 border-l-4 border-warning bg-warning/5 dark:bg-warning/10 rounded-r-lg">
+                            <div class="card">
                                 <div class="flex items-center justify-between">
-                                    <h4 class="font-medium">速率限制触发</h4>
-                                    <span class="text-sm text-secondary">2026-02-12 22:30</span>
-                                </div>
-                                <p class="text-sm mt-1">IP 192.168.1.100 触发速率限制</p>
-                                <div class="mt-2 flex space-x-2">
-                                    <button class="text-sm text-primary hover:text-primary/80">
-                                        <i class="fa fa-eye mr-1"></i>查看详情
-                                    </button>
-                                    <button class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
-                                        <i class="fa fa-check mr-1"></i>标记已处理
-                                    </button>
+                                    <div>
+                                        <p class="text-secondary text-sm">平均响应时间</p>
+                                        <h3 class="text-2xl font-bold">45ms</h3>
+                                        <p class="text-success text-sm mt-1"><i class="fa fa-arrow-down"></i> 5.2%</p>
+                                    </div>
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
+                                        <i class="fa fa-clock-o"></i>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="p-4 border-l-4 border-success bg-success/5 dark:bg-success/10 rounded-r-lg">
+                            <div class="card">
                                 <div class="flex items-center justify-between">
-                                    <h4 class="font-medium">服务恢复</h4>
-                                    <span class="text-sm text-secondary">2026-02-12 22:00</span>
-                                </div>
-                                <p class="text-sm mt-1">产品服务(product-cluster)健康检查恢复正常</p>
-                                <div class="mt-2 flex space-x-2">
-                                    <button class="text-sm text-primary hover:text-primary/80">
-                                        <i class="fa fa-eye mr-1"></i>查看详情
-                                    </button>
-                                    <button class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
-                                        <i class="fa fa-check mr-1"></i>标记已处理
-                                    </button>
+                                    <div>
+                                        <p class="text-secondary text-sm">活跃服务</p>
+                                        <h3 class="text-2xl font-bold">8/10</h3>
+                                        <p class="text-success text-sm mt-1">全部正常</p>
+                                    </div>
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                                        <i class="fa fa-server"></i>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- 日志页面 -->
-                <div id="logs-page" class="page hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold mb-2">日志管理</h2>
-                        <p class="text-secondary">查看和分析网关访问日志</p>
-                    </div>
-
-                    <div class="card mb-6">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
-                            <div class="flex flex-col sm:flex-row gap-2">
-                                <div class="relative">
-                                    <input type="text" placeholder="搜索日志..." class="input pl-10">
-                                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <!-- 图表区域 -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div class="card">
+                                <h3 class="font-semibold mb-4">请求趋势</h3>
+                                <div
+                                    class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+                                    <p class="text-secondary">请求趋势图表</p>
                                 </div>
-                                <select class="input">
-                                    <option>所有级别</option>
-                                    <option>INFO</option>
-                                    <option>WARN</option>
-                                    <option>ERROR</option>
-                                    <option>FATAL</option>
-                                </select>
                             </div>
-                            <div class="flex space-x-2">
-                                <button class="btn btn-secondary">
-                                    <i class="fa fa-download mr-2"></i>导出
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fa fa-refresh mr-2"></i>刷新
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-50 dark:bg-dark-200 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-sm">
-                            <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:45:30.123 [INFO] GET /api/users 200 32ms 192.168.1.100</div>
-                            <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:44:15.678 [INFO] POST /api/products 201 45ms 192.168.1.100</div>
-                            <div class="mb-2 text-warning">2026-02-12 23:43:02.345 [WARN] GET /api/orders 401 18ms 192.168.1.100</div>
-                            <div class="mb-2 text-danger">2026-02-12 23:42:45.987 [ERROR] POST /api/payments 500 120ms 192.168.1.100</div>
-                            <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:41:23.456 [INFO] GET /api/users/1 200 25ms 192.168.1.101</div>
-                            <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:40:11.789 [INFO] PUT /api/users/1 200 38ms 192.168.1.101</div>
-                            <div class="mb-2 text-warning">2026-02-12 23:39:55.234 [WARN] GET /api/products/999 404 12ms 192.168.1.102</div>
-                            <div class="mb-2 text-danger">2026-02-12 23:38:33.567 [ERROR] POST /api/orders 500 95ms 192.168.1.102</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 设置页面 -->
-                <div id="settings-page" class="page hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold mb-2">设置</h2>
-                        <p class="text-secondary">配置网关全局设置</p>
-                    </div>
-
-                    <div class="card">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                                <h3 class="font-semibold mb-4">基本设置</h3>
+                            <div class="card">
+                                <h3 class="font-semibold mb-4">服务状态</h3>
                                 <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">网关名称</label>
-                                        <input type="text" value="MinGo API Gateway" class="input">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">监听端口</label>
-                                        <input type="number" value="8080" class="input">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">HTTPS端口</label>
-                                        <input type="number" value="8443" class="input">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">最大请求体大小</label>
-                                        <div class="flex items-center space-x-2">
-                                            <input type="number" value="10" class="input">
-                                            <span class="text-secondary">MB</span>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 rounded-full bg-success"></div>
+                                            <span>Service A</span>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 class="font-semibold mb-4">高级设置</h3>
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">健康检查间隔</label>
-                                        <div class="flex items-center space-x-2">
-                                            <input type="number" value="10" class="input">
-                                            <span class="text-secondary">秒</span>
+                                        <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                                            <div class="bg-success h-2 rounded-full" style="width: 95%"></div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">超时时间</label>
-                                        <div class="flex items-center space-x-2">
-                                            <input type="number" value="30" class="input">
-                                            <span class="text-secondary">秒</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium mb-1">日志级别</label>
-                                        <select class="input">
-                                            <option>INFO</option>
-                                            <option>DEBUG</option>
-                                            <option>WARN</option>
-                                            <option>ERROR</option>
-                                        </select>
+                                        <span class="text-sm">95%</span>
                                     </div>
                                     <div class="flex items-center justify-between">
-                                        <label class="text-sm font-medium">启用HTTPS</label>
-                                        <div class="relative inline-block w-10 mr-2 align-middle select-none">
-                                            <input type="checkbox" id="https-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-primary transition-all duration-200" checked>
-                                            <label for="https-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 rounded-full bg-success"></div>
+                                            <span>Service B</span>
                                         </div>
+                                        <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                                            <div class="bg-success h-2 rounded-full" style="width: 92%"></div>
+                                        </div>
+                                        <span class="text-sm">92%</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 rounded-full bg-warning"></div>
+                                            <span>Service C</span>
+                                        </div>
+                                        <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                                            <div class="bg-warning h-2 rounded-full" style="width: 75%"></div>
+                                        </div>
+                                        <span class="text-sm">75%</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 rounded-full bg-success"></div>
+                                            <span>Service D</span>
+                                        </div>
+                                        <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                                            <div class="bg-success h-2 rounded-full" style="width: 98%"></div>
+                                        </div>
+                                        <span class="text-sm">98%</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-6 flex justify-end space-x-2">
-                            <button class="btn btn-secondary">
-                                <i class="fa fa-undo mr-2"></i>重置
-                            </button>
-                            <button class="btn btn-primary">
-                                <i class="fa fa-save mr-2"></i>保存设置
-                            </button>
+
+                        <!-- 最近请求 -->
+                        <div class="card">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold">最近请求</h3>
+                                <button class="btn btn-secondary text-sm py-1">查看全部</button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-gray-200 dark:border-dark-200">
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">时间</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">方法</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">状态码</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">响应时间</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4">2026-02-12 23:45</td>
+                                            <td class="py-3 px-4">/api/users</td>
+                                            <td class="py-3 px-4">GET</td>
+                                            <td class="py-3 px-4"><span class="badge badge-success">200</span></td>
+                                            <td class="py-3 px-4">32ms</td>
+                                        </tr>
+                                        <tr
+                                            class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4">2026-02-12 23:44</td>
+                                            <td class="py-3 px-4">/api/products</td>
+                                            <td class="py-3 px-4">POST</td>
+                                            <td class="py-3 px-4"><span class="badge badge-success">201</span></td>
+                                            <td class="py-3 px-4">45ms</td>
+                                        </tr>
+                                        <tr
+                                            class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4">2026-02-12 23:43</td>
+                                            <td class="py-3 px-4">/api/orders</td>
+                                            <td class="py-3 px-4">GET</td>
+                                            <td class="py-3 px-4"><span class="badge badge-warning">401</span></td>
+                                            <td class="py-3 px-4">18ms</td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4">2026-02-12 23:42</td>
+                                            <td class="py-3 px-4">/api/payments</td>
+                                            <td class="py-3 px-4">POST</td>
+                                            <td class="py-3 px-4"><span class="badge badge-danger">500</span></td>
+                                            <td class="py-3 px-4">120ms</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </main>
+
+                    <!-- 路由管理页面 -->
+                    <div id="routes-page" class="page hidden">
+                        <div class="mb-6 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-2">路由管理</h2>
+                                <p class="text-secondary">配置和管理API路由规则</p>
+                            </div>
+                            <button class="btn btn-primary">
+                                <i class="fa fa-plus mr-2"></i>添加路由
+                            </button>
+                        </div>
+
+                        <div class="card mb-6">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
+                                <div class="relative flex-1 max-w-md">
+                                    <input type="text" placeholder="搜索路由..." class="input pl-10">
+                                    <i
+                                        class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <select class="input py-1">
+                                        <option>所有状态</option>
+                                        <option>启用</option>
+                                        <option>禁用</option>
+                                    </select>
+                                    <button class="btn btn-secondary">
+                                        <i class="fa fa-filter mr-2"></i>筛选
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-gray-200 dark:border-dark-200">
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">路由名称</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">集群</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
+                                            <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4 font-medium">用户服务路由</td>
+                                            <td class="py-3 px-4">/api/users/{*path}</td>
+                                            <td class="py-3 px-4">user-cluster</td>
+                                            <td class="py-3 px-4"><span class="badge badge-success">启用</span></td>
+                                            <td class="py-3 px-4">
+                                                <div class="flex space-x-2">
+                                                    <button class="text-primary hover:text-primary/80"><i
+                                                            class="fa fa-edit"></i></button>
+                                                    <button class="text-danger hover:text-danger/80"><i
+                                                            class="fa fa-trash"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr
+                                            class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4 font-medium">产品服务路由</td>
+                                            <td class="py-3 px-4">/api/products/{*path}</td>
+                                            <td class="py-3 px-4">product-cluster</td>
+                                            <td class="py-3 px-4"><span class="badge badge-success">启用</span></td>
+                                            <td class="py-3 px-4">
+                                                <div class="flex space-x-2">
+                                                    <button class="text-primary hover:text-primary/80"><i
+                                                            class="fa fa-edit"></i></button>
+                                                    <button class="text-danger hover:text-danger/80"><i
+                                                            class="fa fa-trash"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                                            <td class="py-3 px-4 font-medium">订单服务路由</td>
+                                            <td class="py-3 px-4">/api/orders/{*path}</td>
+                                            <td class="py-3 px-4">order-cluster</td>
+                                            <td class="py-3 px-4"><span class="badge badge-warning">禁用</span></td>
+                                            <td class="py-3 px-4">
+                                                <div class="flex space-x-2">
+                                                    <button class="text-primary hover:text-primary/80"><i
+                                                            class="fa fa-edit"></i></button>
+                                                    <button class="text-danger hover:text-danger/80"><i
+                                                            class="fa fa-trash"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 集群管理页面 -->
+                    <div id="clusters-page" class="page hidden">
+                        <div class="mb-6 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-2">集群管理</h2>
+                                <p class="text-secondary">配置和管理后端服务集群</p>
+                            </div>
+                            <button class="btn btn-primary">
+                                <i class="fa fa-plus mr-2"></i>添加集群
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="card">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-semibold">user-cluster</h3>
+                                    <span class="badge badge-success">健康</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">User Service 1</p>
+                                            <p class="text-sm text-secondary">http://localhost:5001</p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="badge badge-success">在线</span>
+                                            <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                                                <i class="fa fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">User Service 2</p>
+                                            <p class="text-sm text-secondary">http://localhost:5002</p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="badge badge-success">在线</span>
+                                            <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                                                <i class="fa fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-end space-x-2">
+                                    <button class="btn btn-secondary">
+                                        <i class="fa fa-edit mr-2"></i>编辑
+                                    </button>
+                                    <button class="btn btn-primary">
+                                        <i class="fa fa-plus mr-2"></i>添加目标
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-semibold">product-cluster</h3>
+                                    <span class="badge badge-success">健康</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">Product Service 1</p>
+                                            <p class="text-sm text-secondary">http://localhost:6001</p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="badge badge-success">在线</span>
+                                            <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                                                <i class="fa fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">Product Service 2</p>
+                                            <p class="text-sm text-secondary">http://localhost:6002</p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="badge badge-warning">离线</span>
+                                            <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300">
+                                                <i class="fa fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-end space-x-2">
+                                    <button class="btn btn-secondary">
+                                        <i class="fa fa-edit mr-2"></i>编辑
+                                    </button>
+                                    <button class="btn btn-primary">
+                                        <i class="fa fa-plus mr-2"></i>添加目标
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 安全管理页面 -->
+                    <div id="security-page" class="page hidden">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold mb-2">安全管理</h2>
+                            <p class="text-secondary">配置和管理安全策略</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="card">
+                                <h3 class="font-semibold mb-4">API密钥管理</h3>
+                                <div class="space-y-4">
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">service-api-key</p>
+                                            <p class="text-sm text-secondary">服务调用密钥</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">过期时间: 2026-12-31
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="text-primary hover:text-primary/80 text-sm">
+                                                <i class="fa fa-refresh mr-1"></i>刷新
+                                            </button>
+                                            <button class="text-danger hover:text-danger/80 text-sm">
+                                                <i class="fa fa-trash mr-1"></i>删除
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <div>
+                                            <p class="font-medium">client-api-key</p>
+                                            <p class="text-sm text-secondary">客户端调用密钥</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">过期时间: 2026-06-30
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button class="text-primary hover:text-primary/80 text-sm">
+                                                <i class="fa fa-refresh mr-1"></i>刷新
+                                            </button>
+                                            <button class="text-danger hover:text-danger/80 text-sm">
+                                                <i class="fa fa-trash mr-1"></i>删除
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <button class="btn btn-primary w-full">
+                                        <i class="fa fa-plus mr-2"></i>生成新API密钥
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <h3 class="font-semibold mb-4">IP访问控制</h3>
+                                <div class="space-y-6">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="font-medium">IP白名单</h4>
+                                            <button class="text-primary hover:text-primary/80 text-sm">
+                                                <i class="fa fa-plus mr-1"></i>添加
+                                            </button>
+                                        </div>
+                                        <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                            <p class="text-sm">192.168.1.0/24</p>
+                                            <p class="text-sm mt-1">10.0.0.1</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="font-medium">IP黑名单</h4>
+                                            <button class="text-primary hover:text-primary/80 text-sm">
+                                                <i class="fa fa-plus mr-1"></i>添加
+                                            </button>
+                                        </div>
+                                        <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                            <p class="text-sm">172.16.0.1</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card lg:col-span-2">
+                                <h3 class="font-semibold mb-4">速率限制</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <h4 class="font-medium mb-2">全局限制</h4>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">请求/秒</label>
+                                                <input type="number" value="1000" class="input">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">并发连接</label>
+                                                <input type="number" value="500" class="input">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <h4 class="font-medium mb-2">按IP限制</h4>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">请求/秒</label>
+                                                <input type="number" value="100" class="input">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">并发连接</label>
+                                                <input type="number" value="50" class="input">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                                        <h4 class="font-medium mb-2">按API密钥限制</h4>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">请求/秒</label>
+                                                <input type="number" value="50" class="input">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-secondary mb-1">并发连接</label>
+                                                <input type="number" value="25" class="input">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-end">
+                                    <button class="btn btn-primary">
+                                        <i class="fa fa-save mr-2"></i>保存配置
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 监控页面 -->
+                    <div id="monitoring-page" class="page hidden">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold mb-2">监控</h2>
+                            <p class="text-secondary">查看网关运行指标和告警</p>
+                        </div>
+
+                        <div class="card mb-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold">系统指标</h3>
+                                <div class="flex space-x-2">
+                                    <select class="input py-1">
+                                        <option>最近1小时</option>
+                                        <option>最近6小时</option>
+                                        <option>最近24小时</option>
+                                        <option>最近7天</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div
+                                    class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+                                    <p class="text-secondary">请求量趋势图表</p>
+                                </div>
+                                <div
+                                    class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+                                    <p class="text-secondary">响应时间趋势图表</p>
+                                </div>
+                                <div
+                                    class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+                                    <p class="text-secondary">错误率趋势图表</p>
+                                </div>
+                                <div
+                                    class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+                                    <p class="text-secondary">系统资源使用图表</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="font-semibold mb-4">告警记录</h3>
+                            <div class="space-y-4">
+                                <div class="p-4 border-l-4 border-danger bg-danger/5 dark:bg-danger/10 rounded-r-lg">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="font-medium">服务不可用</h4>
+                                        <span class="text-sm text-secondary">2026-02-12 23:00</span>
+                                    </div>
+                                    <p class="text-sm mt-1">订单服务(order-cluster)健康检查失败</p>
+                                    <div class="mt-2 flex space-x-2">
+                                        <button class="text-sm text-primary hover:text-primary/80">
+                                            <i class="fa fa-eye mr-1"></i>查看详情
+                                        </button>
+                                        <button
+                                            class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
+                                            <i class="fa fa-check mr-1"></i>标记已处理
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-l-4 border-warning bg-warning/5 dark:bg-warning/10 rounded-r-lg">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="font-medium">速率限制触发</h4>
+                                        <span class="text-sm text-secondary">2026-02-12 22:30</span>
+                                    </div>
+                                    <p class="text-sm mt-1">IP 192.168.1.100 触发速率限制</p>
+                                    <div class="mt-2 flex space-x-2">
+                                        <button class="text-sm text-primary hover:text-primary/80">
+                                            <i class="fa fa-eye mr-1"></i>查看详情
+                                        </button>
+                                        <button
+                                            class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
+                                            <i class="fa fa-check mr-1"></i>标记已处理
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-l-4 border-success bg-success/5 dark:bg-success/10 rounded-r-lg">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="font-medium">服务恢复</h4>
+                                        <span class="text-sm text-secondary">2026-02-12 22:00</span>
+                                    </div>
+                                    <p class="text-sm mt-1">产品服务(product-cluster)健康检查恢复正常</p>
+                                    <div class="mt-2 flex space-x-2">
+                                        <button class="text-sm text-primary hover:text-primary/80">
+                                            <i class="fa fa-eye mr-1"></i>查看详情
+                                        </button>
+                                        <button
+                                            class="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100">
+                                            <i class="fa fa-check mr-1"></i>标记已处理
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 日志页面 -->
+                    <div id="logs-page" class="page hidden">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold mb-2">日志管理</h2>
+                            <p class="text-secondary">查看和分析网关访问日志</p>
+                        </div>
+
+                        <div class="card mb-6">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <div class="relative">
+                                        <input type="text" placeholder="搜索日志..." class="input pl-10">
+                                        <i
+                                            class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                    </div>
+                                    <select class="input">
+                                        <option>所有级别</option>
+                                        <option>INFO</option>
+                                        <option>WARN</option>
+                                        <option>ERROR</option>
+                                        <option>FATAL</option>
+                                    </select>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="btn btn-secondary">
+                                        <i class="fa fa-download mr-2"></i>导出
+                                    </button>
+                                    <button class="btn btn-primary">
+                                        <i class="fa fa-refresh mr-2"></i>刷新
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div
+                                class="bg-gray-50 dark:bg-dark-200 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-sm">
+                                <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:45:30.123 [INFO] GET
+                                    /api/users 200 32ms 192.168.1.100</div>
+                                <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:44:15.678 [INFO] POST
+                                    /api/products 201 45ms 192.168.1.100</div>
+                                <div class="mb-2 text-warning">2026-02-12 23:43:02.345 [WARN] GET /api/orders 401 18ms
+                                    192.168.1.100</div>
+                                <div class="mb-2 text-danger">2026-02-12 23:42:45.987 [ERROR] POST /api/payments 500
+                                    120ms 192.168.1.100</div>
+                                <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:41:23.456 [INFO] GET
+                                    /api/users/1 200 25ms 192.168.1.101</div>
+                                <div class="mb-2 text-gray-600 dark:text-gray-400">2026-02-12 23:40:11.789 [INFO] PUT
+                                    /api/users/1 200 38ms 192.168.1.101</div>
+                                <div class="mb-2 text-warning">2026-02-12 23:39:55.234 [WARN] GET /api/products/999 404
+                                    12ms 192.168.1.102</div>
+                                <div class="mb-2 text-danger">2026-02-12 23:38:33.567 [ERROR] POST /api/orders 500 95ms
+                                    192.168.1.102</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 设置页面 -->
+                    <div id="settings-page" class="page hidden">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-bold mb-2">设置</h2>
+                            <p class="text-secondary">配置网关全局设置</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div>
+                                    <h3 class="font-semibold mb-4">基本设置</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">网关名称</label>
+                                            <input type="text" value="MinGo API Gateway" class="input">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">监听端口</label>
+                                            <input type="number" value="8080" class="input">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">HTTPS端口</label>
+                                            <input type="number" value="8443" class="input">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">最大请求体大小</label>
+                                            <div class="flex items-center space-x-2">
+                                                <input type="number" value="10" class="input">
+                                                <span class="text-secondary">MB</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="font-semibold mb-4">高级设置</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">健康检查间隔</label>
+                                            <div class="flex items-center space-x-2">
+                                                <input type="number" value="10" class="input">
+                                                <span class="text-secondary">秒</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">超时时间</label>
+                                            <div class="flex items-center space-x-2">
+                                                <input type="number" value="30" class="input">
+                                                <span class="text-secondary">秒</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">日志级别</label>
+                                            <select class="input">
+                                                <option>INFO</option>
+                                                <option>DEBUG</option>
+                                                <option>WARN</option>
+                                                <option>ERROR</option>
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-sm font-medium">启用HTTPS</label>
+                                            <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                                <input type="checkbox" id="https-toggle"
+                                                    class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-primary transition-all duration-200"
+                                                    checked>
+                                                <label for="https-toggle"
+                                                    class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end space-x-2">
+                                <button class="btn btn-secondary">
+                                    <i class="fa fa-undo mr-2"></i>重置
+                                </button>
+                                <button class="btn btn-primary">
+                                    <i class="fa fa-save mr-2"></i>保存设置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
         </div>
-    </div>
 
-    <script>
-        // 深色模式切换
-        const themeToggle = document.getElementById('theme-toggle');
-        const html = document.documentElement;
+        <script>
+            // 深色模式切换
+            const themeToggle = document.getElementById('theme-toggle');
+            const html = document.documentElement;
 
-        // 检查本地存储中的主题设置
-        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            html.classList.add('dark');
-        } else {
-            html.classList.remove('dark');
-        }
+            // 检查本地存储中的主题设置
+            if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
 
-        themeToggle.addEventListener('click', () => {
-            html.classList.toggle('dark');
-            localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
-        });
+            themeToggle.addEventListener('click', () => {
+                html.classList.toggle('dark');
+                localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+            });
 
-        // 侧边栏控制
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarClose = document.getElementById('sidebar-close');
-        const sidebarOverlay = document.getElementById('sidebar-overlay');
+            // 侧边栏控制
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarClose = document.getElementById('sidebar-close');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
 
-        function openSidebar() {
-            sidebar.classList.remove('-translate-x-full');
-            sidebar.classList.add('translate-x-0');
-            sidebarOverlay.classList.remove('hidden');
-        }
+            function openSidebar() {
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                sidebarOverlay.classList.remove('hidden');
+            }
 
-        function closeSidebar() {
-            sidebar.classList.add('-translate-x-full');
-            sidebar.classList.remove('translate-x-0');
-            sidebarOverlay.classList.add('hidden');
-        }
+            function closeSidebar() {
+                sidebar.classList.add('-translate-x-full');
+                sidebar.classList.remove('translate-x-0');
+                sidebarOverlay.classList.add('hidden');
+            }
 
-        if (mobileMenuButton) {
-            mobileMenuButton.addEventListener('click', openSidebar);
-        }
+            if (mobileMenuButton) {
+                mobileMenuButton.addEventListener('click', openSidebar);
+            }
 
-        if (sidebarClose) {
-            sidebarClose.addEventListener('click', closeSidebar);
-        }
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', closeSidebar);
+            }
 
-        if (sidebarOverlay) {
-            sidebarOverlay.addEventListener('click', closeSidebar);
-        }
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', closeSidebar);
+            }
 
-        // 页面导航
-        const sidebarItems = document.querySelectorAll('.sidebar-item');
-        const pages = document.querySelectorAll('.page');
+            // 页面导航
+            const sidebarItems = document.querySelectorAll('.sidebar-item');
+            const pages = document.querySelectorAll('.page');
 
-        sidebarItems.forEach(item => {
-            item.addEventListener('click', () => {
-                const pageId = item.getAttribute('data-page');
-                
-                // 更新侧边栏项目状态
-                sidebarItems.forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                
-                // 在移动设备上点击菜单项后关闭侧边栏
-                closeSidebar();
-                
-                // 显示对应页面
-                pages.forEach(page => {
-                    page.classList.add('hidden');
-                    page.classList.remove('active');
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const pageId = item.getAttribute('data-page');
+
+                    // 更新侧边栏项目状态
+                    sidebarItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+
+                    // 在移动设备上点击菜单项后关闭侧边栏
+                    closeSidebar();
+
+                    // 显示对应页面
+                    pages.forEach(page => {
+                        page.classList.add('hidden');
+                        page.classList.remove('active');
+                    });
+
+                    const targetPage = document.getElementById(`${pageId}-page`);
+                    if (targetPage) {
+                        targetPage.classList.remove('hidden');
+                        targetPage.classList.add('active');
+                    }
                 });
-                
-                const targetPage = document.getElementById(`${pageId}-page`);
-                if (targetPage) {
-                    targetPage.classList.remove('hidden');
-                    targetPage.classList.add('active');
-                }
             });
-        });
 
-        // 响应式处理
-        function handleResize() {
-            // 响应式处理已通过CSS媒体查询实现
-        }
+            // 响应式处理
+            function handleResize() {
+                // 响应式处理已通过CSS媒体查询实现
+            }
 
-        // 窗口大小变化时处理
-        window.addEventListener('resize', handleResize);
+            // 窗口大小变化时处理
+            window.addEventListener('resize', handleResize);
 
-        // 简单的表单交互
-        const inputs = document.querySelectorAll('.input');
-        inputs.forEach(input => {
-            input.addEventListener('focus', () => {
-                input.classList.add('ring-2', 'ring-primary/50');
+            // 简单的表单交互
+            const inputs = document.querySelectorAll('.input');
+            inputs.forEach(input => {
+                input.addEventListener('focus', () => {
+                    input.classList.add('ring-2', 'ring-primary/50');
+                });
+                input.addEventListener('blur', () => {
+                    input.classList.remove('ring-2', 'ring-primary/50');
+                });
             });
-            input.addEventListener('blur', () => {
-                input.classList.remove('ring-2', 'ring-primary/50');
-            });
-        });
 
-        // 按钮悬停效果
-        const buttons = document.querySelectorAll('.btn');
-        buttons.forEach(button => {
-            button.addEventListener('mouseenter', () => {
-                button.classList.add('translate-y-[-1px]');
+            // 按钮悬停效果
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(button => {
+                button.addEventListener('mouseenter', () => {
+                    button.classList.add('translate-y-[-1px]');
+                });
+                button.addEventListener('mouseleave', () => {
+                    button.classList.remove('translate-y-[-1px]');
+                });
             });
-            button.addEventListener('mouseleave', () => {
-                button.classList.remove('translate-y-[-1px]');
-            });
-        });
 
-        // 卡片悬停效果
-        const cards = document.querySelectorAll('.card');
-        cards.forEach(card => {
-            card.addEventListener('mouseenter', () => {
-                card.classList.add('shadow-md');
-                card.classList.add('translate-y-[-2px]');
+            // 卡片悬停效果
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    card.classList.add('shadow-md');
+                    card.classList.add('translate-y-[-2px]');
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.classList.remove('shadow-md');
+                    card.classList.remove('translate-y-[-2px]');
+                });
             });
-            card.addEventListener('mouseleave', () => {
-                card.classList.remove('shadow-md');
-                card.classList.remove('translate-y-[-2px]');
-            });
-        });
-    </script>
+        </script>
 </body>
+
 </html>

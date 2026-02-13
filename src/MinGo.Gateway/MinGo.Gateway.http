@@ -1,0 +1,6 @@
+@MinGo.Gateway_HostAddress = http://localhost:5293
+
+GET {{MinGo.Gateway_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
