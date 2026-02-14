@@ -32,18 +32,24 @@ public interface ILogService
 public interface IApiManagementService
 {
     Task<IEnumerable<MinGo.Shared.Models.RouteConfig>> GetRoutesAsync();
-    Task<MinGo.Shared.Models.RouteConfig> GetRouteAsync(string id);
+    Task<MinGo.Shared.Models.RouteConfig?> GetRouteAsync(string id);
     Task<MinGo.Shared.Models.RouteConfig> CreateRouteAsync(MinGo.Shared.Models.RouteConfig route);
-    Task<MinGo.Shared.Models.RouteConfig> UpdateRouteAsync(string id, MinGo.Shared.Models.RouteConfig route);
+    Task<MinGo.Shared.Models.RouteConfig?> UpdateRouteAsync(string id, MinGo.Shared.Models.RouteConfig route);
     Task DeleteRouteAsync(string id);
 
     Task<IEnumerable<ClusterConfig>> GetClustersAsync();
-    Task<ClusterConfig> GetClusterAsync(string id);
+    Task<ClusterConfig?> GetClusterAsync(string id);
     Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster);
-    Task<ClusterConfig> UpdateClusterAsync(string id, ClusterConfig cluster);
+    Task<ClusterConfig?> UpdateClusterAsync(string id, ClusterConfig cluster);
     Task DeleteClusterAsync(string id);
 
-    Task<ClusterConfig> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
-    Task<ClusterConfig> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
-    Task<ClusterConfig> RemoveDestinationAsync(string clusterId, string destinationId);
+    Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig?> RemoveDestinationAsync(string clusterId, string destinationId);
+
+    Task<IEnumerable<CertificateConfig>> GetCertificatesAsync();
+    Task<CertificateConfig?> GetCertificateAsync(string id);
+    Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate);
+    Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate);
+    Task DeleteCertificateAsync(string id);
 }

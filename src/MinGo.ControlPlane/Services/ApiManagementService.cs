@@ -7,12 +7,14 @@ public class ApiManagementService : IApiManagementService
     private readonly ILogger<ApiManagementService> _logger;
     private readonly Dictionary<string, MinGo.Shared.Models.RouteConfig> _routes;
     private readonly Dictionary<string, ClusterConfig> _clusters;
+    private readonly Dictionary<string, CertificateConfig> _certificates;
 
     public ApiManagementService(ILogger<ApiManagementService> logger)
     {
         _logger = logger;
         _routes = new Dictionary<string, MinGo.Shared.Models.RouteConfig>();
         _clusters = new Dictionary<string, ClusterConfig>();
+        _certificates = new Dictionary<string, CertificateConfig>();
         
         InitializeSampleData();
     }
@@ -22,10 +24,10 @@ public class ApiManagementService : IApiManagementService
         return Task.FromResult<IEnumerable<MinGo.Shared.Models.RouteConfig>>(_routes.Values);
     }
 
-    public Task<MinGo.Shared.Models.RouteConfig> GetRouteAsync(string id)
+    public Task<MinGo.Shared.Models.RouteConfig?> GetRouteAsync(string id)
     {
         _routes.TryGetValue(id, out var route);
-        return Task.FromResult(route ?? new MinGo.Shared.Models.RouteConfig());
+        return Task.FromResult(route);
     }
 
     public Task<MinGo.Shared.Models.RouteConfig> CreateRouteAsync(MinGo.Shared.Models.RouteConfig route)
@@ -37,17 +39,17 @@ public class ApiManagementService : IApiManagementService
         return Task.FromResult(route);
     }
 
-    public Task<MinGo.Shared.Models.RouteConfig> UpdateRouteAsync(string id, MinGo.Shared.Models.RouteConfig route)
+    public Task<MinGo.Shared.Models.RouteConfig?> UpdateRouteAsync(string id, MinGo.Shared.Models.RouteConfig route)
     {
         if (_routes.ContainsKey(id))
         {
             route.Id = id;
             _routes[id] = route;
             _logger.LogInformation("Updated route: {RouteId}", id);
-            return Task.FromResult(route);
+            return Task.FromResult<MinGo.Shared.Models.RouteConfig?>(route);
         }
         
-        return Task.FromResult(new MinGo.Shared.Models.RouteConfig());
+        return Task.FromResult<MinGo.Shared.Models.RouteConfig?>(null);
     }
 
     public Task DeleteRouteAsync(string id)
@@ -64,10 +66,10 @@ public class ApiManagementService : IApiManagementService
         return Task.FromResult<IEnumerable<ClusterConfig>>(_clusters.Values);
     }
 
-    public Task<ClusterConfig> GetClusterAsync(string id)
+    public Task<ClusterConfig?> GetClusterAsync(string id)
     {
         _clusters.TryGetValue(id, out var cluster);
-        return Task.FromResult(cluster ?? new ClusterConfig());
+        return Task.FromResult(cluster);
     }
 
     public Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster)
@@ -79,17 +81,17 @@ public class ApiManagementService : IApiManagementService
         return Task.FromResult(cluster);
     }
 
-    public Task<ClusterConfig> UpdateClusterAsync(string id, ClusterConfig cluster)
+    public Task<ClusterConfig?> UpdateClusterAsync(string id, ClusterConfig cluster)
     {
         if (_clusters.ContainsKey(id))
         {
             cluster.Id = id;
             _clusters[id] = cluster;
             _logger.LogInformation("Updated cluster: {ClusterId}", id);
-            return Task.FromResult(cluster);
+            return Task.FromResult<ClusterConfig?>(cluster);
         }
         
-        return Task.FromResult(new ClusterConfig());
+        return Task.FromResult<ClusterConfig?>(null);
     }
 
     public Task DeleteClusterAsync(string id)
@@ -101,36 +103,36 @@ public class ApiManagementService : IApiManagementService
         return Task.CompletedTask;
     }
 
-    public Task<ClusterConfig> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
+    public Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
         if (_clusters.TryGetValue(clusterId, out var cluster))
         {
             cluster.Destinations[destinationId] = destination;
             _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", destinationId, clusterId);
-            return Task.FromResult(cluster);
+            return Task.FromResult<ClusterConfig?>(cluster);
         }
-        return Task.FromResult(new ClusterConfig());
+        return Task.FromResult<ClusterConfig?>(null);
     }
 
-    public Task<ClusterConfig> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
+    public Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
         if (_clusters.TryGetValue(clusterId, out var cluster) && cluster.Destinations.ContainsKey(destinationId))
         {
             cluster.Destinations[destinationId] = destination;
             _logger.LogInformation("Updated destination {DestinationId} in cluster {ClusterId}", destinationId, clusterId);
-            return Task.FromResult(cluster);
+            return Task.FromResult<ClusterConfig?>(cluster);
         }
-        return Task.FromResult(new ClusterConfig());
+        return Task.FromResult<ClusterConfig?>(null);
     }
 
-    public Task<ClusterConfig> RemoveDestinationAsync(string clusterId, string destinationId)
+    public Task<ClusterConfig?> RemoveDestinationAsync(string clusterId, string destinationId)
     {
         if (_clusters.TryGetValue(clusterId, out var cluster) && cluster.Destinations.Remove(destinationId))
         {
             _logger.LogInformation("Removed destination {DestinationId} from cluster {ClusterId}", destinationId, clusterId);
-            return Task.FromResult(cluster);
+            return Task.FromResult<ClusterConfig?>(cluster);
         }
-        return Task.FromResult(new ClusterConfig());
+        return Task.FromResult<ClusterConfig?>(null);
     }
 
     private void InitializeSampleData()
@@ -214,5 +216,74 @@ public class ApiManagementService : IApiManagementService
                 }
             }
         };
+
+        _certificates["cert1"] = new CertificateConfig
+        {
+            Id = "cert1",
+            DomainName = "api.example.com",
+            CertificateType = "Pfx",
+            CreatedAt = DateTimeOffset.Now.AddMonths(-3),
+            ExpiresAt = DateTimeOffset.Now.AddMonths(9),
+            Subject = "CN=api.example.com",
+            Issuer = "Let's Encrypt Authority X3",
+            Thumbprint = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+            IsValid = true
+        };
+
+        _certificates["cert2"] = new CertificateConfig
+        {
+            Id = "cert2",
+            DomainName = "admin.example.com",
+            CertificateType = "Pfx",
+            CreatedAt = DateTimeOffset.Now.AddMonths(-6),
+            ExpiresAt = DateTimeOffset.Now.AddMonths(6),
+            Subject = "CN=admin.example.com",
+            Issuer = "Let's Encrypt Authority X3",
+            Thumbprint = "f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1",
+            IsValid = true
+        };
+    }
+
+    public Task<IEnumerable<CertificateConfig>> GetCertificatesAsync()
+    {
+        return Task.FromResult<IEnumerable<CertificateConfig>>(_certificates.Values);
+    }
+
+    public Task<CertificateConfig?> GetCertificateAsync(string id)
+    {
+        _certificates.TryGetValue(id, out var certificate);
+        return Task.FromResult(certificate);
+    }
+
+    public Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate)
+    {
+        var certificateId = Guid.NewGuid().ToString();
+        certificate.Id = certificateId;
+        certificate.CreatedAt = DateTimeOffset.Now;
+        _certificates[certificateId] = certificate;
+        _logger.LogInformation("Created certificate: {CertificateId} for domain {DomainName}", certificateId, certificate.DomainName);
+        return Task.FromResult(certificate);
+    }
+
+    public Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate)
+    {
+        if (_certificates.ContainsKey(id))
+        {
+            certificate.Id = id;
+            _certificates[id] = certificate;
+            _logger.LogInformation("Updated certificate: {CertificateId}", id);
+            return Task.FromResult<CertificateConfig?>(certificate);
+        }
+        
+        return Task.FromResult<CertificateConfig?>(null);
+    }
+
+    public Task DeleteCertificateAsync(string id)
+    {
+        if (_certificates.Remove(id))
+        {
+            _logger.LogInformation("Deleted certificate: {CertificateId}", id);
+        }
+        return Task.CompletedTask;
     }
 }

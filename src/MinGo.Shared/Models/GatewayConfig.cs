@@ -114,3 +114,18 @@ public class MonitoringConfig
     public string MetricsEndpoint { get; set; } = "/metrics";
     public string LogLevel { get; set; } = "Information";
 }
+
+public class CertificateConfig
+{
+    public string Id { get; set; } = string.Empty;
+    public string DomainName { get; set; } = string.Empty;
+    public string CertificateType { get; set; } = "Pfx";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public string? Subject { get; set; }
+    public string? Issuer { get; set; }
+    public string Thumbprint { get; set; } = string.Empty;
+    public bool IsValid { get; set; } = true;
+    public byte[]? CertificateData { get; set; }
+    public string? Password { get; set; }
+}

@@ -17,6 +17,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<IConfigService, ConfigService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
