@@ -14,6 +14,8 @@ public class GatewayConfig
 
 public class RouteConfig
 {
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public string ClusterId { get; set; } = string.Empty;
     public RouteMatch Match { get; set; } = new();
     public RouteTransforms Transforms { get; set; } = new();
@@ -35,6 +37,8 @@ public class RouteTransforms
 
 public class ClusterConfig
 {
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public Dictionary<string, DestinationConfig> Destinations { get; set; } = new();
     public string LoadBalancingPolicy { get; set; } = "RoundRobin";
     public HealthCheckConfig HealthCheck { get; set; } = new();

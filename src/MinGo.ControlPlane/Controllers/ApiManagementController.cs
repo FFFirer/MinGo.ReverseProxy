@@ -121,4 +121,45 @@ public class ClustersController : ControllerBase
         await _apiManagementService.DeleteClusterAsync(id);
         return NoContent();
     }
+
+    [HttpPost("{clusterId}/destinations")]
+    public async Task<ActionResult<ClusterConfig>> AddDestination(
+        string clusterId,
+        [FromQuery] string destinationId,
+        [FromBody] DestinationConfig destination)
+    {
+        var cluster = await _apiManagementService.AddDestinationAsync(clusterId, destinationId, destination);
+        if (cluster == null || string.IsNullOrEmpty(cluster.Id))
+        {
+            return NotFound();
+        }
+        return Ok(cluster);
+    }
+
+    [HttpPut("{clusterId}/destinations/{destinationId}")]
+    public async Task<ActionResult<ClusterConfig>> UpdateDestination(
+        string clusterId,
+        string destinationId,
+        [FromBody] DestinationConfig destination)
+    {
+        var cluster = await _apiManagementService.UpdateDestinationAsync(clusterId, destinationId, destination);
+        if (cluster == null || string.IsNullOrEmpty(cluster.Id))
+        {
+            return NotFound();
+        }
+        return Ok(cluster);
+    }
+
+    [HttpDelete("{clusterId}/destinations/{destinationId}")]
+    public async Task<ActionResult<ClusterConfig>> DeleteDestination(
+        string clusterId,
+        string destinationId)
+    {
+        var cluster = await _apiManagementService.RemoveDestinationAsync(clusterId, destinationId);
+        if (cluster == null || string.IsNullOrEmpty(cluster.Id))
+        {
+            return NotFound();
+        }
+        return Ok(cluster);
+    }
 }

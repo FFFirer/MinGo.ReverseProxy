@@ -42,4 +42,8 @@ public interface IApiManagementService
     Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster);
     Task<ClusterConfig> UpdateClusterAsync(string id, ClusterConfig cluster);
     Task DeleteClusterAsync(string id);
+
+    Task<ClusterConfig> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig> RemoveDestinationAsync(string clusterId, string destinationId);
 }
