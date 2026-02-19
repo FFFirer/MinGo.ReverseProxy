@@ -45,6 +45,8 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAntiforgery();
+
 app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");

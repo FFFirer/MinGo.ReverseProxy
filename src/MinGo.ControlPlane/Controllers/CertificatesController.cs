@@ -43,6 +43,32 @@ public class CertificatesController : ControllerBase
         return CreatedAtAction(nameof(GetCertificate), new { id = created.Id }, created);
     }
 
+    [HttpPost("parse-domain")]
+    public async Task<ActionResult<string>> ParseCertificateDomain(
+        IFormFile certificateFile,
+        [FromForm] string? password = null)
+    {
+        if (certificateFile == null || certificateFile.Length == 0)
+        {
+            return BadRequest("请选择证书文件");
+        }
+
+        using var memoryStream = new MemoryStream();
+        await certificateFile.CopyToAsync(memoryStream);
+        var certificateData = memoryStream.ToArray();
+
+        try
+        {
+            var domainName = ExtractDomainFromCertificate(certificateData, password);
+            return Ok(domainName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "解析证书域名失败");
+            return BadRequest($"证书解析失败: {ex.Message}");
+        }
+    }
+
     [HttpPost("upload")]
     public async Task<ActionResult<CertificateConfig>> UploadCertificate(
         IFormFile certificateFile,
@@ -92,6 +118,36 @@ public class CertificatesController : ControllerBase
     {
         await _apiManagementService.DeleteCertificateAsync(id);
         return NoContent();
+    }
+
+    private string ExtractDomainFromCertificate(byte[] certificateData, string? password)
+    {
+        X509Certificate2 certificate;
+
+        if (!string.IsNullOrEmpty(password))
+        {
+            certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12(certificateData, password, X509KeyStorageFlags.Exportable);
+        }
+        else
+        {
+            try
+            {
+                certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12(certificateData, (string?)null, X509KeyStorageFlags.Exportable);
+            }
+            catch
+            {
+                certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificateData);
+            }
+        }
+
+        var subject = certificate.Subject;
+        var cnMatch = System.Text.RegularExpressions.Regex.Match(subject, @"CN=([^,]+)");
+        if (cnMatch.Success)
+        {
+            return cnMatch.Groups[1].Value.Trim();
+        }
+
+        return string.Empty;
     }
 
     private CertificateConfig ParseCertificate(byte[] certificateData, string? password, string domainName)
