@@ -13,6 +13,16 @@ public class ApiDbService : IApiDbService
     private readonly ILogger<ApiDbService> _logger;
 
     /// <summary>
+    /// 路由变更事件
+    /// </summary>
+    public event Func<Task>? RoutesChanged;
+
+    /// <summary>
+    /// 集群变更事件
+    /// </summary>
+    public event Func<Task>? ClustersChanged;
+
+    /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="dbContext">数据库上下文</param>
@@ -60,6 +70,13 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created route: {RouteId}", entity.Id);
+        
+        // 触发路由变更事件
+        if (RoutesChanged != null)
+        {
+            await RoutesChanged();
+        }
+        
         return MapToRouteModel(entity);
     }
 
@@ -87,6 +104,12 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated route: {RouteId}", id);
 
+        // 触发路由变更事件
+        if (RoutesChanged != null)
+        {
+            await RoutesChanged();
+        }
+
         return MapToRouteModel(existing);
     }
 
@@ -102,6 +125,12 @@ public class ApiDbService : IApiDbService
             _dbContext.Routes.Remove(route);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted route: {RouteId}", id);
+            
+            // 触发路由变更事件
+            if (RoutesChanged != null)
+            {
+                await RoutesChanged();
+            }
         }
     }
 
@@ -161,6 +190,13 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created cluster: {ClusterId}", entity.Id);
+        
+        // 触发集群变更事件
+        if (ClustersChanged != null)
+        {
+            await ClustersChanged();
+        }
+        
         return MapToClusterModel(entity);
     }
 
@@ -208,6 +244,12 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated cluster: {ClusterId}", id);
 
+        // 触发集群变更事件
+        if (ClustersChanged != null)
+        {
+            await ClustersChanged();
+        }
+
         return MapToClusterModel(existing);
     }
 
@@ -223,6 +265,12 @@ public class ApiDbService : IApiDbService
             _dbContext.Clusters.Remove(cluster);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted cluster: {ClusterId}", id);
+            
+            // 触发集群变更事件
+            if (ClustersChanged != null)
+            {
+                await ClustersChanged();
+            }
         }
     }
 
@@ -259,6 +307,12 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", destinationId, clusterId);
 
+        // 触发集群变更事件
+        if (ClustersChanged != null)
+        {
+            await ClustersChanged();
+        }
+
         return MapToClusterModel(cluster);
     }
 
@@ -293,6 +347,12 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated destination {DestinationId} in cluster {ClusterId}", destinationId, clusterId);
 
+        // 触发集群变更事件
+        if (ClustersChanged != null)
+        {
+            await ClustersChanged();
+        }
+
         return MapToClusterModel(cluster);
     }
 
@@ -323,6 +383,12 @@ public class ApiDbService : IApiDbService
 
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Removed destination {DestinationId} from cluster {ClusterId}", destinationId, clusterId);
+
+        // 触发集群变更事件
+        if (ClustersChanged != null)
+        {
+            await ClustersChanged();
+        }
 
         return MapToClusterModel(cluster);
     }
@@ -685,6 +751,16 @@ public class ApiDbService : IApiDbService
 /// </summary>
 public interface IApiDbService
 {
+    /// <summary>
+    /// 路由变更事件
+    /// </summary>
+    event Func<Task>? RoutesChanged;
+
+    /// <summary>
+    /// 集群变更事件
+    /// </summary>
+    event Func<Task>? ClustersChanged;
+
     /// <summary>
     /// 获取所有路由
     /// </summary>

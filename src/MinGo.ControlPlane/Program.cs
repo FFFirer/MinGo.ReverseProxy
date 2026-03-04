@@ -37,6 +37,10 @@ builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
 
+// 注册配置更新服务
+builder.Services.AddHostedService<ConfigUpdateService>();
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // 初始化数据库
