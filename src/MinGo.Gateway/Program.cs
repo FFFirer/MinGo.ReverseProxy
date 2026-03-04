@@ -4,8 +4,15 @@ using Microsoft.Extensions.Primitives;
 using Microsoft.Extensions.Options;
 using MinGo.Gateway.Options;
 using MinGo.Gateway.Services;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+.ReadFrom.Configuration(builder.Configuration)
+.CreateLogger();
+
+builder.Host.UseSerilog();
 
 // 配置反向代理，使用内存配置提供程序
 var configuration = new ConfigurationManager();

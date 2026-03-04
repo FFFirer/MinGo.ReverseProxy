@@ -24,6 +24,10 @@ public class EventsController : ControllerBase
     {
         try
         {
+            _logger.LogDebug("接收到事件: EventId={EventId}, EventType={EventType}, Priority={Priority}", 
+                gatewayEvent.EventId, gatewayEvent.EventType, gatewayEvent.Priority);
+            _logger.LogDebug("事件数据: {EventData}", gatewayEvent.EventData);
+            
             // 处理事件
             await ProcessEventAsync(gatewayEvent);
 
@@ -35,10 +39,13 @@ public class EventsController : ControllerBase
                 InstanceId = Environment.MachineName // 使用机器名作为实例ID
             };
 
+            _logger.LogDebug("事件处理成功，返回响应: {Response}", JsonSerializer.Serialize(response));
             return Ok(response);
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "事件处理失败: {EventId}", gatewayEvent.EventId);
+            
             // 返回错误响应
             var response = new GatewayEventResponse
             {
@@ -48,6 +55,7 @@ public class EventsController : ControllerBase
                 InstanceId = Environment.MachineName
             };
 
+            _logger.LogDebug("返回错误响应: {Response}", JsonSerializer.Serialize(response));
             return BadRequest(response);
         }
     }

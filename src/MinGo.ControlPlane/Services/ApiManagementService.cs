@@ -7,11 +7,13 @@ public class ApiManagementService : IApiManagementService
 {
     private readonly ILogger<ApiManagementService> _logger;
     private readonly IApiDbService _apiDbService;
+    private readonly IGatewayEventService _gatewayEventService;
 
-    public ApiManagementService(ILogger<ApiManagementService> logger, IApiDbService apiDbService)
+    public ApiManagementService(ILogger<ApiManagementService> logger, IApiDbService apiDbService, IGatewayEventService gatewayEventService)
     {
         _logger = logger;
         _apiDbService = apiDbService;
+        _gatewayEventService = gatewayEventService;
         
         // 初始化示例数据
         _ = InitializeSampleDataAsync();
@@ -29,17 +31,22 @@ public class ApiManagementService : IApiManagementService
 
     public async Task<RouteConfig> CreateRouteAsync(RouteConfig route)
     {
-        return await _apiDbService.CreateRouteAsync(route);
+        var result = await _apiDbService.CreateRouteAsync(route);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<RouteConfig?> UpdateRouteAsync(string id, RouteConfig route)
     {
-        return await _apiDbService.UpdateRouteAsync(id, route);
+        var result = await _apiDbService.UpdateRouteAsync(id, route);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task DeleteRouteAsync(string id)
     {
         await _apiDbService.DeleteRouteAsync(id);
+        await NotifyGatewayConfigChangeAsync();
     }
 
     public async Task<IEnumerable<ClusterConfig>> GetClustersAsync()
@@ -54,37 +61,66 @@ public class ApiManagementService : IApiManagementService
 
     public async Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster)
     {
-        return await _apiDbService.CreateClusterAsync(cluster);
+        var result = await _apiDbService.CreateClusterAsync(cluster);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<ClusterConfig?> UpdateClusterAsync(string id, ClusterConfig cluster)
     {
-        return await _apiDbService.UpdateClusterAsync(id, cluster);
+        var result = await _apiDbService.UpdateClusterAsync(id, cluster);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task DeleteClusterAsync(string id)
     {
         await _apiDbService.DeleteClusterAsync(id);
+        await NotifyGatewayConfigChangeAsync();
     }
 
     public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
-        return await _apiDbService.AddDestinationAsync(clusterId, destinationId, destination);
+        var result = await _apiDbService.AddDestinationAsync(clusterId, destinationId, destination);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
-        return await _apiDbService.UpdateDestinationAsync(clusterId, destinationId, destination);
+        var result = await _apiDbService.UpdateDestinationAsync(clusterId, destinationId, destination);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<ClusterConfig?> RemoveDestinationAsync(string clusterId, string destinationId)
     {
-        return await _apiDbService.RemoveDestinationAsync(clusterId, destinationId);
+        var result = await _apiDbService.RemoveDestinationAsync(clusterId, destinationId);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     private async Task InitializeSampleDataAsync()
     {
         await _apiDbService.InitializeSampleDataAsync();
+    }
+
+    /// <summary>
+    /// 通知网关配置变更
+    /// </summary>
+    /// <returns>任务</returns>
+    private async Task NotifyGatewayConfigChangeAsync()
+    {
+        try
+        {
+            // 发送事件到所有网关实例
+            await _gatewayEventService.SendEventToAllInstancesAsync(GatewayEventType.ConfigUpdate, "{}", 1);
+            _logger.LogInformation("Sent config update notification to all gateways");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify gateway of config change");
+        }
     }
 
     public async Task<IEnumerable<CertificateConfig>> GetCertificatesAsync()

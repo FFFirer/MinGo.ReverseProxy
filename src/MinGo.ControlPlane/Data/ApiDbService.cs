@@ -11,48 +11,20 @@ namespace MinGo.ControlPlane.Data;
 public class ApiDbService : IApiDbService
 {
     private readonly ApiDbContext _dbContext;
-    private readonly IGatewayEventSender _gatewayEventSender;
     private readonly ILogger<ApiDbService> _logger;
 
     /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="dbContext">数据库上下文</param>
-    /// <param name="gatewayEventSender">网关事件发送器</param>
     /// <param name="logger">日志记录器</param>
-    public ApiDbService(ApiDbContext dbContext, IGatewayEventSender gatewayEventSender, ILogger<ApiDbService> logger)
+    public ApiDbService(ApiDbContext dbContext, ILogger<ApiDbService> logger)
     {
         _dbContext = dbContext;
-        _gatewayEventSender = gatewayEventSender;
         _logger = logger;
     }
 
-    /// <summary>
-    /// 通知网关配置变更
-    /// </summary>
-    /// <returns>任务</returns>
-    private async Task NotifyGatewayConfigChangeAsync()
-    {
-        try
-        {
-            // 创建配置更新事件
-            var gatewayEvent = new GatewayEvent
-            {
-                EventType = GatewayEventType.ConfigUpdate,
-                EventData = "{}", // 空数据，网关会自行拉取最新配置
-                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
-                Priority = 1
-            };
 
-            // 发送事件
-            await _gatewayEventSender.SendEventAsync(gatewayEvent);
-            _logger.LogInformation("Sent config update notification to gateway");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to notify gateway of config change");
-        }
-    }
 
 
 
@@ -94,9 +66,6 @@ public class ApiDbService : IApiDbService
 
         _logger.LogInformation("Created route: {RouteId}", entity.Id);
         
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-        
         return MapToRouteModel(entity);
     }
 
@@ -124,9 +93,6 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated route: {RouteId}", id);
 
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-
         return MapToRouteModel(existing);
     }
 
@@ -142,9 +108,6 @@ public class ApiDbService : IApiDbService
             _dbContext.Routes.Remove(route);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted route: {RouteId}", id);
-            
-            // 通知网关配置变更
-            await NotifyGatewayConfigChangeAsync();
         }
     }
 
@@ -205,9 +168,6 @@ public class ApiDbService : IApiDbService
 
         _logger.LogInformation("Created cluster: {ClusterId}", entity.Id);
         
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-        
         return MapToClusterModel(entity);
     }
 
@@ -255,9 +215,6 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated cluster: {ClusterId}", id);
 
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-
         return MapToClusterModel(existing);
     }
 
@@ -273,9 +230,6 @@ public class ApiDbService : IApiDbService
             _dbContext.Clusters.Remove(cluster);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted cluster: {ClusterId}", id);
-            
-            // 通知网关配置变更
-            await NotifyGatewayConfigChangeAsync();
         }
     }
 
@@ -312,9 +266,6 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", destinationId, clusterId);
 
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-
         return MapToClusterModel(cluster);
     }
 
@@ -349,9 +300,6 @@ public class ApiDbService : IApiDbService
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated destination {DestinationId} in cluster {ClusterId}", destinationId, clusterId);
 
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
-
         return MapToClusterModel(cluster);
     }
 
@@ -382,9 +330,6 @@ public class ApiDbService : IApiDbService
 
         await _dbContext.SaveChangesAsync();
         _logger.LogInformation("Removed destination {DestinationId} from cluster {ClusterId}", destinationId, clusterId);
-
-        // 通知网关配置变更
-        await NotifyGatewayConfigChangeAsync();
 
         return MapToClusterModel(cluster);
     }
