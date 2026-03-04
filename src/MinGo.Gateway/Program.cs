@@ -1,6 +1,7 @@
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 using Microsoft.Extensions.Primitives;
+using MinGo.Gateway.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,12 @@ builder.Services.AddReverseProxy()
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
 builder.Services.AddSingleton(proxyConfig);
+
+// 添加HTTP客户端工厂
+builder.Services.AddHttpClient();
+
+// 注册Gateway实例服务
+builder.Services.AddHostedService<GatewayInstanceRegistrationService>();
 
 var app = builder.Build();
 

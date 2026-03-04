@@ -53,3 +53,55 @@ public interface IApiManagementService
     Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate);
     Task DeleteCertificateAsync(string id);
 }
+
+/// <summary>
+/// Gateway实例管理服务接口
+/// </summary>
+public interface IGatewayInstanceService
+{
+    /// <summary>
+    /// 注册Gateway实例
+    /// </summary>
+    /// <param name="request">注册请求</param>
+    /// <returns>注册结果</returns>
+    Task<GatewayInstance> RegisterInstanceAsync(GatewayInstanceRegisterRequest request);
+
+    /// <summary>
+    /// 更新实例心跳
+    /// </summary>
+    /// <param name="request">心跳请求</param>
+    /// <returns>是否成功</returns>
+    Task<bool> UpdateHeartbeatAsync(GatewayInstanceHeartbeatRequest request);
+
+    /// <summary>
+    /// 获取所有在线实例
+    /// </summary>
+    /// <returns>实例列表响应</returns>
+    Task<GatewayInstanceListResponse> GetInstancesAsync();
+
+    /// <summary>
+    /// 获取指定实例
+    /// </summary>
+    /// <param name="instanceId">实例ID</param>
+    /// <returns>实例信息</returns>
+    Task<GatewayInstance?> GetInstanceAsync(string instanceId);
+
+    /// <summary>
+    /// 移除实例
+    /// </summary>
+    /// <param name="instanceId">实例ID</param>
+    /// <returns>是否成功</returns>
+    Task<bool> RemoveInstanceAsync(string instanceId);
+
+    /// <summary>
+    /// 检查并更新超时实例状态
+    /// </summary>
+    /// <returns>超时实例数量</returns>
+    Task<int> CheckAndUpdateTimeoutInstancesAsync();
+
+    /// <summary>
+    /// 清理长时间心跳超时的实例
+    /// </summary>
+    /// <returns>清理的实例数量</returns>
+    Task<int> CleanupLongTimeTimeoutInstancesAsync();
+}

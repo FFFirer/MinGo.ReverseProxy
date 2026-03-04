@@ -36,9 +36,11 @@ builder.Services.AddScoped<IConfigService, ConfigService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
+builder.Services.AddScoped<IGatewayInstanceService, GatewayInstanceService>();
 
 // 注册配置更新服务
 builder.Services.AddHostedService<ConfigUpdateService>();
+builder.Services.AddHostedService<GatewayInstanceHealthCheckService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
@@ -73,7 +75,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseAntiforgery();
+
 
 app.MapControllers();
 app.MapBlazorHub();

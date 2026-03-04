@@ -29,6 +29,11 @@ public class GatewayDbContext : DbContext
     public DbSet<DestinationConfigEntity> Destinations { get; set; }
 
     /// <summary>
+    /// Gateway实例表
+    /// </summary>
+    public DbSet<GatewayInstanceEntity> GatewayInstances { get; set; }
+
+    /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="options">数据库选项</param>
@@ -65,6 +70,14 @@ public class GatewayDbContext : DbContext
         modelBuilder.Entity<RouteConfigEntity>().HasKey(r => r.Id);
         modelBuilder.Entity<ClusterConfigEntity>().HasKey(c => c.Id);
         modelBuilder.Entity<DestinationConfigEntity>().HasKey(d => d.Id);
+        modelBuilder.Entity<GatewayInstanceEntity>().HasKey(i => i.InstanceId);
+
+        // 配置索引
+        modelBuilder.Entity<GatewayInstanceEntity>()
+            .HasIndex(i => i.Status);
+
+        modelBuilder.Entity<GatewayInstanceEntity>()
+            .HasIndex(i => i.LastHeartbeat);
     }
 }
 
@@ -230,4 +243,85 @@ public class DestinationConfigEntity
     /// 关联的集群配置
     /// </summary>
     public ClusterConfigEntity ClusterConfig { get; set; } = null!;
+}
+
+/// <summary>
+/// Gateway实例实体
+/// </summary>
+public class GatewayInstanceEntity
+{
+    /// <summary>
+    /// 实例ID
+    /// </summary>
+    public string InstanceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 实例名称
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 实例版本
+    /// </summary>
+    public string Version { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 实例IP地址
+    /// </summary>
+    public string IpAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 实例端口
+    /// </summary>
+    public int Port { get; set; }
+
+    /// <summary>
+    /// 实例状态
+    /// </summary>
+    public int Status { get; set; }
+
+    /// <summary>
+    /// 健康状态
+    /// </summary>
+    public bool IsHealthy { get; set; } = true;
+
+    /// <summary>
+    /// 最后心跳时间
+    /// </summary>
+    public DateTimeOffset LastHeartbeat { get; set; }
+
+    /// <summary>
+    /// 注册时间
+    /// </summary>
+    public DateTimeOffset RegisteredAt { get; set; }
+
+    /// <summary>
+    /// 启动时间
+    /// </summary>
+    public DateTimeOffset? StartedAt { get; set; }
+
+    /// <summary>
+    /// 实例元数据（JSON格式）
+    /// </summary>
+    public string MetadataJson { get; set; } = "{}";
+
+    /// <summary>
+    /// CPU使用率
+    /// </summary>
+    public double CpuUsage { get; set; }
+
+    /// <summary>
+    /// 内存使用率
+    /// </summary>
+    public double MemoryUsage { get; set; }
+
+    /// <summary>
+    /// 请求总数
+    /// </summary>
+    public long TotalRequests { get; set; }
+
+    /// <summary>
+    /// 错误请求数
+    /// </summary>
+    public long ErrorRequests { get; set; }
 }

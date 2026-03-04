@@ -837,34 +837,23 @@
 
                     <!-- 实例管理页面 -->
                     <div id="instances-page" class="page hidden">
-                        <div class="mb-6 flex items-center justify-between">
+                        <div class="mb-6">
                             <div>
                                 <h2 class="text-2xl font-bold mb-2">实例管理</h2>
                                 <p class="text-secondary">管理网关实例的在线状态和配置</p>
                             </div>
-                            <button class="btn btn-primary">
-                                <i class="fa fa-plus mr-2"></i>添加实例
-                            </button>
                         </div>
 
                         <div class="card mb-6">
                             <h3 class="font-semibold mb-4">实例统计</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
                                     <p class="text-secondary text-sm mb-1">总实例数</p>
                                     <h4 class="text-2xl font-bold">4</h4>
                                 </div>
                                 <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <p class="text-secondary text-sm mb-1">在线实例</p>
-                                    <h4 class="text-2xl font-bold text-success">2</h4>
-                                </div>
-                                <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <p class="text-secondary text-sm mb-1">离线实例</p>
-                                    <h4 class="text-2xl font-bold text-danger">1</h4>
-                                </div>
-                                <div class="p-4 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                                    <p class="text-secondary text-sm mb-1">异常实例</p>
-                                    <h4 class="text-2xl font-bold text-warning">1</h4>
+                                    <p class="text-secondary text-sm mb-1">活跃实例</p>
+                                    <h4 class="text-2xl font-bold text-success">3</h4>
                                 </div>
                             </div>
 
@@ -875,17 +864,10 @@
                                         class="fa fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                 </div>
                                 <div class="flex flex-row space-x-2">
-                                    <select class="input py-1">
-                                        <option>所有状态</option>
-                                        <option>在线</option>
-                                        <option>离线</option>
-                                        <option>异常</option>
-                                    </select>
                                     <button class="btn btn-secondary shrink-0">
                                         <i class="fa fa-filter mr-2"></i>筛选
                                     </button>
                                 </div>
-
                             </div>
 
                             <div class="overflow-x-auto">
@@ -894,12 +876,7 @@
                                         <tr class="border-b border-gray-200 dark:border-dark-200">
                                             <th class="text-left py-3 px-4 font-medium text-secondary">实例名称</th>
                                             <th class="text-left py-3 px-4 font-medium text-secondary">IP地址</th>
-                                            <th class="text-left py-3 px-4 font-medium text-secondary">端口</th>
-                                            <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
-                                            <th class="text-left py-3 px-4 font-medium text-secondary">CPU使用率</th>
-                                            <th class="text-left py-3 px-4 font-medium text-secondary">内存使用率</th>
                                             <th class="text-left py-3 px-4 font-medium text-secondary">最后在线</th>
-                                            <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -907,142 +884,24 @@
                                             class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                                             <td class="py-3 px-4 font-medium">Gateway-001</td>
                                             <td class="py-3 px-4">192.168.1.100</td>
-                                            <td class="py-3 px-4">8080</td>
-                                            <td class="py-3 px-4"><span class="badge badge-success">在线</span></td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-success h-2 rounded-full" style="width: 35%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">35%</span>
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-success h-2 rounded-full" style="width: 42%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">42%</span>
-                                                </div>
-                                            </td>
                                             <td class="py-3 px-4">2026-02-12 23:45</td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex space-x-2">
-                                                    <button class="text-primary hover:text-primary/80"><i
-                                                            class="fa fa-edit"></i></button>
-                                                    <button class="text-warning hover:text-warning/80"><i
-                                                            class="fa fa-refresh"></i></button>
-                                                    <button class="text-danger hover:text-danger/80"><i
-                                                            class="fa fa-trash"></i></button>
-                                                </div>
-                                            </td>
                                         </tr>
                                         <tr
                                             class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                                             <td class="py-3 px-4 font-medium">Gateway-002</td>
                                             <td class="py-3 px-4">192.168.1.101</td>
-                                            <td class="py-3 px-4">8080</td>
-                                            <td class="py-3 px-4"><span class="badge badge-success">在线</span></td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-warning h-2 rounded-full" style="width: 75%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">75%</span>
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-warning h-2 rounded-full" style="width: 68%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">68%</span>
-                                                </div>
-                                            </td>
                                             <td class="py-3 px-4">2026-02-12 23:44</td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex space-x-2">
-                                                    <button class="text-primary hover:text-primary/80"><i
-                                                            class="fa fa-edit"></i></button>
-                                                    <button class="text-warning hover:text-warning/80"><i
-                                                            class="fa fa-refresh"></i></button>
-                                                    <button class="text-danger hover:text-danger/80"><i
-                                                            class="fa fa-trash"></i></button>
-                                                </div>
-                                            </td>
                                         </tr>
                                         <tr
                                             class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                                             <td class="py-3 px-4 font-medium">Gateway-003</td>
                                             <td class="py-3 px-4">192.168.1.102</td>
-                                            <td class="py-3 px-4">8080</td>
-                                            <td class="py-3 px-4"><span class="badge badge-danger">离线</span></td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-danger h-2 rounded-full" style="width: 0%"></div>
-                                                    </div>
-                                                    <span class="text-sm">0%</span>
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-danger h-2 rounded-full" style="width: 0%"></div>
-                                                    </div>
-                                                    <span class="text-sm">0%</span>
-                                                </div>
-                                            </td>
                                             <td class="py-3 px-4">2026-02-12 22:30</td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex space-x-2">
-                                                    <button class="text-primary hover:text-primary/80"><i
-                                                            class="fa fa-edit"></i></button>
-                                                    <button class="text-warning hover:text-warning/80"><i
-                                                            class="fa fa-refresh"></i></button>
-                                                    <button class="text-danger hover:text-danger/80"><i
-                                                            class="fa fa-trash"></i></button>
-                                                </div>
-                                            </td>
                                         </tr>
                                         <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
                                             <td class="py-3 px-4 font-medium">Gateway-004</td>
                                             <td class="py-3 px-4">192.168.1.103</td>
-                                            <td class="py-3 px-4">8080</td>
-                                            <td class="py-3 px-4"><span class="badge badge-warning">异常</span></td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-danger h-2 rounded-full" style="width: 95%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">95%</span>
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex items-center space-x-2">
-                                                    <div class="w-24 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
-                                                        <div class="bg-danger h-2 rounded-full" style="width: 90%">
-                                                        </div>
-                                                    </div>
-                                                    <span class="text-sm">90%</span>
-                                                </div>
-                                            </td>
                                             <td class="py-3 px-4">2026-02-12 23:40</td>
-                                            <td class="py-3 px-4">
-                                                <div class="flex space-x-2">
-                                                    <button class="text-primary hover:text-primary/80"><i
-                                                            class="fa fa-edit"></i></button>
-                                                    <button class="text-warning hover:text-warning/80"><i
-                                                            class="fa fa-refresh"></i></button>
-                                                    <button class="text-danger hover:text-danger/80"><i
-                                                            class="fa fa-trash"></i></button>
-                                                </div>
-                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
