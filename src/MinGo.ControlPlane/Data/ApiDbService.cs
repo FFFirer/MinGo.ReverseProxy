@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using MinGo.ControlPlane.Services;
 using MinGo.Shared.Models;
 
 namespace MinGo.ControlPlane.Data;
