@@ -1,6 +1,7 @@
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.Options;
 using MinGo.Gateway.Options;
 using MinGo.Gateway.Services;
 
@@ -25,14 +26,14 @@ builder.Services.Configure<ControlPlaneOptions>(
 // 添加HTTP客户端工厂，配置ControlPlane客户端
 builder.Services.AddHttpClient("ControlPlane", (serviceProvider, client) =>
 {
-    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    var options = serviceProvider.GetRequiredService<IOptions<ControlPlaneOptions>>().Value;
     client.BaseAddress = new Uri(options.Url);
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
 })
 .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
 {
-    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    var options = serviceProvider.GetRequiredService<IOptions<ControlPlaneOptions>>().Value;
     var handler = new HttpClientHandler();
 
     // 仅在配置明确允许时跳过SSL证书验证（用于开发环境）

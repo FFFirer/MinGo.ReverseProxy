@@ -115,7 +115,7 @@ public class EventsController : ControllerBase
     {
         try
         {
-            Console.WriteLine($"处理配置更新事件: {gatewayEvent.EventId}");
+            _logger.LogInformation($"处理配置更新事件: {gatewayEvent.EventId}");
 
             // 拉取最新的网关配置
             var config = await FetchLatestConfigAsync();
@@ -169,11 +169,11 @@ public class EventsController : ControllerBase
 
             // 更新配置
             _configProvider.Update(yarpRoutes.AsReadOnly(), yarpClusters.AsReadOnly());
-            Console.WriteLine($"成功更新配置，路由数: {yarpRoutes.Count}, 集群数: {yarpClusters.Count}");
+            _logger.LogInformation($"成功更新配置，路由数: {yarpRoutes.Count}, 集群数: {yarpClusters.Count}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"处理配置更新事件失败: {ex.Message}");
+            _logger.LogError(ex, "处理配置更新事件失败");
             throw;
         }
         await Task.CompletedTask;
@@ -220,7 +220,7 @@ public class EventsController : ControllerBase
     private async Task HandleCertificateUpdateEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理证书更新逻辑
-        Console.WriteLine($"处理证书更新事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理证书更新事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -232,7 +232,7 @@ public class EventsController : ControllerBase
     private async Task HandleRouteUpdateEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理路由更新逻辑
-        Console.WriteLine($"处理路由更新事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理路由更新事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -244,7 +244,7 @@ public class EventsController : ControllerBase
     private async Task HandleClusterUpdateEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理集群更新逻辑
-        Console.WriteLine($"处理集群更新事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理集群更新事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -256,7 +256,7 @@ public class EventsController : ControllerBase
     private async Task HandleRestartEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理重启逻辑
-        Console.WriteLine($"处理重启事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理重启事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -268,7 +268,7 @@ public class EventsController : ControllerBase
     private async Task HandleShutdownEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理下线逻辑
-        Console.WriteLine($"处理下线事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理下线事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -280,7 +280,7 @@ public class EventsController : ControllerBase
     private async Task HandleHealthCheckEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理健康检查逻辑
-        Console.WriteLine($"处理健康检查事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理健康检查事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 
@@ -292,7 +292,7 @@ public class EventsController : ControllerBase
     private async Task HandleCustomEventAsync(GatewayEvent gatewayEvent)
     {
         // 处理自定义事件逻辑
-        Console.WriteLine($"处理自定义事件: {gatewayEvent.EventId}");
+        _logger.LogInformation($"处理自定义事件: {gatewayEvent.EventId}");
         await Task.CompletedTask;
     }
 }
