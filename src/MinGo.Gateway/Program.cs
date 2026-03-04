@@ -1,6 +1,7 @@
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 using Microsoft.Extensions.Primitives;
+using MinGo.Gateway.Options;
 using MinGo.Gateway.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,8 +18,31 @@ builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
 builder.Services.AddSingleton(proxyConfig);
 
-// 添加HTTP客户端工厂
-builder.Services.AddHttpClient();
+// 配置ControlPlane选项
+builder.Services.Configure<ControlPlaneOptions>(
+    builder.Configuration.GetSection(ControlPlaneOptions.SectionName));
+
+// 添加HTTP客户端工厂，配置ControlPlane客户端
+builder.Services.AddHttpClient("ControlPlane", (serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    client.BaseAddress = new Uri(options.Url);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    var handler = new HttpClientHandler();
+
+    // 仅在配置明确允许时跳过SSL证书验证（用于开发环境）
+    if (options.SkipSslCertificateValidation)
+    {
+        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+    }
+
+    return handler;
+});
 
 // 注册Gateway实例服务
 builder.Services.AddHostedService<GatewayInstanceRegistrationService>();

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using MinGo.Gateway.Options;
 using MinGo.Shared.Models;
 using System.Text.Json;
 using Yarp.ReverseProxy.Configuration;
@@ -51,10 +53,20 @@ public class EventsController : ControllerBase
     }
 
     private readonly InMemoryConfigProvider _configProvider;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ControlPlaneOptions _controlPlaneOptions;
+    private readonly ILogger<EventsController> _logger;
 
-    public EventsController(InMemoryConfigProvider configProvider)
+    public EventsController(
+        InMemoryConfigProvider configProvider,
+        IHttpClientFactory httpClientFactory,
+        IOptions<ControlPlaneOptions> controlPlaneOptions,
+        ILogger<EventsController> logger)
     {
         _configProvider = configProvider;
+        _httpClientFactory = httpClientFactory;
+        _controlPlaneOptions = controlPlaneOptions.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -175,27 +187,27 @@ public class EventsController : ControllerBase
     {
         try
         {
-            // 从ControlPlane的API获取最新配置
-            var controlPlaneUrl = "https://localhost:7171/api/config/latest";
-            using var httpClient = new HttpClient();
-            // 忽略SSL证书错误（仅用于开发环境）
-            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            var controlPlaneUrl = _controlPlaneOptions.GetConfigApiUrl();
+            _logger.LogInformation("正在从 {Url} 拉取配置", controlPlaneUrl);
+
+            var httpClient = _httpClientFactory.CreateClient("ControlPlane");
             var response = await httpClient.GetAsync(controlPlaneUrl);
+
             if (response.IsSuccessStatusCode)
             {
                 var config = await response.Content.ReadFromJsonAsync<GatewayConfig>();
-                Console.WriteLine("成功拉取最新配置");
+                _logger.LogInformation("成功拉取最新配置");
                 return config;
             }
             else
             {
-                Console.WriteLine($"拉取配置失败: {response.StatusCode}");
+                _logger.LogWarning("拉取配置失败: {StatusCode}", response.StatusCode);
                 return null;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"拉取配置异常: {ex.Message}");
+            _logger.LogError(ex, "拉取配置异常");
             return null;
         }
     }
