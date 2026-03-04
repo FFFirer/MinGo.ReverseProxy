@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using MinGo.ControlPlane.Data;
 using MinGo.ControlPlane.Services;
 using Serilog;
 using Vite.AspNetCore;
@@ -19,12 +21,34 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 
+// 配置数据库
+builder.Services.AddDbContext<GatewayDbContext>(options =>
+    options.UseSqlite("Data Source=gateway.db")
+);
+builder.Services.AddDbContext<ApiDbContext>(options =>
+    options.UseSqlite("Data Source=gateway.db")
+);
+
+// 注册服务
+builder.Services.AddScoped<IDbConfigService, DbConfigService>();
+builder.Services.AddScoped<IApiDbService, ApiDbService>();
 builder.Services.AddScoped<IConfigService, ConfigService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
 
 var app = builder.Build();
+
+// 初始化数据库
+using (var scope = app.Services.CreateScope())
+{
+    var gatewayDbContext = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
+    gatewayDbContext.Database.Migrate();
+    
+    var apiDbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+    apiDbContext.Database.Migrate();
+}
+
 
 Console.WriteLine("Configuring middleware...");
 
