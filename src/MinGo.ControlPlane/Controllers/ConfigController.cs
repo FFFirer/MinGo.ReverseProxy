@@ -61,4 +61,11 @@ public class ConfigController : ControllerBase
         await _configService.DeleteConfigAsync(id);
         return NoContent();
     }
+
+    [HttpGet("latest")]
+    public async Task<ActionResult<GatewayConfig>> GetLatestConfig()
+    {
+        var config = await _configService.GetConfigAsync();
+        return Ok(config);
+    }
 }

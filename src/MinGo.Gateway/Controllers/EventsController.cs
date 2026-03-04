@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MinGo.Shared.Models;
 using System.Text.Json;
+using Yarp.ReverseProxy.Configuration;
 
 namespace MinGo.Gateway.Controllers;
 
@@ -49,6 +50,13 @@ public class EventsController : ControllerBase
         }
     }
 
+    private readonly InMemoryConfigProvider _configProvider;
+
+    public EventsController(InMemoryConfigProvider configProvider)
+    {
+        _configProvider = configProvider;
+    }
+
     /// <summary>
     /// 处理事件
     /// </summary>
@@ -93,10 +101,103 @@ public class EventsController : ControllerBase
     /// <returns>任务</returns>
     private async Task HandleConfigUpdateEventAsync(GatewayEvent gatewayEvent)
     {
-        // 处理配置更新逻辑
-        // 例如：重新加载配置
-        Console.WriteLine($"处理配置更新事件: {gatewayEvent.EventId}");
+        try
+        {
+            Console.WriteLine($"处理配置更新事件: {gatewayEvent.EventId}");
+
+            // 拉取最新的网关配置
+            var config = await FetchLatestConfigAsync();
+            if (config == null)
+            {
+                throw new Exception("Failed to fetch latest config");
+            }
+
+            // 转换为YARP的配置格式
+            var yarpRoutes = new List<Yarp.ReverseProxy.Configuration.RouteConfig>();
+            var yarpClusters = new List<Yarp.ReverseProxy.Configuration.ClusterConfig>();
+
+            // 转换路由
+            foreach (var route in config.Routes.Values)
+            {
+                var yarpRoute = new Yarp.ReverseProxy.Configuration.RouteConfig
+                {
+                    RouteId = route.Id,
+                    ClusterId = route.ClusterId,
+                    Match = new Yarp.ReverseProxy.Configuration.RouteMatch
+                    {
+                        Path = route.Match.Path,
+                        Hosts = route.Match.Host != null ? new[] { route.Match.Host } : null
+                    }
+                };
+                yarpRoutes.Add(yarpRoute);
+            }
+
+            // 转换集群
+            foreach (var cluster in config.Clusters.Values)
+            {
+                var destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>();
+                
+                // 添加目标
+                foreach (var destination in cluster.Destinations.Values)
+                {
+                    destinations[destination.Address] = new Yarp.ReverseProxy.Configuration.DestinationConfig
+                    {
+                        Address = destination.Address
+                    };
+                }
+
+                var yarpCluster = new Yarp.ReverseProxy.Configuration.ClusterConfig
+                {
+                    ClusterId = cluster.Id,
+                    LoadBalancingPolicy = cluster.LoadBalancingPolicy,
+                    Destinations = destinations
+                };
+                yarpClusters.Add(yarpCluster);
+            }
+
+            // 更新配置
+            _configProvider.Update(yarpRoutes.AsReadOnly(), yarpClusters.AsReadOnly());
+            Console.WriteLine($"成功更新配置，路由数: {yarpRoutes.Count}, 集群数: {yarpClusters.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"处理配置更新事件失败: {ex.Message}");
+            throw;
+        }
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 从ControlPlane拉取最新的配置
+    /// </summary>
+    /// <returns>网关配置</returns>
+    private async Task<GatewayConfig?> FetchLatestConfigAsync()
+    {
+        try
+        {
+            // 从ControlPlane的API获取最新配置
+            var controlPlaneUrl = "https://localhost:7171/api/config/latest";
+            using var httpClient = new HttpClient();
+            // 忽略SSL证书错误（仅用于开发环境）
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            var response = await httpClient.GetAsync(controlPlaneUrl);
+            if (response.IsSuccessStatusCode)
+            {
+                var config = await response.Content.ReadFromJsonAsync<GatewayConfig>();
+                Console.WriteLine("成功拉取最新配置");
+                return config;
+            }
+            else
+            {
+                Console.WriteLine($"拉取配置失败: {response.StatusCode}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"拉取配置异常: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>

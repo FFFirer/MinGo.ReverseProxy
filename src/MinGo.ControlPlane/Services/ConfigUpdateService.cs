@@ -1,5 +1,6 @@
 using MinGo.ControlPlane.Data;
 using MinGo.Shared.Models;
+using System.Text.Json;
 
 namespace MinGo.ControlPlane.Services;
 
@@ -11,7 +12,6 @@ public class ConfigUpdateService : IHostedService, IDisposable
     private readonly ILogger<ConfigUpdateService> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly HttpClient _httpClient;
-    private IApiDbService? _apiDbService;
 
     /// <summary>
     /// 构造函数
@@ -27,17 +27,7 @@ public class ConfigUpdateService : IHostedService, IDisposable
         _logger = logger;
         _serviceScopeFactory = serviceScopeFactory;
         _httpClient = httpClient;
-
-        // 创建作用域并获取API数据库服务实例
-        using var scope = _serviceScopeFactory.CreateScope();
-        _apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
-
-        // 订阅路由和集群变更事件
-        if (_apiDbService != null)
-        {
-            _apiDbService.RoutesChanged += OnRoutesChanged;
-            _apiDbService.ClustersChanged += OnClustersChanged;
-        }
+        _logger.LogInformation("ConfigUpdateService initialized");
     }
 
     /// <summary>
@@ -60,26 +50,6 @@ public class ConfigUpdateService : IHostedService, IDisposable
     {
         _logger.LogInformation("ConfigUpdateService stopped");
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 路由变更事件处理
-    /// </summary>
-    /// <returns>任务</returns>
-    private async Task OnRoutesChanged()
-    {
-        _logger.LogInformation("Routes changed, updating gateway config");
-        await UpdateGatewayConfigAsync();
-    }
-
-    /// <summary>
-    /// 集群变更事件处理
-    /// </summary>
-    /// <returns>任务</returns>
-    private async Task OnClustersChanged()
-    {
-        _logger.LogInformation("Clusters changed, updating gateway config");
-        await UpdateGatewayConfigAsync();
     }
 
     /// <summary>
@@ -133,14 +103,24 @@ public class ConfigUpdateService : IHostedService, IDisposable
     {
         try
         {
-            // 这里假设API网关有一个端点来接收配置更新通知
-            // 实际实现中，需要根据API网关的具体实现来调整
-            var gatewayUrl = "http://localhost:5000/api/config/reload";
-            var response = await _httpClient.PostAsJsonAsync(gatewayUrl, config);
+            // 创建配置更新事件
+            var gatewayEvent = new GatewayEvent
+            {
+                EventType = GatewayEventType.ConfigUpdate,
+                EventData = JsonSerializer.Serialize(config),
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                Priority = 1
+            };
+
+            // 发送事件到所有网关实例
+            // 这里假设Gateway有一个事件接收端点
+            var gatewayUrl = "http://localhost:8080/api/events";
+            var response = await _httpClient.PostAsJsonAsync(gatewayUrl, gatewayEvent);
             
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Successfully notified gateway of config change");
+                var eventResponse = await response.Content.ReadFromJsonAsync<GatewayEventResponse>();
+                _logger.LogInformation("Successfully notified gateway of config change: {EventId}, Status: {Success}", gatewayEvent.EventId, eventResponse?.Success);
             }
             else
             {
@@ -158,12 +138,6 @@ public class ConfigUpdateService : IHostedService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        // 取消订阅事件
-        if (_apiDbService != null)
-        {
-            _apiDbService.RoutesChanged -= OnRoutesChanged;
-            _apiDbService.ClustersChanged -= OnClustersChanged;
-        }
         _httpClient.Dispose();
         GC.SuppressFinalize(this);
     }

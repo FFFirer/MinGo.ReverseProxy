@@ -9,28 +9,58 @@ namespace MinGo.ControlPlane.Data;
 /// </summary>
 public class ApiDbService : IApiDbService
 {
-    private readonly ApiDbContext _dbContext;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<ApiDbService> _logger;
-
-    /// <summary>
-    /// 路由变更事件
-    /// </summary>
-    public event Func<Task>? RoutesChanged;
-
-    /// <summary>
-    /// 集群变更事件
-    /// </summary>
-    public event Func<Task>? ClustersChanged;
 
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="dbContext">数据库上下文</param>
+    /// <param name="serviceScopeFactory">服务作用域工厂</param>
     /// <param name="logger">日志记录器</param>
-    public ApiDbService(ApiDbContext dbContext, ILogger<ApiDbService> logger)
+    public ApiDbService(IServiceScopeFactory serviceScopeFactory, ILogger<ApiDbService> logger)
     {
-        _dbContext = dbContext;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// 通知网关配置变更
+    /// </summary>
+    /// <returns>任务</returns>
+    private async Task NotifyGatewayConfigChangeAsync()
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var gatewayEventSender = scope.ServiceProvider.GetRequiredService<IGatewayEventSender>();
+        
+        try
+        {
+            // 创建配置更新事件
+            var gatewayEvent = new GatewayEvent
+            {
+                EventType = GatewayEventType.ConfigUpdate,
+                EventData = "{}", // 空数据，网关会自行拉取最新配置
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                Priority = 1
+            };
+
+            // 发送事件
+            await gatewayEventSender.SendEventAsync(gatewayEvent);
+            _logger.LogInformation("Sent config update notification to gateway");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify gateway of config change");
+        }
+    }
+
+    /// <summary>
+    /// 获取数据库上下文
+    /// </summary>
+    /// <returns>数据库上下文</returns>
+    private ApiDbContext GetDbContext()
+    {
+        var scope = _serviceScopeFactory.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<ApiDbContext>();
     }
 
     /// <summary>
@@ -39,7 +69,9 @@ public class ApiDbService : IApiDbService
     /// <returns>路由列表</returns>
     public async Task<IEnumerable<RouteConfig>> GetRoutesAsync()
     {
-        var entities = await _dbContext.Routes.ToListAsync();
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var entities = await dbContext.Routes.ToListAsync();
         return entities.Select(MapToRouteModel);
     }
 
@@ -50,7 +82,9 @@ public class ApiDbService : IApiDbService
     /// <returns>路由配置</returns>
     public async Task<RouteConfig?> GetRouteAsync(string id)
     {
-        var entity = await _dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var entity = await dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
         return entity != null ? MapToRouteModel(entity) : null;
     }
 
@@ -61,21 +95,21 @@ public class ApiDbService : IApiDbService
     /// <returns>创建的路由</returns>
     public async Task<RouteConfig> CreateRouteAsync(RouteConfig route)
     {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
         var entity = MapToRouteEntity(route);
         entity.Id = Guid.NewGuid().ToString();
         entity.CreatedAt = DateTimeOffset.UtcNow;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.Routes.AddAsync(entity);
-        await _dbContext.SaveChangesAsync();
+        await dbContext.Routes.AddAsync(entity);
+        await dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created route: {RouteId}", entity.Id);
         
-        // 触发路由变更事件
-        if (RoutesChanged != null)
-        {
-            await RoutesChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
         
         return MapToRouteModel(entity);
     }
@@ -88,7 +122,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的路由</returns>
     public async Task<RouteConfig?> UpdateRouteAsync(string id, RouteConfig route)
     {
-        var existing = await _dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var existing = await dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
         if (existing == null)
         {
             return null;
@@ -101,14 +138,11 @@ public class ApiDbService : IApiDbService
         existing.Enabled = route.Enabled;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated route: {RouteId}", id);
 
-        // 触发路由变更事件
-        if (RoutesChanged != null)
-        {
-            await RoutesChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
 
         return MapToRouteModel(existing);
     }
@@ -119,18 +153,18 @@ public class ApiDbService : IApiDbService
     /// <param name="id">路由ID</param>
     public async Task DeleteRouteAsync(string id)
     {
-        var route = await _dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var route = await dbContext.Routes.FirstOrDefaultAsync(r => r.Id == id);
         if (route != null)
         {
-            _dbContext.Routes.Remove(route);
-            await _dbContext.SaveChangesAsync();
+            dbContext.Routes.Remove(route);
+            await dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted route: {RouteId}", id);
             
-            // 触发路由变更事件
-            if (RoutesChanged != null)
-            {
-                await RoutesChanged();
-            }
+            // 通知网关配置变更
+            await NotifyGatewayConfigChangeAsync();
         }
     }
 
@@ -140,7 +174,10 @@ public class ApiDbService : IApiDbService
     /// <returns>集群列表</returns>
     public async Task<IEnumerable<ClusterConfig>> GetClustersAsync()
     {
-        var entities = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var entities = await dbContext.Clusters
             .Include(c => c.Destinations)
             .ToListAsync();
         return entities.Select(MapToClusterModel);
@@ -153,7 +190,10 @@ public class ApiDbService : IApiDbService
     /// <returns>集群配置</returns>
     public async Task<ClusterConfig?> GetClusterAsync(string id)
     {
-        var entity = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var entity = await dbContext.Clusters
             .Include(c => c.Destinations)
             .FirstOrDefaultAsync(c => c.Id == id);
         return entity != null ? MapToClusterModel(entity) : null;
@@ -166,6 +206,9 @@ public class ApiDbService : IApiDbService
     /// <returns>创建的集群</returns>
     public async Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster)
     {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
         var entity = MapToClusterEntity(cluster);
         entity.Id = Guid.NewGuid().ToString();
         entity.CreatedAt = DateTimeOffset.UtcNow;
@@ -186,16 +229,13 @@ public class ApiDbService : IApiDbService
             entity.Destinations.Add(destinationEntity);
         }
 
-        await _dbContext.Clusters.AddAsync(entity);
-        await _dbContext.SaveChangesAsync();
+        await dbContext.Clusters.AddAsync(entity);
+        await dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created cluster: {ClusterId}", entity.Id);
         
-        // 触发集群变更事件
-        if (ClustersChanged != null)
-        {
-            await ClustersChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
         
         return MapToClusterModel(entity);
     }
@@ -208,7 +248,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的集群</returns>
     public async Task<ClusterConfig?> UpdateClusterAsync(string id, ClusterConfig cluster)
     {
-        var existing = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var existing = await dbContext.Clusters
             .Include(c => c.Destinations)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (existing == null)
@@ -223,7 +266,7 @@ public class ApiDbService : IApiDbService
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         // 删除旧的目标
-        _dbContext.Destinations.RemoveRange(existing.Destinations);
+        dbContext.Destinations.RemoveRange(existing.Destinations);
         existing.Destinations.Clear();
 
         // 添加新的目标
@@ -241,14 +284,11 @@ public class ApiDbService : IApiDbService
             existing.Destinations.Add(destinationEntity);
         }
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated cluster: {ClusterId}", id);
 
-        // 触发集群变更事件
-        if (ClustersChanged != null)
-        {
-            await ClustersChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
 
         return MapToClusterModel(existing);
     }
@@ -259,18 +299,18 @@ public class ApiDbService : IApiDbService
     /// <param name="id">集群ID</param>
     public async Task DeleteClusterAsync(string id)
     {
-        var cluster = await _dbContext.Clusters.FirstOrDefaultAsync(c => c.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var cluster = await dbContext.Clusters.FirstOrDefaultAsync(c => c.Id == id);
         if (cluster != null)
         {
-            _dbContext.Clusters.Remove(cluster);
-            await _dbContext.SaveChangesAsync();
+            dbContext.Clusters.Remove(cluster);
+            await dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted cluster: {ClusterId}", id);
             
-            // 触发集群变更事件
-            if (ClustersChanged != null)
-            {
-                await ClustersChanged();
-            }
+            // 通知网关配置变更
+            await NotifyGatewayConfigChangeAsync();
         }
     }
 
@@ -283,7 +323,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的集群</returns>
     public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
-        var cluster = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var cluster = await dbContext.Clusters
             .Include(c => c.Destinations)
             .FirstOrDefaultAsync(c => c.Id == clusterId);
         if (cluster == null)
@@ -304,14 +347,11 @@ public class ApiDbService : IApiDbService
         cluster.Destinations.Add(destinationEntity);
         cluster.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", destinationId, clusterId);
 
-        // 触发集群变更事件
-        if (ClustersChanged != null)
-        {
-            await ClustersChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
 
         return MapToClusterModel(cluster);
     }
@@ -325,7 +365,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的集群</returns>
     public async Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
     {
-        var cluster = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var cluster = await dbContext.Clusters
             .Include(c => c.Destinations)
             .FirstOrDefaultAsync(c => c.Id == clusterId);
         if (cluster == null)
@@ -344,14 +387,11 @@ public class ApiDbService : IApiDbService
         destinationEntity.UpdatedAt = DateTimeOffset.UtcNow;
         cluster.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated destination {DestinationId} in cluster {ClusterId}", destinationId, clusterId);
 
-        // 触发集群变更事件
-        if (ClustersChanged != null)
-        {
-            await ClustersChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
 
         return MapToClusterModel(cluster);
     }
@@ -364,7 +404,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的集群</returns>
     public async Task<ClusterConfig?> RemoveDestinationAsync(string clusterId, string destinationId)
     {
-        var cluster = await _dbContext.Clusters
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var cluster = await dbContext.Clusters
             .Include(c => c.Destinations)
             .FirstOrDefaultAsync(c => c.Id == clusterId);
         if (cluster == null)
@@ -381,14 +424,11 @@ public class ApiDbService : IApiDbService
         cluster.Destinations.Remove(destinationEntity);
         cluster.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Removed destination {DestinationId} from cluster {ClusterId}", destinationId, clusterId);
 
-        // 触发集群变更事件
-        if (ClustersChanged != null)
-        {
-            await ClustersChanged();
-        }
+        // 通知网关配置变更
+        await NotifyGatewayConfigChangeAsync();
 
         return MapToClusterModel(cluster);
     }
@@ -399,7 +439,10 @@ public class ApiDbService : IApiDbService
     /// <returns>证书列表</returns>
     public async Task<IEnumerable<CertificateConfig>> GetCertificatesAsync()
     {
-        var entities = await _dbContext.Certificates.ToListAsync();
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var entities = await dbContext.Certificates.ToListAsync();
         return entities.Select(MapToCertificateModel);
     }
 
@@ -410,7 +453,10 @@ public class ApiDbService : IApiDbService
     /// <returns>证书配置</returns>
     public async Task<CertificateConfig?> GetCertificateAsync(string id)
     {
-        var entity = await _dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var entity = await dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
         return entity != null ? MapToCertificateModel(entity) : null;
     }
 
@@ -421,13 +467,16 @@ public class ApiDbService : IApiDbService
     /// <returns>创建的证书</returns>
     public async Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate)
     {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
         var entity = MapToCertificateEntity(certificate);
         entity.Id = Guid.NewGuid().ToString();
         entity.CreatedAt = DateTimeOffset.UtcNow;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.Certificates.AddAsync(entity);
-        await _dbContext.SaveChangesAsync();
+        await dbContext.Certificates.AddAsync(entity);
+        await dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created certificate: {CertificateId} for domain {DomainName}", entity.Id, entity.DomainName);
         return MapToCertificateModel(entity);
@@ -441,7 +490,10 @@ public class ApiDbService : IApiDbService
     /// <returns>更新后的证书</returns>
     public async Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate)
     {
-        var existing = await _dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var existing = await dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
         if (existing == null)
         {
             return null;
@@ -458,7 +510,7 @@ public class ApiDbService : IApiDbService
         existing.Password = certificate.Password;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         _logger.LogInformation("Updated certificate: {CertificateId}", id);
 
         return MapToCertificateModel(existing);
@@ -470,11 +522,14 @@ public class ApiDbService : IApiDbService
     /// <param name="id">证书ID</param>
     public async Task DeleteCertificateAsync(string id)
     {
-        var certificate = await _dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
+        var certificate = await dbContext.Certificates.FirstOrDefaultAsync(c => c.Id == id);
         if (certificate != null)
         {
-            _dbContext.Certificates.Remove(certificate);
-            await _dbContext.SaveChangesAsync();
+            dbContext.Certificates.Remove(certificate);
+            await dbContext.SaveChangesAsync();
             _logger.LogInformation("Deleted certificate: {CertificateId}", id);
         }
     }
@@ -484,8 +539,11 @@ public class ApiDbService : IApiDbService
     /// </summary>
     public async Task InitializeSampleDataAsync()
     {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        
         // 检查是否已有数据
-        if (await _dbContext.Routes.AnyAsync() || await _dbContext.Clusters.AnyAsync())
+        if (await dbContext.Routes.AnyAsync() || await dbContext.Clusters.AnyAsync())
         {
             return;
         }
@@ -751,16 +809,6 @@ public class ApiDbService : IApiDbService
 /// </summary>
 public interface IApiDbService
 {
-    /// <summary>
-    /// 路由变更事件
-    /// </summary>
-    event Func<Task>? RoutesChanged;
-
-    /// <summary>
-    /// 集群变更事件
-    /// </summary>
-    event Func<Task>? ClustersChanged;
-
     /// <summary>
     /// 获取所有路由
     /// </summary>
