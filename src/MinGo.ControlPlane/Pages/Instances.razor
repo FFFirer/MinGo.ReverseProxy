@@ -96,10 +96,12 @@
 
     private GatewayInstanceListResponse? instances;
     private int onlineCount => instances?.OnlineCount ?? 0;
+    private CancellationTokenSource? _refreshTimerCancellationTokenSource;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadInstances();
+        StartRefreshTimer();
     }
 
     private async Task LoadInstances()
@@ -112,5 +114,45 @@
             Logger.LogError(ex, "Failed to load instances");
         }
     }
+
+    private void StartRefreshTimer()
+    {
+        // 清理之前的定时器
+        if (_refreshTimerCancellationTokenSource != null)
+        {
+            _refreshTimerCancellationTokenSource.Cancel();
+            _refreshTimerCancellationTokenSource.Dispose();
+        }
+
+        _refreshTimerCancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = _refreshTimerCancellationTokenSource.Token;
+
+        // 每5分钟刷新一次
+        _ = Task.Run(async () =>
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        await LoadInstances();
+                    });
+                }
+            }
+        }, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        if (_refreshTimerCancellationTokenSource != null)
+        {
+            _refreshTimerCancellationTokenSource.Cancel();
+            _refreshTimerCancellationTokenSource.Dispose();
+        }
+    }
 }
+
+@implements IDisposable
 
