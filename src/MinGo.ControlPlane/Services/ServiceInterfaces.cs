@@ -105,3 +105,81 @@ public interface IGatewayInstanceService
     /// <returns>清理的实例数量</returns>
     Task<int> CleanupLongTimeTimeoutInstancesAsync();
 }
+
+/// <summary>
+/// Gateway事件发送器接口
+/// </summary>
+public interface IGatewayEventSender
+{
+    /// <summary>
+    /// 发送事件到实例
+    /// </summary>
+    /// <param name="instance">实例信息</param>
+    /// <param name="gatewayEvent">网关事件</param>
+    /// <returns>事件响应</returns>
+    Task<GatewayEventResponse> SendEventAsync(GatewayInstance instance, GatewayEvent gatewayEvent);
+}
+
+/// <summary>
+/// Gateway事件下发服务接口
+/// </summary>
+public interface IGatewayEventService
+{
+    /// <summary>
+    /// 发送事件到所有实例
+    /// </summary>
+    /// <param name="eventType">事件类型</param>
+    /// <param name="eventData">事件数据</param>
+    /// <param name="priority">事件优先级</param>
+    /// <returns>事件响应列表</returns>
+    Task<List<GatewayEventResponse>> SendEventToAllInstancesAsync(GatewayEventType eventType, object eventData, int priority = 0);
+
+    /// <summary>
+    /// 发送事件到指定实例
+    /// </summary>
+    /// <param name="instanceId">实例ID</param>
+    /// <param name="eventType">事件类型</param>
+    /// <param name="eventData">事件数据</param>
+    /// <param name="priority">事件优先级</param>
+    /// <returns>事件响应</returns>
+    Task<GatewayEventResponse?> SendEventToInstanceAsync(string instanceId, GatewayEventType eventType, object eventData, int priority = 0);
+
+    /// <summary>
+    /// 发送事件到多个实例
+    /// </summary>
+    /// <param name="instanceIds">实例ID列表</param>
+    /// <param name="eventType">事件类型</param>
+    /// <param name="eventData">事件数据</param>
+    /// <param name="priority">事件优先级</param>
+    /// <returns>事件响应列表</returns>
+    Task<List<GatewayEventResponse>> SendEventToInstancesAsync(IEnumerable<string> instanceIds, GatewayEventType eventType, object eventData, int priority = 0);
+
+    /// <summary>
+    /// 订阅事件
+    /// </summary>
+    /// <param name="request">订阅请求</param>
+    /// <returns>是否成功</returns>
+    Task<bool> SubscribeToEventsAsync(GatewayEventSubscriptionRequest request);
+
+    /// <summary>
+    /// 取消订阅事件
+    /// </summary>
+    /// <param name="instanceId">实例ID</param>
+    /// <returns>是否成功</returns>
+    Task<bool> UnsubscribeFromEventsAsync(string instanceId);
+
+    /// <summary>
+    /// 获取事件历史
+    /// </summary>
+    /// <param name="startTime">开始时间</param>
+    /// <param name="endTime">结束时间</param>
+    /// <param name="eventType">事件类型（可选）</param>
+    /// <returns>事件列表</returns>
+    Task<List<GatewayEvent>> GetEventHistoryAsync(DateTimeOffset startTime, DateTimeOffset endTime, GatewayEventType? eventType = null);
+
+    /// <summary>
+    /// 清理过期事件
+    /// </summary>
+    /// <returns>清理的事件数量</returns>
+    Task<int> CleanupExpiredEventsAsync();
+}

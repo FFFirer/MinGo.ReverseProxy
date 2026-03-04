@@ -37,6 +37,9 @@ builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
 builder.Services.AddScoped<IGatewayInstanceService, GatewayInstanceService>();
+// 注册事件服务
+builder.Services.AddScoped<IGatewayEventSender, HttpGatewayEventSender>();
+builder.Services.AddScoped<IGatewayEventService, GatewayEventService>();
 
 // 注册配置更新服务
 builder.Services.AddHostedService<ConfigUpdateService>();
