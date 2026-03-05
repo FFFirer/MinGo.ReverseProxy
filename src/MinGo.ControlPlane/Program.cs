@@ -47,7 +47,7 @@ builder.Services.AddHttpClient();
 var app = builder.Build();
 
 // 初始化数据库和示例数据
-await InitializeDatabaseAsync(app);
+// await InitializeDatabaseAsync(app);
 
 async Task InitializeDatabaseAsync(WebApplication app)
 {
@@ -85,8 +85,6 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-
-
 
 app.MapControllers();
 app.MapBlazorHub();

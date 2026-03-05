@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MinGo.Gateway.Options;
+using MinGo.Gateway.Services;
 using MinGo.Shared.Models;
 using System.Text.Json;
 using Yarp.ReverseProxy.Configuration;
@@ -60,13 +61,13 @@ public class EventsController : ControllerBase
         }
     }
 
-    private readonly InMemoryConfigProvider _configProvider;
+    private readonly DatabaseProxyConfigProvider _configProvider;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ControlPlaneOptions _controlPlaneOptions;
     private readonly ILogger<EventsController> _logger;
 
     public EventsController(
-        InMemoryConfigProvider configProvider,
+        DatabaseProxyConfigProvider configProvider,
         IHttpClientFactory httpClientFactory,
         IOptions<ControlPlaneOptions> controlPlaneOptions,
         ILogger<EventsController> logger)
@@ -126,59 +127,9 @@ public class EventsController : ControllerBase
         {
             _logger.LogInformation($"处理配置更新事件: {gatewayEvent.EventId}");
 
-            // 拉取最新的网关配置
-            var config = await FetchLatestConfigAsync();
-            if (config == null)
-            {
-                throw new Exception("Failed to fetch latest config");
-            }
-
-            // 转换为YARP的配置格式
-            var yarpRoutes = new List<Yarp.ReverseProxy.Configuration.RouteConfig>();
-            var yarpClusters = new List<Yarp.ReverseProxy.Configuration.ClusterConfig>();
-
-            // 转换路由
-            foreach (var route in config.Routes.Values)
-            {
-                var yarpRoute = new Yarp.ReverseProxy.Configuration.RouteConfig
-                {
-                    RouteId = route.Id,
-                    ClusterId = route.ClusterId,
-                    Match = new Yarp.ReverseProxy.Configuration.RouteMatch
-                    {
-                        Path = route.Match.Path,
-                        Hosts = route.Match.Host != null ? new[] { route.Match.Host } : null
-                    }
-                };
-                yarpRoutes.Add(yarpRoute);
-            }
-
-            // 转换集群
-            foreach (var cluster in config.Clusters.Values)
-            {
-                var destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>();
-                
-                // 添加目标
-                foreach (var destination in cluster.Destinations.Values)
-                {
-                    destinations[destination.Address] = new Yarp.ReverseProxy.Configuration.DestinationConfig
-                    {
-                        Address = destination.Address
-                    };
-                }
-
-                var yarpCluster = new Yarp.ReverseProxy.Configuration.ClusterConfig
-                {
-                    ClusterId = cluster.Id,
-                    LoadBalancingPolicy = cluster.LoadBalancingPolicy,
-                    Destinations = destinations
-                };
-                yarpClusters.Add(yarpCluster);
-            }
-
-            // 更新配置
-            _configProvider.Update(yarpRoutes.AsReadOnly(), yarpClusters.AsReadOnly());
-            _logger.LogInformation($"成功更新配置，路由数: {yarpRoutes.Count}, 集群数: {yarpClusters.Count}");
+            // 从数据库刷新配置
+            _configProvider.Refresh();
+            _logger.LogInformation("成功从数据库刷新配置");
         }
         catch (Exception ex)
         {

@@ -58,12 +58,12 @@ public class ConfigController : ControllerBase
         try
         {
             _configProvider.Refresh();
-            _logger.LogInformation("Manually triggered config refresh from database");
+            _logger.LogInformation("Manually triggered config refresh from control plane");
             
             return Ok(new
             {
                 Status = "Success",
-                Message = "Config refreshed from database successfully"
+                Message = "Config refreshed from control plane successfully"
             });
         }
         catch (Exception ex)
@@ -73,6 +73,34 @@ public class ConfigController : ControllerBase
             {
                 Status = "Error",
                 Message = "Failed to refresh config"
+            });
+        }
+    }
+
+    /// <summary>
+    /// 获取当前YARP配置
+    /// </summary>
+    /// <returns>当前YARP配置</returns>
+    [HttpGet("current")]
+    public IActionResult GetCurrentConfig()
+    {
+        try
+        {
+            var config = _configProvider.GetConfig();
+            return Ok(new
+            {
+                Routes = config.Routes,
+                Clusters = config.Clusters,
+                ChangeTime = ((MinGo.Gateway.Services.DatabaseProxyConfig)config).ChangeTime
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get current config");
+            return StatusCode(500, new
+            {
+                Status = "Error",
+                Message = "Failed to get current config"
             });
         }
     }
