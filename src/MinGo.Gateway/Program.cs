@@ -18,12 +18,6 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// 配置数据库 - 使用与控制平面相同的数据库
-var connectionString = builder.Configuration.GetConnectionString("ProxyDb") 
-    ?? "Data Source=gateway.db";
-builder.Services.AddDbContext<ProxyDbContext>(options =>
-    options.UseSqlite(connectionString));
-
 // 配置反向代理，使用数据库配置提供程序
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration)
@@ -61,13 +55,6 @@ builder.Services.AddHttpClient("ControlPlane", (serviceProvider, client) =>
 builder.Services.AddHostedService<GatewayInstanceRegistrationService>();
 
 var app = builder.Build();
-
-// 初始化数据库
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ProxyDbContext>();
-    dbContext.Database.EnsureCreated();
-}
 
 app.UseRouting();
 app.MapControllers();
