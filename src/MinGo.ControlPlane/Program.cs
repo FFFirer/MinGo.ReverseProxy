@@ -42,20 +42,29 @@ builder.Services.AddScoped<IGatewayEventSender, HttpGatewayEventSender>();
 builder.Services.AddScoped<IGatewayEventService, GatewayEventService>();
 
 // 注册配置更新服务
-builder.Services.AddHostedService<ConfigUpdateService>();
 builder.Services.AddHostedService<GatewayInstanceHealthCheckService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// 初始化数据库
-using (var scope = app.Services.CreateScope())
+// 初始化数据库和示例数据
+await InitializeDatabaseAsync(app);
+
+async Task InitializeDatabaseAsync(WebApplication app)
 {
-    var gatewayDbContext = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
-    gatewayDbContext.Database.Migrate();
-    
-    var apiDbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
-    apiDbContext.Database.Migrate();
+    using (var scope = app.Services.CreateScope())
+    {
+        var gatewayDbContext = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
+        gatewayDbContext.Database.Migrate();
+        
+        var apiDbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        apiDbContext.Database.Migrate();
+        
+        // 初始化示例数据
+        var apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
+        await apiDbService.InitializeSampleDataAsync();
+        Console.WriteLine("Sample data initialized");
+    }
 }
 
 

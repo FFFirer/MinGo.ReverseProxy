@@ -176,14 +176,15 @@ public class GatewayEventService : IGatewayEventService
 /// </summary>
 public class HttpGatewayEventSender : IGatewayEventSender
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     /// <summary>
     /// 构造函数
     /// </summary>
-    public HttpGatewayEventSender()
+    /// <param name="httpClientFactory">HTTP客户端工厂</param>
+    public HttpGatewayEventSender(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        _httpClientFactory = httpClientFactory;
     }
 
     /// <summary>
@@ -203,6 +204,9 @@ public class HttpGatewayEventSender : IGatewayEventSender
 
         try
         {
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+            
             // 构建实例的事件接收URL
             var eventUrl = $"http://{instance.IpAddress}:{instance.Port}/api/events";
             var content = new StringContent(
@@ -211,7 +215,7 @@ public class HttpGatewayEventSender : IGatewayEventSender
                 "application/json"
             );
 
-            var httpResponse = await _httpClient.PostAsync(eventUrl, content);
+            var httpResponse = await httpClient.PostAsync(eventUrl, content);
             httpResponse.EnsureSuccessStatusCode();
 
             var responseContent = await httpResponse.Content.ReadAsStringAsync();

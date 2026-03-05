@@ -14,9 +14,6 @@ public class ApiManagementService : IApiManagementService
         _logger = logger;
         _apiDbService = apiDbService;
         _gatewayEventService = gatewayEventService;
-        
-        // 初始化示例数据
-        _ = InitializeSampleDataAsync();
     }
 
     public async Task<IEnumerable<RouteConfig>> GetRoutesAsync()
