@@ -45,6 +45,7 @@ public class GatewayInstanceService : IGatewayInstanceService
             existingInstance.Version = request.Version;
             existingInstance.IpAddress = request.IpAddress;
             existingInstance.Port = request.Port;
+            existingInstance.ListenerAddressesJson = JsonSerializer.Serialize(request.ListenerAddresses ?? new List<string>());
             existingInstance.Status = (int)GatewayInstanceStatus.Online;
             existingInstance.IsHealthy = true;
             existingInstance.LastHeartbeat = now;
@@ -70,6 +71,7 @@ public class GatewayInstanceService : IGatewayInstanceService
             Version = request.Version,
             IpAddress = request.IpAddress,
             Port = request.Port,
+            ListenerAddressesJson = JsonSerializer.Serialize(request.ListenerAddresses ?? new List<string>()),
             Status = (int)GatewayInstanceStatus.Online,
             IsHealthy = true,
             LastHeartbeat = now,
@@ -280,6 +282,19 @@ public class GatewayInstanceService : IGatewayInstanceService
     /// <returns>领域模型</returns>
     private static GatewayInstance MapToModel(GatewayInstanceEntity entity)
     {
+        List<string>? listenerAddresses = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(entity.ListenerAddressesJson) && entity.ListenerAddressesJson != "[]")
+            {
+                listenerAddresses = JsonSerializer.Deserialize<List<string>>(entity.ListenerAddressesJson);
+            }
+        }
+        catch
+        {
+            listenerAddresses = null;
+        }
+
         return new GatewayInstance
         {
             InstanceId = entity.InstanceId,
@@ -287,6 +302,7 @@ public class GatewayInstanceService : IGatewayInstanceService
             Version = entity.Version,
             IpAddress = entity.IpAddress,
             Port = entity.Port,
+            ListenerAddresses = listenerAddresses,
             Status = (GatewayInstanceStatus)entity.Status,
             IsHealthy = entity.IsHealthy,
             LastHeartbeat = entity.LastHeartbeat,
@@ -324,12 +340,26 @@ public class GatewayInstanceService : IGatewayInstanceService
             metadata = null;
         }
 
+        List<string>? listenerAddresses = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(entity.ListenerAddressesJson) && entity.ListenerAddressesJson != "[]")
+            {
+                listenerAddresses = JsonSerializer.Deserialize<List<string>>(entity.ListenerAddressesJson);
+            }
+        }
+        catch
+        {
+            listenerAddresses = null;
+        }
+
         return new GatewayInstanceResponse
         {
             InstanceId = entity.InstanceId,
             Name = entity.Name,
             Version = entity.Version,
-            Address = $"{entity.IpAddress}:{entity.Port}",
+            Address = listenerAddresses?.FirstOrDefault() ?? $"{entity.IpAddress}:{entity.Port}",
+            ListenerAddresses = listenerAddresses,
             Status = (GatewayInstanceStatus)entity.Status,
             IsHealthy = entity.IsHealthy,
             LastHeartbeat = entity.LastHeartbeat,

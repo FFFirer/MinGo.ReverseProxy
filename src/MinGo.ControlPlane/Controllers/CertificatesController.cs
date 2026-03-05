@@ -175,7 +175,7 @@ public class CertificatesController : ControllerBase
             DomainName = domainName,
             CertificateType = certificate.HasPrivateKey ? "Pfx" : "Cer",
             CreatedAt = DateTimeOffset.Now,
-            ExpiresAt = new DateTimeOffset(certificate.NotAfter, TimeSpan.Zero),
+            ExpiresAt = DateTimeOffset.Parse(certificate.NotAfter.ToString("o")),
             Subject = certificate.Subject,
             Issuer = certificate.Issuer,
             Thumbprint = certificate.Thumbprint,

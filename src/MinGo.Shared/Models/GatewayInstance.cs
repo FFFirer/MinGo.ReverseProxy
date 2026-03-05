@@ -21,14 +21,19 @@ public class GatewayInstance
     public string Version { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例IP地址
+    /// 实例IP地址（兼容旧版）
     /// </summary>
     public string IpAddress { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例端口
+    /// 实例端口（兼容旧版）
     /// </summary>
     public int Port { get; set; }
+
+    /// <summary>
+    /// 监听地址列表
+    /// </summary>
+    public List<string>? ListenerAddresses { get; set; }
 
     /// <summary>
     /// 实例状态
@@ -138,14 +143,19 @@ public class GatewayInstanceRegisterRequest
     public string Version { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例IP地址
+    /// 实例IP地址（兼容旧版）
     /// </summary>
     public string IpAddress { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例端口
+    /// 实例端口（兼容旧版）
     /// </summary>
     public int Port { get; set; }
+
+    /// <summary>
+    /// 监听地址列表
+    /// </summary>
+    public List<string>? ListenerAddresses { get; set; }
 
     /// <summary>
     /// 实例元数据
@@ -215,9 +225,15 @@ public class GatewayInstanceResponse
     public string Version { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例地址
+    /// 实例地址（兼容旧版）
     /// </summary>
+    [Obsolete]
     public string Address { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 监听地址列表
+    /// </summary>
+    public List<string>? ListenerAddresses { get; set; }
 
     /// <summary>
     /// 实例状态

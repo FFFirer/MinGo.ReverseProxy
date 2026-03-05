@@ -266,14 +266,19 @@ public class GatewayInstanceEntity
     public string Version { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例IP地址
+    /// 实例IP地址（兼容旧版）
     /// </summary>
     public string IpAddress { get; set; } = string.Empty;
 
     /// <summary>
-    /// 实例端口
+    /// 实例端口（兼容旧版）
     /// </summary>
     public int Port { get; set; }
+
+    /// <summary>
+    /// 监听地址列表（JSON格式）
+    /// </summary>
+    public string ListenerAddressesJson { get; set; } = "[]";
 
     /// <summary>
     /// 实例状态

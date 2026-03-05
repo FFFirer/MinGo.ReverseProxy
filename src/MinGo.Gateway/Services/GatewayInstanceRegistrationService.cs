@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using MinGo.Shared.Models;
 
 namespace MinGo.Gateway.Services;
@@ -13,6 +15,7 @@ public class GatewayInstanceRegistrationService : BackgroundService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GatewayInstanceRegistrationService> _logger;
+    private readonly IServer _server;
     private readonly string _instanceId;
     private readonly string _instanceName;
     private readonly string _instanceVersion;
@@ -30,14 +33,17 @@ public class GatewayInstanceRegistrationService : BackgroundService
     /// <param name="httpClientFactory">HTTP客户端工厂</param>
     /// <param name="configuration">配置</param>
     /// <param name="logger">日志记录器</param>
+    /// <param name="server">服务器实例</param>
     public GatewayInstanceRegistrationService(
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILogger<GatewayInstanceRegistrationService> logger)
+        ILogger<GatewayInstanceRegistrationService> logger,
+        IServer server)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
+        _server = server;
 
         _instanceId = _configuration["Gateway:InstanceId"] ?? Guid.NewGuid().ToString("N");
         _instanceName = _configuration["Gateway:Name"] ?? "Gateway-Default";
@@ -81,6 +87,8 @@ public class GatewayInstanceRegistrationService : BackgroundService
         try
         {
             var client = _httpClientFactory.CreateClient();
+            var listenerAddresses = GetListenerAddresses();
+            var firstAddress = listenerAddresses.FirstOrDefault();
             var request = new GatewayInstanceRegisterRequest
             {
                 InstanceId = _instanceId,
@@ -88,6 +96,7 @@ public class GatewayInstanceRegistrationService : BackgroundService
                 Version = _instanceVersion,
                 IpAddress = GetLocalIpAddress(),
                 Port = GetGatewayPort(),
+                ListenerAddresses = listenerAddresses,
                 Metadata = new Dictionary<string, string>
                 {
                     { "Environment", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production" },
@@ -99,7 +108,7 @@ public class GatewayInstanceRegistrationService : BackgroundService
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Gateway instance registered successfully at {Address}:{Port}", request.IpAddress, request.Port);
+                _logger.LogInformation("Gateway instance registered successfully with listener addresses: {Addresses}", string.Join(", ", listenerAddresses));
             }
             else
             {
@@ -190,6 +199,27 @@ public class GatewayInstanceRegistrationService : BackgroundService
         var url = _configuration["Kestrel:Endpoints:GatewayHttp:Url"] ?? "http://localhost:8080";
         var uri = new Uri(url);
         return uri.Port;
+    }
+
+    /// <summary>
+    /// 获取监听地址列表
+    /// </summary>
+    /// <returns>监听地址列表</returns>
+    private List<string> GetListenerAddresses()
+    {
+        var feature = _server.Features.Get<IServerAddressesFeature>();
+        var addresses = feature?.Addresses.ToList() ?? new List<string>();
+        
+        // 如果从IServerAddressesFeature获取不到地址，则从配置中读取作为 fallback
+        if (addresses.Count == 0)
+        {
+            var applicationUrl = _configuration["ASPNETCORE_URLS"] ?? _configuration["applicationUrl"] ?? "http://localhost:8080";
+            addresses = applicationUrl.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(url => url.Trim())
+                .ToList();
+        }
+        
+        return addresses;
     }
 
     /// <summary>

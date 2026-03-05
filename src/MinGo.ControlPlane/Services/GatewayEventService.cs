@@ -208,7 +208,7 @@ public class HttpGatewayEventSender : IGatewayEventSender
             httpClient.Timeout = TimeSpan.FromSeconds(10);
             
             // 构建实例的事件接收URL
-            var eventUrl = $"http://{instance.IpAddress}:{instance.Port}/api/events";
+            var eventUrl = $"{instance.ListenerAddresses?.FirstOrDefault() ?? $"http://{instance.IpAddress}:{instance.Port}"}/api/events";
             var content = new StringContent(
                 JsonSerializer.Serialize(gatewayEvent),
                 System.Text.Encoding.UTF8,
