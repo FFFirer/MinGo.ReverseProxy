@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using MinGo.ControlPlane.Data;
 using MinGo.ControlPlane.Services;
+using MinGo.ControlPlane.Options;
+using MinGo.ControlPlane.Extensions;
 using Serilog;
 using Vite.AspNetCore;
+using Yarp.ReverseProxy.Configuration;
 
 Console.WriteLine("Starting MinGo Control Plane...");
 
@@ -20,6 +23,39 @@ builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+
+// 配置反向代理，使用数据库配置提供程序
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration)
+    .LoadFromDatabase();
+
+// 添加健康检查服务
+builder.Services.AddHealthChecks();
+
+// 配置ControlPlane选项
+builder.Services.Configure<ControlPlaneOptions>(
+    builder.Configuration.GetSection(ControlPlaneOptions.SectionName));
+
+// 添加HTTP客户端工厂，配置ControlPlane客户端
+builder.Services.AddHttpClient("ControlPlane", (serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    client.BaseAddress = new Uri(options.Url);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ControlPlaneOptions>>().Value;
+    var handler = new System.Net.Http.HttpClientHandler();
+
+    if (options.SkipSslCertificateValidation)
+    {
+        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+    }
+
+    return handler;
+});
 
 // 配置数据库
 builder.Services.AddDbContext<GatewayDbContext>(options =>
@@ -42,6 +78,7 @@ builder.Services.AddScoped<IGatewayEventService, GatewayEventService>();
 
 // 注册配置更新服务
 builder.Services.AddHostedService<GatewayInstanceHealthCheckService>();
+builder.Services.AddHostedService<MinGo.ControlPlane.Services.GatewayInstanceRegistrationService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
@@ -86,6 +123,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+// 映射健康检查端点
+app.MapHealthChecks("/health");
+
+// 映射反向代理端点（所有非管理路径）
+app.MapReverseProxy();
+
+// 映射管理界面和API
 app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
