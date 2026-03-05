@@ -130,7 +130,7 @@ public class InstancesController : ControllerBase
         try
         {
             // 构建实例的配置 API 地址
-            var configUrl = $"http://{instance.Address}/api/config/current";
+            var configUrl = $"http://{instance.IpAddress}:{instance.Port}/api/config/current";
             _logger.LogInformation("正在从 {Url} 获取实例配置", configUrl);
 
             // 创建 HTTP 客户端并调用实例的配置 API

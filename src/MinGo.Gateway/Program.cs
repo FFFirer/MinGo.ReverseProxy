@@ -70,15 +70,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseRouting();
-
-app.UseEndpoints(endpoints =>
-{
-    // 为管理接口配置路由（使用 8081/8444 端口）
-    endpoints.MapControllers().RequireHost("*:8081", "*:8444");
-    endpoints.MapHealthChecks("/health").RequireHost("*:8081", "*:8444");
-    
-    // 为反向代理配置路由（使用 8080/8443 端口）
-    endpoints.MapReverseProxy().RequireHost("*:8080", "*:8443");
-});
+app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapReverseProxy();
 
 app.Run();
