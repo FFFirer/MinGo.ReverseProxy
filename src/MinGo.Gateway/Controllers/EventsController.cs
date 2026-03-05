@@ -84,6 +84,7 @@ public class EventsController : ControllerBase
     /// <returns>任务</returns>
     private async Task ProcessEventAsync(GatewayEvent gatewayEvent)
     {
+        _logger.LogDebug("开始处理事件: {EventType} {EventId}", gatewayEvent.EventType, gatewayEvent.EventId);
         // 根据事件类型处理不同的事件
         switch (gatewayEvent.EventType)
         {
