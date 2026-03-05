@@ -2,15 +2,6 @@ using MinGo.Shared.Models;
 
 namespace MinGo.ControlPlane.Services;
 
-public interface IConfigService
-{
-    Task<GatewayConfig> GetConfigAsync();
-    Task<GatewayConfig> GetConfigByVersionAsync(string version);
-    Task<GatewayConfig> CreateConfigAsync(GatewayConfig config);
-    Task<GatewayConfig> UpdateConfigAsync(string id, GatewayConfig config);
-    Task DeleteConfigAsync(string id);
-    Task NotifyConfigChangeAsync(GatewayConfig config);
-}
 
 public interface IMonitoringService
 {

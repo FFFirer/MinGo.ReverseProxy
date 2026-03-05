@@ -163,3 +163,36 @@ public class ClustersController : ControllerBase
         return Ok(cluster);
     }
 }
+
+[ApiController]
+[Route("api/[controller]")]
+public class ApiManagementController : ControllerBase
+{
+    private readonly IApiManagementService _apiManagementService;
+    private readonly ILogger<ApiManagementController> _logger;
+
+    public ApiManagementController(IApiManagementService apiManagementService, ILogger<ApiManagementController> logger)
+    {
+        _apiManagementService = apiManagementService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// 获取当前最新的集群配置项及路由配置
+    /// </summary>
+    /// <returns>包含集群和路由配置的响应</returns>
+    [HttpGet("config")]
+    public async Task<ActionResult<object>> GetCurrentConfig()
+    {
+        var routes = await _apiManagementService.GetRoutesAsync();
+        var clusters = await _apiManagementService.GetClustersAsync();
+
+        var config = new
+        {
+            Routes = routes,
+            Clusters = clusters
+        };
+
+        return Ok(config);
+    }
+}

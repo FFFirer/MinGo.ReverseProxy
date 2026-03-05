@@ -32,7 +32,6 @@ builder.Services.AddDbContext<ApiDbContext>(options =>
 // 注册服务
 builder.Services.AddScoped<IDbConfigService, DbConfigService>();
 builder.Services.AddScoped<IApiDbService, ApiDbService>();
-builder.Services.AddScoped<IConfigService, ConfigService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
