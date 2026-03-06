@@ -1,0 +1,47 @@
+@page "/clusters"
+
+<Header PageTitle="集群管理" />
+
+<div class="clusters">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">集群列表</h5>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>服务数</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>api-cluster</td>
+                        <td>3</td>
+                        <td>健康</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">编辑</button>
+                            <button class="btn btn-sm btn-danger">删除</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>frontend-cluster</td>
+                        <td>2</td>
+                        <td>健康</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">编辑</button>
+                            <button class="btn btn-sm btn-danger">删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .clusters {
+        margin-top: 2rem;
+    }
+</style>

@@ -1,0 +1,47 @@
+@page "/logs"
+
+<Header PageTitle="日志管理" />
+
+<div class="logs">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">系统日志</h5>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>级别</th>
+                        <th>消息</th>
+                        <th>来源</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2026-03-06 18:30:00</td>
+                        <td>信息</td>
+                        <td>网关启动成功</td>
+                        <td>Gateway</td>
+                    </tr>
+                    <tr>
+                        <td>2026-03-06 18:29:30</td>
+                        <td>警告</td>
+                        <td>配置更新</td>
+                        <td>ControlPlane</td>
+                    </tr>
+                    <tr>
+                        <td>2026-03-06 18:28:15</td>
+                        <td>错误</td>
+                        <td>路由配置错误</td>
+                        <td>Gateway</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .logs {
+        margin-top: 2rem;
+    }
+</style>

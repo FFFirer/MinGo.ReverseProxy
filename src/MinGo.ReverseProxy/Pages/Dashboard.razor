@@ -1,0 +1,86 @@
+@page "/"
+
+<Header PageTitle="仪表盘" />
+
+<div class="dashboard">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">活跃路由</h5>
+                    <p class="card-text">12</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">集群数量</h5>
+                    <p class="card-text">3</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">网关实例</h5>
+                    <p class="card-text">2</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">请求量</h5>
+                    <p class="card-text">1,245</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">最近请求</h5>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>路由</th>
+                                <th>状态</th>
+                                <th>响应时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2026-03-06 18:30</td>
+                                <td>/api/users</td>
+                                <td>200</td>
+                                <td>120ms</td>
+                            </tr>
+                            <tr>
+                                <td>2026-03-06 18:29</td>
+                                <td>/api/products</td>
+                                <td>200</td>
+                                <td>85ms</td>
+                            </tr>
+                            <tr>
+                                <td>2026-03-06 18:28</td>
+                                <td>/api/orders</td>
+                                <td>404</td>
+                                <td>30ms</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard {
+        margin-top: 2rem;
+    }
+</style>

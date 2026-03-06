@@ -1,0 +1,37 @@
+@page "/settings"
+
+<Header PageTitle="系统设置" />
+
+<div class="settings">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">系统配置</h5>
+            <form>
+                <div class="form-group">
+                    <label for="appName">应用名称</label>
+                    <input type="text" class="form-control" id="appName" value="MinGo Reverse Proxy">
+                </div>
+                <div class="form-group">
+                    <label for="logLevel">日志级别</label>
+                    <select class="form-control" id="logLevel">
+                        <option>Debug</option>
+                        <option selected>Information</option>
+                        <option>Warning</option>
+                        <option>Error</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="databaseConnection">数据库连接</label>
+                    <input type="text" class="form-control" id="databaseConnection" value="Data Source=gateway.db">
+                </div>
+                <button type="submit" class="btn btn-primary">保存设置</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings {
+        margin-top: 2rem;
+    }
+</style>

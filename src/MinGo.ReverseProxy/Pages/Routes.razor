@@ -1,0 +1,50 @@
+@page "/routes"
+
+<Header PageTitle="路由管理" />
+
+<div class="routes">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">路由列表</h5>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>路径</th>
+                        <th>集群</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>API 路由</td>
+                        <td>/api/*</td>
+                        <td>api-cluster</td>
+                        <td>活跃</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">编辑</button>
+                            <button class="btn btn-sm btn-danger">删除</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>前端路由</td>
+                        <td>/*</td>
+                        <td>frontend-cluster</td>
+                        <td>活跃</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">编辑</button>
+                            <button class="btn btn-sm btn-danger">删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .routes {
+        margin-top: 2rem;
+    }
+</style>
