@@ -8,6 +8,9 @@ public class LogQuery
     public string? Category { get; set; }
     public string? Message { get; set; }
     public string? InstanceId { get; set; }
+    public string? RouteId { get; set; }
+    public string? ClusterId { get; set; }
+    public int? StatusCode { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 100;
 }

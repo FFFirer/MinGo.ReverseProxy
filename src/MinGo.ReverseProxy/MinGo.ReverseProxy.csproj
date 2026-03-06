@@ -4,6 +4,7 @@
     <ProjectReference Include="..\MinGo.Application\MinGo.Application.csproj" />
     <ProjectReference Include="..\MinGo.Infrastructure\MinGo.Infrastructure.csproj" />
     <ProjectReference Include="..\MinGo.Core\MinGo.Core.csproj" />
+    <ProjectReference Include="..\MinGo.Shared\MinGo.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
