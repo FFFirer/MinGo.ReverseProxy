@@ -1,0 +1,26 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="header">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-6">
+                <h1>@PageTitle</h1>
+            </div>
+            <div class="col-md-6 text-right">
+                <button class="btn btn-primary">添加</button>
+                <button class="btn btn-secondary ml-2">刷新</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string PageTitle { get; set; } = "MinGo Reverse Proxy";
+}
+
+<style>
+    .header {
+        padding: 1rem 0;
+    }
+</style>

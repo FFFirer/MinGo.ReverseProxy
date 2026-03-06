@@ -7,6 +7,5 @@
     <Project Path="src/MinGo.Infrastructure/MinGo.Infrastructure.csproj" />
     <Project Path="src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj" />
     <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" />
-    <Project Path="src/MinGo.Web/MinGo.Web.csproj" />
   </Folder>
 </Solution>
