@@ -35,26 +35,12 @@ builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayInstanceService, MinGo.
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventSender, MinGo.Application.Services.GatewayEventSender>();
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventService, MinGo.Application.Services.GatewayEventService>();
 
+// 反向代理
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration);
+
+
 var app = builder.Build();
-
-// 初始化数据库和示例数据
-await InitializeDatabaseAsync(app);
-
-async Task InitializeDatabaseAsync(WebApplication app)
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        var apiDbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
-        apiDbContext.Database.Migrate();
-        
-        // 初始化示例数据
-        var apiDbService = scope.ServiceProvider.GetRequiredService<MinGo.Core.Interfaces.IApiDbService>();
-        await apiDbService.InitializeSampleDataAsync();
-        Console.WriteLine("Sample data initialized");
-    }
-}
-
-Console.WriteLine("Configuring middleware...");
 
 if (!app.Environment.IsDevelopment())
 {
@@ -78,3 +64,4 @@ app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
+

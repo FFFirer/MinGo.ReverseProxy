@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using MinGo.Core.Models;
+using MinGo.Core.Interfaces;
 using Yarp.ReverseProxy.Configuration;
 using YarpRouteConfig = Yarp.ReverseProxy.Configuration.RouteConfig;
 using YarpClusterConfig = Yarp.ReverseProxy.Configuration.ClusterConfig;
@@ -17,8 +18,7 @@ namespace MinGo.Infrastructure.ExternalServices;
 /// </summary>
 public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string _controlPlaneUrl;
+    private readonly IApiDbService _apiDbService;
     private readonly ILogger<DatabaseProxyConfigProvider> _logger;
     private volatile DatabaseProxyConfig _config;
     private bool _disposed;
@@ -26,15 +26,13 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="httpClientFactory">HTTP 客户端工厂</param>
-    /// <param name="controlPlaneUrl">控制平面 URL</param>
+    /// <param name="apiDbService">API 数据库服务</param>
     /// <param name="logger">日志记录器</param>
-    public DatabaseProxyConfigProvider(IHttpClientFactory httpClientFactory, string controlPlaneUrl, ILogger<DatabaseProxyConfigProvider> logger)
+    public DatabaseProxyConfigProvider(IApiDbService apiDbService, ILogger<DatabaseProxyConfigProvider> logger)
     {
-        _httpClientFactory = httpClientFactory;
-        _controlPlaneUrl = controlPlaneUrl;
+        _apiDbService = apiDbService;
         _logger = logger;
-        _config = LoadConfigFromControlPlane();
+        _config = LoadConfigFromDatabase();
     }
 
     /// <summary>
@@ -44,76 +42,73 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     public IProxyConfig GetConfig() => _config;
 
     /// <summary>
-    /// 从控制平面加载配置
+    /// 从数据库加载配置
     /// </summary>
-    private DatabaseProxyConfig LoadConfigFromControlPlane()
+    private DatabaseProxyConfig LoadConfigFromDatabase()
     {
         var routes = new List<YarpRouteConfig>();
         var clusters = new List<YarpClusterConfig>();
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("ControlPlane");
-            var configUrl = $"{_controlPlaneUrl}/api/ApiManagement/config";
-            _logger.LogInformation("正在从 {Url} 拉取配置", configUrl);
+            _logger.LogInformation("正在从数据库加载配置");
 
-            var response = httpClient.GetAsync(configUrl).Result;
-            if (response.IsSuccessStatusCode)
+            // 同步获取路由和集群配置
+            var routesTask = _apiDbService.GetRoutesAsync();
+            var clustersTask = _apiDbService.GetClustersAsync();
+            Task.WaitAll(routesTask, clustersTask);
+
+            var dbRoutes = routesTask.Result;
+            var dbClusters = clustersTask.Result;
+
+            // 转换集群配置
+            foreach (var cluster in dbClusters)
             {
-                var config = response.Content.ReadFromJsonAsync<ControlPlaneConfigResponse>().Result;
-                if (config != null)
+                var destinations = new Dictionary<string, YarpDestinationConfig>();
+                if (cluster.Destinations != null)
                 {
-                    // 转换集群配置
-                    foreach (var cluster in config.Clusters)
+                    foreach (var dest in cluster.Destinations)
                     {
-                        var destinations = new Dictionary<string, YarpDestinationConfig>();
-                        if (cluster.Destinations != null)
+                        destinations[dest.Key] = new YarpDestinationConfig
                         {
-                            foreach (var dest in cluster.Destinations)
-                            {
-                                destinations[dest.Key] = new YarpDestinationConfig
-                                {
-                                    Address = dest.Value.Address
-                                };
-                            }
+                            Address = dest.Value.Address
+                        };
+                    }
+                }
+
+                var clusterConfig = new YarpClusterConfig
+                {
+                    ClusterId = cluster.Id,
+                    LoadBalancingPolicy = cluster.LoadBalancingPolicy,
+                    Destinations = destinations
+                };
+                clusters.Add(clusterConfig);
+            }
+
+            // 转换路由配置
+            foreach (var route in dbRoutes)
+            {
+                if (route.Enabled)
+                {
+                    var routeConfig = new YarpRouteConfig
+                    {
+                        RouteId = route.Id,
+                        ClusterId = route.ClusterId,
+                        Match = new Yarp.ReverseProxy.Configuration.RouteMatch
+                        {
+                            Path = route.Match?.Path,
+                            Hosts = route.Match?.Host != null ? new[] { route.Match.Host } : Array.Empty<string>()
                         }
-
-                        var clusterConfig = new YarpClusterConfig
-                        {
-                            ClusterId = cluster.Id,
-                            LoadBalancingPolicy = cluster.LoadBalancingPolicy,
-                            Destinations = destinations
-                        };
-                        clusters.Add(clusterConfig);
-                    }
-
-                    // 转换路由配置
-                    foreach (var route in config.Routes)
-                    {
-                        var routeConfig = new YarpRouteConfig
-                        {
-                            RouteId = route.Id,
-                            ClusterId = route.ClusterId,
-                            Match = new Yarp.ReverseProxy.Configuration.RouteMatch
-                            {
-                                Path = route.Match?.Path,
-                                Hosts = route.Match?.Host != null ? new[] { route.Match.Host } : Array.Empty<string>()
-                            }
-                        };
-                        routes.Add(routeConfig);
-                    }
-
-                    _logger.LogInformation("成功从控制平面拉取配置，路由数: {RouteCount}, 集群数: {ClusterCount}", routes.Count, clusters.Count);
+                    };
+                    routes.Add(routeConfig);
                 }
             }
-            else
-            {
-                _logger.LogWarning("拉取配置失败: {StatusCode}", response.StatusCode);
-            }
+
+            _logger.LogInformation("成功从数据库加载配置，路由数: {RouteCount}, 集群数: {ClusterCount}", routes.Count, clusters.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "拉取配置异常");
+            _logger.LogError(ex, "从数据库加载配置异常");
         }
 
         _logger.LogDebug("共加载{R}条路由，{C}条集群", routes.Count, clusters.Count);
@@ -122,27 +117,11 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     }
 
     /// <summary>
-    /// 控制平面配置响应
-    /// </summary>
-    private class ControlPlaneConfigResponse
-    {
-        /// <summary>
-        /// 路由配置
-        /// </summary>
-        public List<MinGo.Core.Models.RouteConfig> Routes { get; set; }
-
-        /// <summary>
-        /// 集群配置
-        /// </summary>
-        public List<MinGo.Core.Models.ClusterConfig> Clusters { get; set; }
-    }
-
-    /// <summary>
     /// 手动刷新配置
     /// </summary>
     public void Refresh()
     {
-        var latest = LoadConfigFromControlPlane();
+        var latest = LoadConfigFromDatabase();
         var oldConfig = Interlocked.Exchange(ref _config, latest);
         oldConfig.SignalChange();
     }
