@@ -18,7 +18,7 @@ namespace MinGo.Infrastructure.ExternalServices;
 /// </summary>
 public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
 {
-    private readonly IApiDbService _apiDbService;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<DatabaseProxyConfigProvider> _logger;
     private volatile DatabaseProxyConfig _config;
     private bool _disposed;
@@ -28,9 +28,9 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     /// </summary>
     /// <param name="apiDbService">API 数据库服务</param>
     /// <param name="logger">日志记录器</param>
-    public DatabaseProxyConfigProvider(IApiDbService apiDbService, ILogger<DatabaseProxyConfigProvider> logger)
+    public DatabaseProxyConfigProvider(IServiceScopeFactory serviceScopeFactory, ILogger<DatabaseProxyConfigProvider> logger)
     {
-        _apiDbService = apiDbService;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _config = LoadConfigFromDatabase();
     }
@@ -51,6 +51,9 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
 
         try
         {
+            using var scope = _serviceScopeFactory.CreateAsyncScope();
+            var _apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
+
             _logger.LogInformation("正在从数据库加载配置");
 
             // 同步获取路由和集群配置

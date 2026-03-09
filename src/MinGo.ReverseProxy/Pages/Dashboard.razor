@@ -1,86 +1,164 @@
 @page "/"
+@page "/dashboard"
 
-<PageHeader PageTitle="仪表盘" />
+<PageTitle>仪表盘 - MinGo API网关</PageTitle>
 
-<div class="dashboard">
-    <div class="row">
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">活跃路由</h5>
-                    <p class="card-text">12</p>
-                </div>
+<div class="mb-6">
+    <h2 class="text-2xl font-bold mb-2">仪表盘</h2>
+    <p class="text-secondary">实时监控网关运行状态</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-secondary text-sm">总请求数</p>
+                <h3 class="text-2xl font-bold">12,458</h3>
+                <p class="text-success text-sm mt-1"><i class="fa fa-arrow-up"></i> 12.5%</p>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">集群数量</h5>
-                    <p class="card-text">3</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">网关实例</h5>
-                    <p class="card-text">2</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">请求量</h5>
-                    <p class="card-text">1,245</p>
-                </div>
+            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <i class="fa fa-refresh"></i>
             </div>
         </div>
     </div>
-
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">最近请求</h5>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>时间</th>
-                                <th>路由</th>
-                                <th>状态</th>
-                                <th>响应时间</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>2026-03-06 18:30</td>
-                                <td>/api/users</td>
-                                <td>200</td>
-                                <td>120ms</td>
-                            </tr>
-                            <tr>
-                                <td>2026-03-06 18:29</td>
-                                <td>/api/products</td>
-                                <td>200</td>
-                                <td>85ms</td>
-                            </tr>
-                            <tr>
-                                <td>2026-03-06 18:28</td>
-                                <td>/api/orders</td>
-                                <td>404</td>
-                                <td>30ms</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-secondary text-sm">错误率</p>
+                <h3 class="text-2xl font-bold">1.2%</h3>
+                <p class="text-danger text-sm mt-1"><i class="fa fa-arrow-up"></i> 0.3%</p>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
+                <i class="fa fa-exclamation-circle"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-secondary text-sm">平均响应时间</p>
+                <h3 class="text-2xl font-bold">45ms</h3>
+                <p class="text-success text-sm mt-1"><i class="fa fa-arrow-down"></i> 5.2%</p>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
+                <i class="fa fa-clock-o"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-secondary text-sm">活跃服务</p>
+                <h3 class="text-2xl font-bold">8/10</h3>
+                <p class="text-success text-sm mt-1">全部正常</p>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                <i class="fa fa-server"></i>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    .dashboard {
-        margin-top: 2rem;
-    }
-</style>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <h3 class="font-semibold mb-4">请求趋势</h3>
+        <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
+            <p class="text-secondary">请求趋势图表</p>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+        <h3 class="font-semibold mb-4">服务状态</h3>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-success"></div>
+                    <span>Service A</span>
+                </div>
+                <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                    <div class="bg-success h-2 rounded-full" style="width: 95%"></div>
+                </div>
+                <span class="text-sm">95%</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-success"></div>
+                    <span>Service B</span>
+                </div>
+                <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                    <div class="bg-success h-2 rounded-full" style="width: 92%"></div>
+                </div>
+                <span class="text-sm">92%</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-warning"></div>
+                    <span>Service C</span>
+                </div>
+                <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                    <div class="bg-warning h-2 rounded-full" style="width: 75%"></div>
+                </div>
+                <span class="text-sm">75%</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-success"></div>
+                    <span>Service D</span>
+                </div>
+                <div class="w-1/2 bg-gray-200 dark:bg-dark-200 rounded-full h-2">
+                    <div class="bg-success h-2 rounded-full" style="width: 98%"></div>
+                </div>
+                <span class="text-sm">98%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold">最近请求</h3>
+        <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200 text-sm py-1">查看全部</button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-200 dark:border-dark-200">
+                    <th class="text-left py-3 px-4 font-medium text-secondary">时间</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">方法</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">状态码</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary">响应时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4">2026-02-12 23:45</td>
+                    <td class="py-3 px-4">/api/users</td>
+                    <td class="py-3 px-4">GET</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">200</span></td>
+                    <td class="py-3 px-4">32ms</td>
+                </tr>
+                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4">2026-02-12 23:44</td>
+                    <td class="py-3 px-4">/api/products</td>
+                    <td class="py-3 px-4">POST</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-success/10 text-success">201</span></td>
+                    <td class="py-3 px-4">45ms</td>
+                </tr>
+                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4">2026-02-12 23:43</td>
+                    <td class="py-3 px-4">/api/orders</td>
+                    <td class="py-3 px-4">GET</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-warning/10 text-warning">401</span></td>
+                    <td class="py-3 px-4">18ms</td>
+                </tr>
+                <tr class="hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                    <td class="py-3 px-4">2026-02-12 23:42</td>
+                    <td class="py-3 px-4">/api/payments</td>
+                    <td class="py-3 px-4">POST</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs font-medium rounded-full bg-danger/10 text-danger">500</span></td>
+                    <td class="py-3 px-4">120ms</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

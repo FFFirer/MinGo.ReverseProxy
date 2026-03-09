@@ -3,6 +3,7 @@ using MinGo.Infrastructure.Data;
 using MinGo.Application.Services;
 using Serilog;
 using Vite.AspNetCore;
+using MinGo.Infrastructure;
 
 Console.WriteLine("Starting MinGo Reverse Proxy...");
 
@@ -11,6 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
+
+int[] AdminPorts = [58074];
+int[] ProxyPorts = [5286, 7064];
+
+// builder.Configuration.GetSection(nameof(AdminPorts)).Bind(AdminPorts);
+// builder.Configuration.GetSection(nameof(ProxyPorts)).Bind(ProxyPorts);
 
 builder.Host.UseSerilog();
 builder.Services.AddViteServices();
@@ -37,31 +44,56 @@ builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventService, MinGo.App
 
 // 反向代理
 builder.Services.AddReverseProxy()
-    .LoadFromConfig(builder.Configuration);
-
+    .LoadFromConfig(builder.Configuration)
+    .LoadFromDatabase();
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+app.UseDevelopmentAutoMigration();
+
+app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
 {
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-}
+    if (!app.Environment.IsDevelopment())
+    {
+        b.UseExceptionHandler("/Error");
+        // b.UseHsts();
+    }
 
-if(app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment())
+    {
+        b.UseViteDevelopmentServer(true);
+    }
+
+    // b.UseHttpsRedirection();
+
+    b.UseStaticFiles();
+
+    b.UseRouting();
+
+    b.UseEndpoints(e =>
+    {
+        e.MapControllers();
+        e.MapBlazorHub();
+        e.MapFallbackToPage("/_Host");
+    });
+});
+
+app.MapWhen(x => ProxyPorts.Contains(x.Connection.LocalPort), b =>
 {
-    app.UseViteDevelopmentServer(true);
-}
+    b.UseRouting();
+    b.UseEndpoints(e =>
+    {
+        e.MapReverseProxy();
+    });
+});
 
-app.UseHttpsRedirection();
+var adminHosts = AdminPorts.Select(p => $"*:{p}").ToArray();
+var proxyHosts = ProxyPorts.Select(p => $"*:{p}").ToArray();
 
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.MapControllers();
-app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
+// app.MapControllers().RequireHost(adminHosts);
+// app.MapBlazorHub().RequireHost(adminHosts);
+// app.MapFallbackToPage("/_Host").RequireHost(adminHosts);
+// app.MapReverseProxy().RequireHost(proxyHosts);
 
 app.Run();
 

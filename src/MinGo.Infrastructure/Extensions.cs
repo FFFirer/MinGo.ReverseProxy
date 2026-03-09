@@ -1,3 +1,11 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using MinGo.Infrastructure.ExternalServices;
+using Yarp.ReverseProxy.Configuration;
+
 namespace MinGo.Infrastructure;
 /// <summary>
 /// YARP反向代理扩展方法
@@ -16,5 +24,18 @@ public static class ReverseProxyExtensions
         builder.Services.AddSingleton<IProxyConfigProvider>(sp => sp.GetRequiredService<DatabaseProxyConfigProvider>());
 
         return builder;
+    }
+
+    public static void UseDevelopmentAutoMigration(this WebApplication app)
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            using var scope = app.Services.CreateScope();
+            var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("AutoMigration");
+            var dbContext = scope.ServiceProvider.GetRequiredService<Data.ApiDbContext>();
+            dbContext.Database.Migrate();
+
+            logger.LogInformation("Auto apply migrations!");
+        }
     }
 }
