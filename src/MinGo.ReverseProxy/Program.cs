@@ -30,7 +30,7 @@ builder.Services.AddHttpClient();
 
 // 配置数据库
 builder.Services.AddDbContext<ApiDbContext>(options =>
-    options.UseSqlite("Data Source=gateway.db")
+    options.UseSqlite("Data Source=proxy.db")
 );
 
 // 注册服务
@@ -41,6 +41,10 @@ builder.Services.AddScoped<MinGo.Core.Interfaces.IApiManagementService, MinGo.Ap
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayInstanceService, MinGo.Application.Services.GatewayInstanceService>();
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventSender, MinGo.Application.Services.GatewayEventSender>();
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventService, MinGo.Application.Services.GatewayEventService>();
+builder.Services.AddSingleton<MinGo.Core.Interfaces.IMessageNotificationService, MinGo.Application.Services.MemoryMessageNotificationService>();
+
+// 注册配置更新事件监听器
+builder.Services.AddHostedService<MinGo.Infrastructure.ExternalServices.ConfigUpdateEventListener>();
 
 // 反向代理
 builder.Services.AddReverseProxy()
@@ -78,17 +82,19 @@ app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
     });
 });
 
-app.MapWhen(x => ProxyPorts.Contains(x.Connection.LocalPort), b =>
-{
-    b.UseRouting();
-    b.UseEndpoints(e =>
-    {
-        e.MapReverseProxy();
-    });
-});
+// app.MapWhen(x => ProxyPorts.Contains(x.Connection.LocalPort), b =>
+// {
+//     // b.UseRouting();
+//     b.UseEndpoints(e =>
+//     {
+//         e.MapReverseProxy();
+//     });
+// });
 
 var adminHosts = AdminPorts.Select(p => $"*:{p}").ToArray();
 var proxyHosts = ProxyPorts.Select(p => $"*:{p}").ToArray();
+
+app.MapReverseProxy().RequireHost(proxyHosts);
 
 // app.MapControllers().RequireHost(adminHosts);
 // app.MapBlazorHub().RequireHost(adminHosts);

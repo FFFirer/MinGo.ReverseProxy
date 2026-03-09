@@ -1,9 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/MinGo.Application/MinGo.Application.csproj" />
-    <Project Path="src/MinGo.ControlPlane/MinGo.ControlPlane.csproj" />
     <Project Path="src/MinGo.Core/MinGo.Core.csproj" />
-    <Project Path="src/MinGo.Gateway/MinGo.Gateway.csproj" />
     <Project Path="src/MinGo.Infrastructure/MinGo.Infrastructure.csproj" />
     <Project Path="src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj" />
     <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" />

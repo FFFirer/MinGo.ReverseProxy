@@ -11,11 +11,13 @@ public class GatewayEventService : IGatewayEventService
 {
     private readonly ILogger<GatewayEventService> _logger;
     private readonly IGatewayEventSender _eventSender;
+    private readonly IMessageNotificationService _messageNotificationService;
 
-    public GatewayEventService(ILogger<GatewayEventService> logger, IGatewayEventSender eventSender)
+    public GatewayEventService(ILogger<GatewayEventService> logger, IGatewayEventSender eventSender, IMessageNotificationService messageNotificationService)
     {
         _logger = logger;
         _eventSender = eventSender;
+        _messageNotificationService = messageNotificationService;
     }
 
     /// <summary>
@@ -27,10 +29,22 @@ public class GatewayEventService : IGatewayEventService
     /// <returns>事件响应列表</returns>
     public async Task<List<GatewayEventResponse>> SendEventToAllInstancesAsync(GatewayEventType eventType, object eventData, int priority = 0)
     {
-        // 这里应该实现具体的发送事件到所有实例的逻辑
-        var responses = new List<GatewayEventResponse>();
+        // 创建事件对象
+        var gatewayEvent = new GatewayEvent
+        {
+            EventId = Guid.NewGuid().ToString(),
+            EventType = eventType,
+            EventTime = DateTimeOffset.UtcNow,
+            Source = "GatewayEventService",
+            EventDataJson = System.Text.Json.JsonSerializer.Serialize(eventData),
+            Priority = priority
+        };
+
+        // 通过消息通知服务发布事件
+        await _messageNotificationService.PublishEventAsync(gatewayEvent);
+
         _logger.LogInformation("Sent event {EventType} to all instances", eventType);
-        return await Task.FromResult(responses);
+        return new List<GatewayEventResponse>();
     }
 
     /// <summary>
