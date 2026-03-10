@@ -62,17 +62,48 @@ public class MonitoringService : IMonitoringService
             : new List<MetricPoint>();
 
         var metrics = new List<RequestMetrics>();
-        if (durationPoints.Count > 0)
+        
+        // 按分钟分组计算数据点
+        var timeSpan = end - start;
+        var intervalMinutes = Math.Min((int)timeSpan.TotalMinutes, 60); // 最多60个数据点
+        if (intervalMinutes < 1) intervalMinutes = 1;
+        
+        for (int i = 0; i <= intervalMinutes; i++)
         {
-            metrics.Add(new RequestMetrics
+            var intervalStart = start.AddMinutes(i);
+            var intervalEnd = intervalStart.AddMinutes(1);
+            
+            if (intervalStart > end) break;
+            
+            var intervalDurationPoints = durationPoints.Where(p => p.Timestamp >= intervalStart.UtcDateTime && p.Timestamp < intervalEnd.UtcDateTime).ToList();
+            var intervalTotalPoints = totalPoints.Where(p => p.Timestamp >= intervalStart.UtcDateTime && p.Timestamp < intervalEnd.UtcDateTime).ToList();
+            var intervalErrorPoints = errorPoints.Where(p => p.Timestamp >= intervalStart.UtcDateTime && p.Timestamp < intervalEnd.UtcDateTime).ToList();
+            
+            if (intervalTotalPoints.Count > 0 || intervalErrorPoints.Count > 0)
             {
-                Timestamp = end,
-                Count = totalPoints.Sum(p => (int)p.Value),
-                ErrorCount = errorPoints.Sum(p => (int)p.Value),
-                AverageResponseTime = durationPoints.Average(p => p.Value),
-                P95ResponseTime = GetPercentile(durationPoints.Select(p => p.Value).ToList(), 95),
-                P99ResponseTime = GetPercentile(durationPoints.Select(p => p.Value).ToList(), 99)
-            });
+                metrics.Add(new RequestMetrics
+                {
+                    Timestamp = intervalStart,
+                    Count = intervalTotalPoints.Sum(p => (int)p.Value),
+                    ErrorCount = intervalErrorPoints.Sum(p => (int)p.Value),
+                    AverageResponseTime = intervalDurationPoints.Count > 0 ? intervalDurationPoints.Average(p => p.Value) : 0,
+                    P95ResponseTime = GetPercentile(intervalDurationPoints.Select(p => p.Value).ToList(), 95),
+                    P99ResponseTime = GetPercentile(intervalDurationPoints.Select(p => p.Value).ToList(), 99)
+                });
+            }
+            else
+            {
+                // 添加空数据点以保持图表连续
+                metrics.Add(new RequestMetrics
+                {
+                    Timestamp = intervalStart,
+                    Count = 0,
+                    ErrorCount = 0,
+                    AverageResponseTime = 0,
+                    P95ResponseTime = 0,
+                    P99ResponseTime = 0
+                });
+            }
         }
 
         return Task.FromResult(metrics.AsEnumerable());

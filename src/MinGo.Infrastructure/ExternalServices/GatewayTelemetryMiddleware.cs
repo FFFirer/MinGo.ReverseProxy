@@ -33,8 +33,9 @@ namespace MinGo.Infrastructure.ExternalServices
         /// <returns>任务</returns>
         public async Task Invoke(HttpContext ctx)
         {
-            var route = ctx.GetEndpoint()?.DisplayName;
-            using var activity = Source.StartActivity($"gateway.request: {ctx.Request.Method} {ctx.Request.Path}", ActivityKind.Server);
+            var endpoint = ctx.GetEndpoint();
+            var route = endpoint?.DisplayName ?? $"{ctx.Request.Method} {ctx.Request.Path}";
+            using var activity = Source.StartActivity($"gateway.request: {route}", ActivityKind.Server);
 
             var sw = Stopwatch.StartNew();
 

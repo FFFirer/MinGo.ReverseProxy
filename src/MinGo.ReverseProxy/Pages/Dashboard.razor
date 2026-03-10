@@ -3,9 +3,15 @@
 
 @inject MinGo.Core.Interfaces.IMonitoringService monitoringService
 @inject MinGo.Core.Interfaces.IGatewayInstanceService instanceService
+@inject IJSRuntime JSRuntime
 @using MinGo.Core.Entities
+@using MinGo.Core.Models
+@using Microsoft.JSInterop
 
 <PageTitle>仪表盘 - MinGo API网关</PageTitle>
+
+<!-- Chart.js 引用 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <div class="mb-6">
     <h2 class="text-2xl font-bold mb-2">仪表盘</h2>
@@ -68,8 +74,8 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
         <h3 class="font-semibold mb-4">请求趋势</h3>
-        <div class="h-64 bg-gray-50 dark:bg-dark-200 rounded-lg flex items-center justify-center">
-            <p class="text-secondary">请求趋势图表（开发中）</p>
+        <div class="h-64">
+            <canvas id="requestsChart"></canvas>
         </div>
     </div>
     <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
@@ -151,9 +157,11 @@
 @code {
     private MetricsSummary? metricsSummary;
     private IEnumerable<ServiceMetrics>? serviceMetrics;
+    private IEnumerable<RequestMetrics>? requestMetrics;
     private int onlineInstanceCount;
     private int totalInstanceCount;
     private System.Threading.Timer? refreshTimer;
+    private string chartScript = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,16 +180,98 @@
         {
             metricsSummary = await monitoringService.GetMetricsSummaryAsync();
             serviceMetrics = await monitoringService.GetServiceMetricsAsync();
+            
+            // 获取过去1小时的请求指标
+            var endTime = DateTimeOffset.UtcNow;
+            var startTime = endTime.AddHours(-1);
+            requestMetrics = await monitoringService.GetRequestMetricsAsync(startTime, endTime);
 
             var instances = await instanceService.GetInstancesAsync();
             totalInstanceCount = instances.Instances.Count;
             onlineInstanceCount = instances.Instances.Count(i => i.Status == GatewayInstanceStatus.Online);
 
             await InvokeAsync(StateHasChanged);
+            
+            // 更新图表
+            UpdateChart();
         }
         catch
         {
         }
+    }
+
+    private void UpdateChart()
+    {
+        if (requestMetrics == null) return;
+        
+        var labels = requestMetrics.Select(m => m.Timestamp.ToString("HH:mm")).ToArray();
+        var counts = requestMetrics.Select(m => m.Count).ToArray();
+        var errorCounts = requestMetrics.Select(m => m.ErrorCount).ToArray();
+        
+        chartScript = $@"
+            var ctx = document.getElementById('requestsChart').getContext('2d');
+            
+            // 销毁旧图表
+            if (window.requestsChart) {{
+                window.requestsChart.destroy();
+            }}
+            
+            window.requestsChart = new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: {System.Text.Json.JsonSerializer.Serialize(labels)},
+                    datasets: [
+                        {{
+                            label: '总请求数',
+                            data: {System.Text.Json.JsonSerializer.Serialize(counts)},
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }},
+                        {{
+                            label: '错误请求数',
+                            data: {System.Text.Json.JsonSerializer.Serialize(errorCounts)},
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'top',
+                        }},
+                        tooltip: {{
+                            mode: 'index',
+                            intersect: false
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            title: {{
+                                display: true,
+                                text: '请求数'
+                            }}
+                        }},
+                        x: {{
+                            title: {{
+                                display: true,
+                                text: '时间'
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        ";
+        
+        // 执行图表脚本
+        JSRuntime.InvokeAsync<object>("eval", chartScript);
     }
 
     private string GetServiceDisplayName(string route)
