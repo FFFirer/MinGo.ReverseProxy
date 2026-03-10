@@ -35,6 +35,9 @@ builder.Services.AddDbContext<ApiDbContext>(options =>
     options.UseSqlite("Data Source=proxy.db")
 );
 
+// 注册遥测存储
+builder.Services.AddSingleton<TelemetryStore>();
+
 // 注册服务
 builder.Services.AddScoped<MinGo.Core.Interfaces.IApiDbService, MinGo.Infrastructure.Data.ApiDbService>();
 builder.Services.AddScoped<MinGo.Core.Interfaces.IMonitoringService, MinGo.Application.Services.MonitoringService>();
@@ -44,9 +47,6 @@ builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayInstanceService, MinGo.
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventSender, MinGo.Application.Services.GatewayEventSender>();
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventService, MinGo.Application.Services.GatewayEventService>();
 builder.Services.AddSingleton<MinGo.Core.Interfaces.IMessageNotificationService, MinGo.Application.Services.MemoryMessageNotificationService>();
-
-// 注册遥测存储
-builder.Services.AddSingleton<TelemetryStore>();
 
 // 注册配置更新事件监听器
 builder.Services.AddHostedService<MinGo.Infrastructure.ExternalServices.ConfigUpdateEventListener>();
