@@ -21,6 +21,11 @@
 
 # 实现规范
 
+## c#
+
+- 文件范围内的命名空间：https://learn.microsoft.com/zh-cn/dotnet/csharp/language-reference/proposals/csharp-10.0/file-scoped-namespaces
+- 
+
 ## 遵循整洁架构/洋葱架构
 
 - 实现层次为更具体的实现依赖更抽象的逻辑

@@ -4,6 +4,8 @@ using MinGo.Application.Services;
 using Serilog;
 using Vite.AspNetCore;
 using MinGo.Infrastructure;
+using MinGo.Core.Services;
+using MinGo.Infrastructure.ExternalServices;
 
 Console.WriteLine("Starting MinGo Reverse Proxy...");
 
@@ -13,11 +15,11 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
 
-int[] AdminPorts = [58074];
-int[] ProxyPorts = [5286, 7064];
+int[] AdminPorts = builder.Configuration.GetSection(nameof(AdminPorts)).Get<int[]>() ?? [];
+int[] ProxyPorts = builder.Configuration.GetSection(nameof(ProxyPorts)).Get<int[]>() ?? [];
 
-// builder.Configuration.GetSection(nameof(AdminPorts)).Bind(AdminPorts);
-// builder.Configuration.GetSection(nameof(ProxyPorts)).Bind(ProxyPorts);
+var adminHosts = AdminPorts.Select(p => $"*:{p}").ToArray();
+var proxyHosts = ProxyPorts.Select(p => $"*:{p}").ToArray();
 
 builder.Host.UseSerilog();
 builder.Services.AddViteServices();
@@ -43,6 +45,9 @@ builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventSender, MinGo.Appl
 builder.Services.AddScoped<MinGo.Core.Interfaces.IGatewayEventService, MinGo.Application.Services.GatewayEventService>();
 builder.Services.AddSingleton<MinGo.Core.Interfaces.IMessageNotificationService, MinGo.Application.Services.MemoryMessageNotificationService>();
 
+// 注册遥测存储
+builder.Services.AddSingleton<TelemetryStore>();
+
 // 注册配置更新事件监听器
 builder.Services.AddHostedService<MinGo.Infrastructure.ExternalServices.ConfigUpdateEventListener>();
 
@@ -55,14 +60,16 @@ var app = builder.Build();
 
 app.UseDevelopmentAutoMigration();
 
+if(!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseGatewayTelemetry();
+
 app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
 {
-    if (!app.Environment.IsDevelopment())
-    {
-        b.UseExceptionHandler("/Error");
-        // b.UseHsts();
-    }
-
     if (app.Environment.IsDevelopment())
     {
         b.UseViteDevelopmentServer(true);
@@ -82,24 +89,14 @@ app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
     });
 });
 
-// app.MapWhen(x => ProxyPorts.Contains(x.Connection.LocalPort), b =>
-// {
-//     // b.UseRouting();
-//     b.UseEndpoints(e =>
-//     {
-//         e.MapReverseProxy();
-//     });
-// });
-
-var adminHosts = AdminPorts.Select(p => $"*:{p}").ToArray();
-var proxyHosts = ProxyPorts.Select(p => $"*:{p}").ToArray();
-
-app.MapReverseProxy().RequireHost(proxyHosts);
-
-// app.MapControllers().RequireHost(adminHosts);
-// app.MapBlazorHub().RequireHost(adminHosts);
-// app.MapFallbackToPage("/_Host").RequireHost(adminHosts);
-// app.MapReverseProxy().RequireHost(proxyHosts);
+app.MapWhen(x => ProxyPorts.Contains(x.Connection.LocalPort), p =>
+{
+    p.UseRouting();
+    p.UseEndpoints(e =>
+    {
+        e.MapReverseProxy();
+    });
+});
 
 app.Run();
 

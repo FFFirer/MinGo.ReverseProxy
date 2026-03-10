@@ -107,7 +107,20 @@ namespace MinGo.ReverseProxy.Controllers
             try
             {
                 // 构建实例的配置 API 地址
-                var configUrl = $"{instance.ListenerAddresses?.FirstOrDefault() ?? $"http://{instance.IpAddress}:{instance.Port}"}/api/config/current";
+                string? baseUrl = instance.ListenerAddresses?.FirstOrDefault();
+                if (string.IsNullOrEmpty(baseUrl))
+                {
+                    if (!string.IsNullOrEmpty(instance.IpAddress) && instance.Port > 0)
+                    {
+                        baseUrl = $"http://{instance.IpAddress}:{instance.Port}";
+                    }
+                    else
+                    {
+                        return BadRequest(new { message = "Instance has no valid listener address or IP/Port configuration" });
+                    }
+                }
+                
+                var configUrl = $"{baseUrl.TrimEnd('/')}/api/config/current";
                 _logger.LogInformation("正在从 {Url} 获取实例配置", configUrl);
 
                 // 创建 HTTP 客户端并调用实例的配置 API
