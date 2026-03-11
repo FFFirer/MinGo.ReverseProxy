@@ -25,9 +25,9 @@ node_modules/
 pnpm-store/
 
 # Test files
-tests/
-*Tests.csproj
-*Test.csproj
+# tests/
+# *Tests.csproj
+# *Test.csproj
 
 # Documentation
 docs/
