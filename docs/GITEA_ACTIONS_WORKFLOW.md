@@ -85,7 +85,9 @@ jobs:
   3. 登录到 Docker 镜像仓库
   4. 提取版本号
     - 当触发事件为 release 时，从 Git 标签中提取版本号
-    - 当手动触发时，使用 `dev-${COMMIT_SHA}` 格式，其中 COMMIT_SHA 是 Git 提交的短哈希值
+    - 当手动触发时，使用 `dev-${COMMIT_SHA}-${TIMESTAMP}` 格式，其中：
+      - COMMIT_SHA 是 Git 提交的短哈希值
+      - TIMESTAMP 是构建时的时间戳，格式为 YYYYMMDDHHMMSS
   5. 构建并推送 Docker 镜像
     - 构建上下文：项目根目录
     - 推送条件：总是推送
@@ -134,7 +136,7 @@ jobs:
 
 - `${CONTAINER_REGISTRY}/[镜像名称]:${VERSION}` - 带版本号的镜像
   - 当触发事件为 release 时，版本号为 Git 标签（例如：v1.0.0）
-  - 当手动触发时，版本号为 `dev-${COMMIT_SHA}` 格式（例如：dev-abc123）
+  - 当手动触发时，版本号为 `dev-${COMMIT_SHA}-${TIMESTAMP}` 格式（例如：dev-abc123-20240101120000）
 - `${CONTAINER_REGISTRY}/[镜像名称]:latest` - 最新版本镜像
 
 ## 故障排除
@@ -193,9 +195,9 @@ DOCKER_PASSWORD=mypassword
 - `registry.example.com/[镜像名称]:latest`
 
 **手动触发时**：
-当手动触发工作流时，工作流会构建并推送以下镜像（假设 commit sha 为 abc123）：
+当手动触发工作流时，工作流会构建并推送以下镜像（假设 commit sha 为 abc123，时间戳为 20240101120000）：
 
-- `registry.example.com/[镜像名称]:dev-abc123`
+- `registry.example.com/[镜像名称]:dev-abc123-20240101120000`
 - `registry.example.com/[镜像名称]:latest`
 
 ## 结论
@@ -204,6 +206,8 @@ DOCKER_PASSWORD=mypassword
 
 该脚本支持两种版本生成方式：
 - 发布触发时：使用 Git 标签作为版本号
-- 手动触发时：使用 `dev-${COMMIT_SHA}` 格式，包含 Git 提交的短哈希值
+- 手动触发时：使用 `dev-${COMMIT_SHA}-${TIMESTAMP}` 格式，包含：
+  - Git 提交的短哈希值
+  - 构建时的时间戳（格式：YYYYMMDDHHMMSS）
 
-这种设计使得镜像版本更加清晰，同时在开发过程中也能通过 commit sha 快速定位构建来源。
+这种设计使得镜像版本更加清晰，同时在开发过程中也能通过 commit sha 和时间戳快速定位构建来源，避免同一 commit 多次构建时的版本冲突。

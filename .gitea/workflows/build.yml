@@ -35,7 +35,8 @@ jobs:
           if [ "${{ github.event_name }}" == "release" ]; then
             echo "VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
           else
-            echo "VERSION=dev-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "VERSION=dev-${GITHUB_SHA:0:7}-${TIMESTAMP}" >> $GITHUB_ENV
           fi
 
       - name: Build and push Docker image
