@@ -7,6 +7,7 @@
 @using MinGo.Core.Entities
 @using MinGo.Core.Models
 @using Microsoft.JSInterop
+@implements IAsyncDisposable
 
 <PageTitle>仪表盘 - MinGo API网关</PageTitle>
 
@@ -75,15 +76,28 @@
     <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
         <h3 class="font-semibold mb-4">请求趋势</h3>
         <div class="h-64">
-            <canvas id="requestsChart"></canvas>
+            <canvas @ref="requestsChartRef"></canvas>
         </div>
     </div>
     <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300">
         <h3 class="font-semibold mb-4">服务状态</h3>
         <div class="space-y-4">
-            @if (serviceMetrics?.Any() == true)
+            @{
+                // 创建一个完全独立的副本
+                var currentServiceMetrics = serviceMetrics?.Select(s => new MinGo.Core.Models.ServiceMetrics
+                {
+                    ServiceId = s.ServiceId,
+                    ServiceName = s.ServiceName,
+                    TotalRequests = s.TotalRequests,
+                    ErrorRequests = s.ErrorRequests,
+                    ErrorRate = s.ErrorRate,
+                    AverageResponseTime = s.AverageResponseTime,
+                    LastUpdated = s.LastUpdated
+                }).ToList();
+            }
+            @if (currentServiceMetrics?.Any() == true)
             {
-                @foreach (var service in serviceMetrics.Take(5))
+                @foreach (var service in currentServiceMetrics.Take(5))
                 {
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
@@ -122,9 +136,22 @@
                 </tr>
             </thead>
             <tbody>
-                @if (serviceMetrics?.Any() == true)
+                @{
+                    // 创建一个完全独立的副本
+                    var currentServiceMetricsForTable = serviceMetrics?.Select(s => new MinGo.Core.Models.ServiceMetrics
+                    {
+                        ServiceId = s.ServiceId,
+                        ServiceName = s.ServiceName,
+                        TotalRequests = s.TotalRequests,
+                        ErrorRequests = s.ErrorRequests,
+                        ErrorRate = s.ErrorRate,
+                        AverageResponseTime = s.AverageResponseTime,
+                        LastUpdated = s.LastUpdated
+                    }).ToList();
+                }
+                @if (currentServiceMetricsForTable?.Any() == true)
                 {
-                    @foreach (var service in serviceMetrics)
+                    @foreach (var service in currentServiceMetricsForTable)
                     {
                         <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                             <td class="py-3 px-4 font-medium">@GetServiceDisplayName(service.ServiceName)</td>
@@ -161,7 +188,9 @@
     private int onlineInstanceCount;
     private int totalInstanceCount;
     private System.Threading.Timer? refreshTimer;
-    private string chartScript = "";
+    private IJSObjectReference? module;
+    private IJSObjectReference? chartInstance;
+    private ElementReference requestsChartRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -174,17 +203,49 @@
         );
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && requestMetrics != null)
+        {
+            // 导入 JavaScript 模块
+            module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/chartModule.js");
+            // 初始化图表
+            await InitializeChart();
+        }
+    }
+
+    private async Task InitializeChart()
+    {
+        if (requestMetrics == null || module == null) return;
+        
+        var labels = requestMetrics.Select(m => m.Timestamp.ToString("HH:mm")).ToArray();
+        var counts = requestMetrics.Select(m => m.Count).ToArray();
+        var errorCounts = requestMetrics.Select(m => m.ErrorCount).ToArray();
+        
+        // 调用模块的初始化图表函数，使用 ElementReference
+        chartInstance = await module.InvokeAsync<IJSObjectReference>("initChart", 
+            requestsChartRef, 
+            labels, 
+            counts, 
+            errorCounts);
+    }
+
     private async Task RefreshDataAsync()
     {
         try
         {
+            Console.WriteLine("RefreshDataAsync started");
+            
             metricsSummary = await monitoringService.GetMetricsSummaryAsync();
             serviceMetrics = await monitoringService.GetServiceMetricsAsync();
             
-            // 获取过去1小时的请求指标
+            // 获取过去15分钟的请求指标
             var endTime = DateTimeOffset.UtcNow;
-            var startTime = endTime.AddHours(-1);
+            var startTime = endTime.AddMinutes(-15);
+            Console.WriteLine($"Getting request metrics from {startTime} to {endTime}");
             requestMetrics = await monitoringService.GetRequestMetricsAsync(startTime, endTime);
+            
+            Console.WriteLine($"Request metrics count: {requestMetrics?.Count()}");
 
             var instances = await instanceService.GetInstancesAsync();
             totalInstanceCount = instances.Instances.Count;
@@ -193,85 +254,43 @@
             await InvokeAsync(StateHasChanged);
             
             // 更新图表
-            UpdateChart();
+            Console.WriteLine("Calling UpdateChart");
+            await UpdateChart();
+            Console.WriteLine("UpdateChart completed");
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error in RefreshDataAsync: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
     }
 
-    private void UpdateChart()
+    private async Task UpdateChart()
     {
-        if (requestMetrics == null) return;
+        if (requestMetrics == null || module == null) return;
         
         var labels = requestMetrics.Select(m => m.Timestamp.ToString("HH:mm")).ToArray();
         var counts = requestMetrics.Select(m => m.Count).ToArray();
         var errorCounts = requestMetrics.Select(m => m.ErrorCount).ToArray();
         
-        chartScript = $@"
-            var ctx = document.getElementById('requestsChart').getContext('2d');
-            
-            // 销毁旧图表
-            if (window.requestsChart) {{
-                window.requestsChart.destroy();
-            }}
-            
-            window.requestsChart = new Chart(ctx, {{
-                type: 'line',
-                data: {{
-                    labels: {System.Text.Json.JsonSerializer.Serialize(labels)},
-                    datasets: [
-                        {{
-                            label: '总请求数',
-                            data: {System.Text.Json.JsonSerializer.Serialize(counts)},
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }},
-                        {{
-                            label: '错误请求数',
-                            data: {System.Text.Json.JsonSerializer.Serialize(errorCounts)},
-                            borderColor: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }}
-                    ]
-                }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {{
-                        legend: {{
-                            position: 'top',
-                        }},
-                        tooltip: {{
-                            mode: 'index',
-                            intersect: false
-                        }}
-                    }},
-                    scales: {{
-                        y: {{
-                            beginAtZero: true,
-                            title: {{
-                                display: true,
-                                text: '请求数'
-                            }}
-                        }},
-                        x: {{
-                            title: {{
-                                display: true,
-                                text: '时间'
-                            }}
-                        }}
-                    }}
-                }}
-            }});
-        ";
+        // 检查数据
+        Console.WriteLine($"Chart data: labels={labels.Length}, counts={counts.Length}, errorCounts={errorCounts.Length}");
+        Console.WriteLine($"First count: {counts.FirstOrDefault()}, First error count: {errorCounts.FirstOrDefault()}");
         
-        // 执行图表脚本
-        JSRuntime.InvokeAsync<object>("eval", chartScript);
+        if (chartInstance != null)
+        {
+            // 调用模块的更新图表数据函数
+            await module.InvokeAsync<bool>("updateChartData", 
+                chartInstance, 
+                labels, 
+                counts, 
+                errorCounts);
+        }
+        else
+        {
+            // 如果图表实例不存在，初始化图表
+            await InitializeChart();
+        }
     }
 
     private string GetServiceDisplayName(string route)
@@ -287,8 +306,19 @@
         return route;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         refreshTimer?.Dispose();
+        if (module != null)
+        {
+            try
+            {
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // 忽略断开连接的异常
+            }
+        }
     }
 }
