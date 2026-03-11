@@ -1,0 +1,49 @@
+# .dockerignore
+# Git
+.git
+.gitignore
+
+# Build outputs
+bin/
+obj/
+out/
+publish/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Logs
+*.log
+logs/
+
+# Node modules
+node_modules/
+pnpm-store/
+
+# Test files
+tests/
+*Tests.csproj
+*Test.csproj
+
+# Documentation
+docs/
+*.md
+README*
+
+# Archived code
+archived/
+
+# IDE specific files
+*.slnx.user
+
+# CI/CD
+.github/
+.azure/
+
+# Misc
+*.DS_Store
+Thumbs.db
