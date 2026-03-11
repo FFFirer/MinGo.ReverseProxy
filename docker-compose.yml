@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  reverse-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: min-go-reverse-proxy
+    ports:
+      - "8080:8080"
+      - "6139:6139"
+      - "58074:58074"
+      - "5286:5286"
+      - "7064:7064"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - Serilog__MinimumLevel=Information
+      - Vite__Server__AutoRun=false
+    volumes:
+      - sqlite-data:/app/data
+    restart: unless-stopped
+    networks:
+      - min-go-network
+
+volumes:
+  sqlite-data:
+    driver: local
+
+networks:
+  min-go-network:
+    driver: bridge

@@ -1,4 +1,4 @@
-namespace MinGo.Shared.Models;
+namespace MinGo.Core.Entities;
 
 /// <summary>
 /// Gateway实例信息

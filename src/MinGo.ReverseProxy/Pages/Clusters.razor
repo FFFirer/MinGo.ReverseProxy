@@ -1,0 +1,361 @@
+@page "/clusters"
+@inject IApiManagementService ApiManagementService
+
+<PageTitle>集群管理 - MinGo API网关</PageTitle>
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-bold mb-2">集群管理</h2>
+        <p class="text-secondary">配置和管理后端服务集群</p>
+    </div>
+    <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100"
+            @onclick="OpenCreateClusterModal">
+        <i class="fa fa-plus mr-2"></i>添加集群
+    </button>
+</div>
+
+@if (clusters == null)
+{
+    <div class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+}
+else if (!clusters.Any())
+{
+    <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-12 text-center">
+        <i class="fa fa-server text-6xl text-gray-400 mb-4"></i>
+        <h3 class="text-xl font-semibold mb-2">暂无集群</h3>
+        <p class="text-secondary mb-6">点击上方按钮添加第一个集群</p>
+        <button class="px-6 py-3 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100"
+                @onclick="OpenCreateClusterModal">
+            <i class="fa fa-plus mr-2"></i>添加集群
+        </button>
+    </div>
+}
+else
+{
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        @foreach (var cluster in clusters)
+        {
+            var healthyCount = cluster.Destinations.Values.Count(d => d.Healthy);
+            var totalCount = cluster.Destinations.Count;
+            var isHealthy = totalCount > 0 && healthyCount == totalCount;
+
+            <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300 hover:shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="font-semibold text-lg">@cluster.Name</h3>
+                        <p class="text-sm text-secondary">@cluster.LoadBalancingPolicy</p>
+                    </div>
+                    <span class="px-3 py-1 text-xs font-medium rounded-full @(isHealthy ? "bg-success/10 text-success" : "bg-warning/10 text-warning")">
+                        @(isHealthy ? "健康" : "部分离线")
+                    </span>
+                </div>
+                
+                <div class="space-y-3 mb-4">
+                    @foreach (var (destinationId, destination) in cluster.Destinations)
+                    {
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium truncate">@destinationId</p>
+                                <p class="text-sm text-secondary truncate">@destination.Address</p>
+                            </div>
+                            <div class="flex items-center space-x-2 ml-2">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full @(destination.Healthy ? "bg-success/10 text-success" : "bg-warning/10 text-warning")">
+                                    @(destination.Healthy ? "在线" : "离线")
+                                </span>
+                                <div class="relative">
+                                    <button class="text-secondary hover:text-gray-600 dark:hover:text-gray-300 p-1"
+                                            @onclick="() => ToggleDestinationMenu(cluster.Id, destinationId)">
+                                        <i class="fa fa-ellipsis-v"></i>
+                                    </button>
+                                    @if (openDestinationMenu == (cluster.Id, destinationId))
+                                    {
+                                        <div class="absolute right-0 mt-2 w-40 bg-white dark:bg-dark-100 rounded-lg shadow-lg border border-gray-200 dark:border-dark-200 z-10">
+                                            <button class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-t-lg"
+                                                    @onclick="() => OpenEditDestinationModal(cluster, destinationId, destination)">
+                                                <i class="fa fa-edit mr-2"></i>编辑
+                                            </button>
+                                            <button class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-b-lg text-red-600"
+                                                    @onclick="() => DeleteDestination(cluster.Id, destinationId)">
+                                                <i class="fa fa-trash mr-2"></i>删除
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="border-t border-gray-200 dark:border-dark-200 pt-4 flex justify-between items-center">
+                    <div class="text-sm text-secondary">
+                        <i class="fa fa-heartbeat mr-1"></i>
+                        @(cluster.HealthCheck.Active.Enabled ? "健康检查已启用" : "健康检查已禁用")
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200"
+                                @onclick="() => OpenEditClusterModal(cluster)">
+                            <i class="fa fa-edit mr-1"></i>编辑
+                        </button>
+                        <button class="px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100"
+                                @onclick="() => OpenAddDestinationModal(cluster)">
+                            <i class="fa fa-plus mr-1"></i>添加目标
+                        </button>
+                        <button class="px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-red-100 text-red-700 hover:bg-red-200"
+                                @onclick="() => DeleteCluster(cluster.Id)">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (showCreateClusterModal || showEditClusterModal || showAddDestinationModal || showEditDestinationModal)
+{
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @onclick="CloseAllModals">
+        <div class="bg-white dark:bg-dark-100 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" @onclick:stopPropagation>
+            <div class="p-6 border-b border-gray-200 dark:border-dark-200">
+                <h3 class="text-xl font-semibold">
+                    @(showCreateClusterModal ? "添加集群" : showEditClusterModal ? "编辑集群" : showAddDestinationModal ? "添加目标" : "编辑目标")
+                </h3>
+            </div>
+            <div class="p-6 space-y-4">
+                @if (showCreateClusterModal || showEditClusterModal)
+                {
+                    <div>
+                        <label class="block text-sm font-medium mb-2">集群名称</label>
+                        <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 focus:ring-2 focus:ring-primary focus:border-transparent"
+                               @bind="clusterForm.Name" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">负载均衡策略</label>
+                        <select class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 focus:ring-2 focus:ring-primary focus:border-transparent"
+                                @bind="clusterForm.LoadBalancingPolicy">
+                            <option value="RoundRobin">轮询 (RoundRobin)</option>
+                            <option value="LeastRequests">最少连接 (LeastRequests)</option>
+                            <option value="Random">随机 (Random)</option>
+                            <option value="PowerOfTwoChoices">PowerOfTwoChoices</option>
+                            <option value="FirstAlphabetical">FirstAlphabetical</option>
+                        </select>
+                    </div>
+                    <div class="border-t border-gray-200 dark:border-dark-200 pt-4">
+                        <h4 class="font-medium mb-4">健康检查配置</h4>
+                        <div class="space-y-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="healthCheckEnabled" class="mr-2"
+                                       @bind="clusterForm.HealthCheck.Active.Enabled" />
+                                <label for="healthCheckEnabled">启用主动健康检查</label>
+                            </div>
+                            @if (clusterForm.HealthCheck.Active.Enabled)
+                            {
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">检查间隔</label>
+                                        <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200"
+                                               @bind="clusterForm.HealthCheck.Active.Interval" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">超时时间</label>
+                                        <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200"
+                                               @bind="clusterForm.HealthCheck.Active.Timeout" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">检查路径</label>
+                                    <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200"
+                                           @bind="clusterForm.HealthCheck.Active.Path" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div>
+                        <label class="block text-sm font-medium mb-2">目标ID</label>
+                        <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 focus:ring-2 focus:ring-primary focus:border-transparent"
+                               @bind="destinationFormId"
+                               disabled="@showEditDestinationModal" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">地址</label>
+                        <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 focus:ring-2 focus:ring-primary focus:border-transparent"
+                               @bind="destinationForm.Address"
+                               placeholder="http://localhost:5001" />
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="destinationHealthy" class="mr-2"
+                               @bind="destinationForm.Healthy" />
+                        <label for="destinationHealthy">标记为健康</label>
+                    </div>
+                }
+            </div>
+            <div class="p-6 border-t border-gray-200 dark:border-dark-200 flex justify-end space-x-3">
+                <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200"
+                        @onclick="CloseAllModals">
+                    取消
+                </button>
+                <button class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100"
+                        @onclick="SaveForm">
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IEnumerable<ClusterConfig>? clusters;
+    private bool showCreateClusterModal;
+    private bool showEditClusterModal;
+    private bool showAddDestinationModal;
+    private bool showEditDestinationModal;
+    private ClusterConfig clusterForm = new();
+    private DestinationConfig destinationForm = new();
+    private string destinationFormId = string.Empty;
+    private string? editingClusterId;
+    private string? editingDestinationClusterId;
+    private (string ClusterId, string DestinationId)? openDestinationMenu;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClustersAsync();
+    }
+
+    private async Task LoadClustersAsync()
+    {
+        clusters = await ApiManagementService.GetClustersAsync();
+    }
+
+    private void OpenCreateClusterModal()
+    {
+        clusterForm = new ClusterConfig
+        {
+            LoadBalancingPolicy = "RoundRobin",
+            HealthCheck = new HealthCheckConfig
+            {
+                Active = new HealthCheckActiveConfig
+                {
+                    Enabled = true,
+                    Interval = "00:00:10",
+                    Timeout = "00:00:05",
+                    Path = "/health"
+                },
+                Passive = new HealthCheckPassiveConfig()
+            }
+        };
+        showCreateClusterModal = true;
+        openDestinationMenu = null;
+    }
+
+    private void OpenEditClusterModal(ClusterConfig cluster)
+    {
+        editingClusterId = cluster.Id;
+        clusterForm = new ClusterConfig
+        {
+            Id = cluster.Id,
+            Name = cluster.Name,
+            LoadBalancingPolicy = cluster.LoadBalancingPolicy,
+            Destinations = cluster.Destinations,
+            HealthCheck = new HealthCheckConfig
+            {
+                Active = new HealthCheckActiveConfig
+                {
+                    Enabled = cluster.HealthCheck.Active.Enabled,
+                    Interval = cluster.HealthCheck.Active.Interval,
+                    Timeout = cluster.HealthCheck.Active.Timeout,
+                    Path = cluster.HealthCheck.Active.Path
+                },
+                Passive = cluster.HealthCheck.Passive
+            }
+        };
+        showEditClusterModal = true;
+        openDestinationMenu = null;
+    }
+
+    private void OpenAddDestinationModal(ClusterConfig cluster)
+    {
+        editingDestinationClusterId = cluster.Id;
+        destinationFormId = string.Empty;
+        destinationForm = new DestinationConfig { Healthy = true };
+        showAddDestinationModal = true;
+        openDestinationMenu = null;
+    }
+
+    private void OpenEditDestinationModal(ClusterConfig cluster, string destinationId, DestinationConfig destination)
+    {
+        editingDestinationClusterId = cluster.Id;
+        destinationFormId = destinationId;
+        destinationForm = new DestinationConfig
+        {
+            Address = destination.Address,
+            Healthy = destination.Healthy
+        };
+        showEditDestinationModal = true;
+        openDestinationMenu = null;
+    }
+
+    private void CloseAllModals()
+    {
+        showCreateClusterModal = false;
+        showEditClusterModal = false;
+        showAddDestinationModal = false;
+        showEditDestinationModal = false;
+        openDestinationMenu = null;
+    }
+
+    private void ToggleDestinationMenu(string clusterId, string destinationId)
+    {
+        if (openDestinationMenu == (clusterId, destinationId))
+        {
+            openDestinationMenu = null;
+        }
+        else
+        {
+            openDestinationMenu = (clusterId, destinationId);
+        }
+    }
+
+    private async Task SaveForm()
+    {
+        if (showCreateClusterModal)
+        {
+            await ApiManagementService.CreateClusterAsync(clusterForm);
+        }
+        else if (showEditClusterModal && editingClusterId != null)
+        {
+            await ApiManagementService.UpdateClusterAsync(editingClusterId, clusterForm);
+        }
+        else if (showAddDestinationModal && editingDestinationClusterId != null)
+        {
+            if (string.IsNullOrWhiteSpace(destinationFormId))
+            {
+                destinationFormId = $"destination{Guid.NewGuid().ToString("N").Substring(0, 8)}";
+            }
+            await ApiManagementService.AddDestinationAsync(editingDestinationClusterId, destinationFormId, destinationForm);
+        }
+        else if (showEditDestinationModal && editingDestinationClusterId != null)
+        {
+            await ApiManagementService.UpdateDestinationAsync(editingDestinationClusterId, destinationFormId, destinationForm);
+        }
+
+        CloseAllModals();
+        await LoadClustersAsync();
+    }
+
+    private async Task DeleteCluster(string id)
+    {
+        await ApiManagementService.DeleteClusterAsync(id);
+        await LoadClustersAsync();
+    }
+
+    private async Task DeleteDestination(string clusterId, string destinationId)
+    {
+        await ApiManagementService.RemoveDestinationAsync(clusterId, destinationId);
+        await LoadClustersAsync();
+        openDestinationMenu = null;
+    }
+}

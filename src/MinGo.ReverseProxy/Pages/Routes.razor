@@ -1,0 +1,283 @@
+@page "/routes"
+@inject IApiManagementService ApiManagementService
+
+<PageTitle>路由管理 - MinGo API网关</PageTitle>
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h2 class="text-2xl font-bold mb-2">路由管理</h2>
+        <p class="text-secondary">配置和管理API路由规则</p>
+    </div>
+    <button @onclick="ShowAddModal" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary text-white hover:bg-primary/90 focus:ring-primary/50 focus:ring-offset-white dark:focus:ring-offset-dark-100">
+        <i class="fa fa-plus mr-2"></i>添加路由
+    </button>
+</div>
+
+<div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6 transition-all duration-300 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
+        <div class="relative flex-1 max-w-md">
+            <input type="text" placeholder="搜索路由..." @bind="@searchTerm" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 pl-10">
+            <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        </div>
+        <div class="flex space-x-2">
+            <select @bind="filterStatus" class="shrink-0 px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 py-1">
+                <option value="">所有状态</option>
+                <option value="enabled">启用</option>
+                <option value="disabled">禁用</option>
+            </select>
+            <button @onclick="ApplyFilter" class="shrink-0 px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-800 dark:bg-dark-100 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                <i class="fa fa-filter mr-2"></i>筛选
+            </button>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-max">
+            <thead>
+                <tr class="border-b border-gray-200 dark:border-dark-200">
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">路由名称</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">Host</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">路径</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">集群</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">状态</th>
+                    <th class="text-left py-3 px-4 font-medium text-secondary whitespace-nowrap">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var route in filteredRoutes)
+                {
+                    <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
+                        <td class="py-3 px-4 font-medium whitespace-nowrap">@route.Name</td>
+                        <td class="py-3 px-4 whitespace-nowrap">@(string.IsNullOrEmpty(route.Match.Host) ? "-" : route.Match.Host)</td>
+                        <td class="py-3 px-4 whitespace-nowrap">@route.Match.Path</td>
+                        <td class="py-3 px-4 whitespace-nowrap">@GetClusterName(route.ClusterId)</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <button @onclick="() => ToggleRouteStatus(route)" class="px-2 py-1 text-xs font-medium rounded-full @(route.Enabled ? "bg-success/10 text-success hover:bg-success/20" : "bg-warning/10 text-warning hover:bg-warning/20") transition-colors">
+                                @(route.Enabled ? "启用" : "禁用")
+                            </button>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <div class="flex space-x-2">
+                                <button @onclick="() => ShowEditModal(route)" class="text-primary hover:text-primary/80" title="编辑">
+                                    <i class="fa fa-edit"></i>
+                                </button>
+                                <button @onclick="() => ShowDeleteConfirm(route)" class="text-danger hover:text-danger/80" title="删除">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="bg-white dark:bg-dark-100 rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-200">
+                <h3 class="text-xl font-bold">@(isEditMode ? "编辑路由" : "添加路由")</h3>
+                <button @onclick="HideModal" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">路由名称</label>
+                        <input type="text" @bind="currentRoute.Name" placeholder="请输入路由名称" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Host（可选）</label>
+                        <input type="text" @bind="currentRoute.Match.Host" placeholder="api.example.com" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <p class="mt-1 text-xs text-gray-500">留空则匹配所有 Host</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">路径模式</label>
+                        <input type="text" @bind="currentRoute.Match.Path" placeholder="/api/{**catch-all}" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">目标集群</label>
+                        <select @bind="currentRoute.ClusterId" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-200 bg-white dark:bg-dark-200 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            <option value="">请选择集群</option>
+                            @foreach (var cluster in clusters)
+                            {
+                                <option value="@cluster.Id">@cluster.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" @bind="currentRoute.Enabled" class="rounded border-gray-300 text-primary focus:ring-primary">
+                            <span class="text-sm font-medium">启用路由</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 dark:border-dark-200">
+                <button @onclick="HideModal" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-gray-100 text-gray-800 dark:bg-dark-200 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                    取消
+                </button>
+                <button @onclick="SaveRoute" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-primary text-white hover:bg-primary/90">
+                    @(isEditMode ? "保存" : "添加")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="bg-white dark:bg-dark-100 rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-danger/10 rounded-full mb-4">
+                    <i class="fa fa-exclamation-triangle text-danger text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-center mb-2">确认删除</h3>
+                <p class="text-secondary text-center mb-6">
+                    确定要删除路由 "<strong>@routeToDelete?.Name</strong>" 吗？此操作不可撤销。
+                </p>
+                <div class="flex items-center justify-center space-x-3">
+                    <button @onclick="HideDeleteConfirm" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-gray-100 text-gray-800 dark:bg-dark-200 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-dark-200">
+                        取消
+                    </button>
+                    <button @onclick="ConfirmDelete" class="px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-danger text-white hover:bg-danger/90">
+                        删除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RouteConfig> routes = new();
+    private List<ClusterConfig> clusters = new();
+    private List<RouteConfig> filteredRoutes = new();
+    private string searchTerm = "";
+    private string filterStatus = "";
+    private bool showModal = false;
+    private bool showDeleteConfirm = false;
+    private bool isEditMode = false;
+    private RouteConfig currentRoute = new();
+    private RouteConfig? routeToDelete = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        routes = (await ApiManagementService.GetRoutesAsync()).ToList();
+        clusters = (await ApiManagementService.GetClustersAsync()).ToList();
+        ApplyFilter();
+    }
+
+    private void ShowAddModal()
+    {
+        isEditMode = false;
+        currentRoute = new RouteConfig
+        {
+            Enabled = true,
+            Match = new RouteMatch()
+        };
+        showModal = true;
+    }
+
+    private void ShowEditModal(RouteConfig route)
+    {
+        isEditMode = true;
+        currentRoute = new RouteConfig
+        {
+            Id = route.Id,
+            Name = route.Name,
+            ClusterId = route.ClusterId,
+            Match = new RouteMatch
+            {
+                Path = route.Match.Path,
+                Host = route.Match.Host
+            },
+            Enabled = route.Enabled
+        };
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+    }
+
+    private async Task SaveRoute()
+    {
+        if (string.IsNullOrWhiteSpace(currentRoute.Name) || 
+            string.IsNullOrWhiteSpace(currentRoute.Match.Path) || 
+            string.IsNullOrWhiteSpace(currentRoute.ClusterId))
+        {
+            return;
+        }
+
+        if (isEditMode)
+        {
+            await ApiManagementService.UpdateRouteAsync(currentRoute.Id, currentRoute);
+        }
+        else
+        {
+            await ApiManagementService.CreateRouteAsync(currentRoute);
+        }
+        
+        await LoadData();
+        HideModal();
+    }
+
+    private async Task ToggleRouteStatus(RouteConfig route)
+    {
+        route.Enabled = !route.Enabled;
+        await ApiManagementService.UpdateRouteAsync(route.Id, route);
+        await LoadData();
+    }
+
+    private void ShowDeleteConfirm(RouteConfig route)
+    {
+        routeToDelete = route;
+        showDeleteConfirm = true;
+    }
+
+    private void HideDeleteConfirm()
+    {
+        showDeleteConfirm = false;
+        routeToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (routeToDelete != null)
+        {
+            await ApiManagementService.DeleteRouteAsync(routeToDelete.Id);
+            await LoadData();
+        }
+        HideDeleteConfirm();
+    }
+
+    private void ApplyFilter()
+    {
+        filteredRoutes = routes.Where(r => 
+            (string.IsNullOrWhiteSpace(searchTerm) || 
+             r.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+             (r.Match.Host != null && r.Match.Host.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+             r.Match.Path.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(filterStatus) || 
+             (filterStatus == "enabled" && r.Enabled) || 
+             (filterStatus == "disabled" && !r.Enabled))
+        ).ToList();
+    }
+
+    private string GetClusterName(string clusterId)
+    {
+        var cluster = clusters.FirstOrDefault(c => c.Id == clusterId);
+        return cluster?.Name ?? clusterId;
+    }
+}
