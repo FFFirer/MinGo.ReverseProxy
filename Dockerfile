@@ -42,6 +42,8 @@ COPY src/MinGo.Core/MinGo.Core.csproj src/MinGo.Core/
 COPY src/MinGo.Infrastructure/MinGo.Infrastructure.csproj src/MinGo.Infrastructure/
 COPY src/MinGo.Shared/MinGo.Shared.csproj src/MinGo.Shared/
 
+RUN pwd
+RUN ls
 # 还原 nuget 包（使用缓存）
 RUN dotnet restore
 
