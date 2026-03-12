@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # 第一阶段：构建前端
 FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:20-alpine AS frontend-build
 
