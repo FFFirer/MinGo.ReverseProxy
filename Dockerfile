@@ -29,7 +29,7 @@ COPY src/MinGo.ReverseProxy/ .
 RUN pnpm run build
 
 # 第二阶段：构建 .NET 应用
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 
 # 设置工作目录
 WORKDIR /app
@@ -60,7 +60,7 @@ RUN dotnet build --configuration Release
 RUN dotnet publish src/MinGo.ReverseProxy --configuration Release --no-build --output /app/publish
 
 # 第三阶段：发布
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 # 设置工作目录
 WORKDIR /app
