@@ -50,9 +50,6 @@ RUN dotnet restore
 # 复制全部项目文件
 COPY . .
 
-# 复制前端构建产物
-COPY --from=frontend-build /app/wwwroot ./src/MinGo.ReverseProxy/wwwroot
-
 # 使用 Release 编译项目
 RUN dotnet build --configuration Release
 
@@ -67,6 +64,8 @@ WORKDIR /app
 
 # 复制发布文件
 COPY --from=backend-build /app/publish .
+# 复制前端构建产物
+COPY --from=frontend-build /app/wwwroot ./wwwroot
 
 # 创建数据目录（如果需要）
 RUN mkdir -p /app/data
