@@ -1,0 +1,32 @@
+@using Vite.AspNetCore
+@inherits ComponentBase
+
+@inject IViteManifest? manifest;
+@inject IWebHostEnvironment env;
+@inject ILogger<ViteLink> logger;
+
+@if (env.IsDevelopment())
+{
+    <link rel="stylesheet" href="@ViteHref" />
+}
+else
+{
+    <link rel="stylesheet" href="@manifest?[ViteHref]?.File" />
+}
+
+@code {
+    [Parameter]
+    public required string ViteHref { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if(manifest is null) {
+            logger.LogInformation("Manifest is null");
+            return;
+        }
+
+        foreach(var m in manifest) {
+            logger.LogInformation("Vite: {@chunk}", m);
+        }
+    }
+}
