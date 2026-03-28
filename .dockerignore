@@ -4,10 +4,11 @@
 .gitignore
 
 # Build outputs
-bin/
-obj/
-out/
-publish/
+**/bin/
+**/obj/
+**/out/
+**/publish/
+**/*.db
 
 # IDE
 .vs/
@@ -18,16 +19,16 @@ publish/
 
 # Logs
 *.log
-logs/
+**/logs/
 
 # Node modules
-node_modules/
-pnpm-store/
+**/node_modules/
+**/pnpm-store/
 
 # Test files
-tests/
-*Tests.csproj
-*Test.csproj
+# tests/
+# *Tests.csproj
+# *Test.csproj
 
 # Documentation
 docs/
