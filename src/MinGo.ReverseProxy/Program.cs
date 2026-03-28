@@ -32,7 +32,7 @@ builder.Services.AddHttpClient();
 
 // 配置数据库
 builder.Services.AddDbContext<ApiDbContext>(options =>
-    options.UseSqlite("Data Source=proxy.db")
+    options.UseSqlite(builder.Configuration.GetConnectionString("Default"))
 );
 
 // 注册遥测存储
