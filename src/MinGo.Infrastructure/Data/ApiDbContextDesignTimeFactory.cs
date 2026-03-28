@@ -18,7 +18,7 @@ public class ApiDbContextDesignTimeFactory : IDesignTimeDbContextFactory<ApiDbCo
 
         // 配置 DbContextOptions
         var optionsBuilder = new DbContextOptionsBuilder<ApiDbContext>();
-        optionsBuilder.UseSqlite("Data Source=proxy.db");
+        optionsBuilder.UseSqlite();
 
         return new ApiDbContext(optionsBuilder.Options);
     }
