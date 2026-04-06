@@ -11,14 +11,14 @@ using MinGo.Infrastructure.Data;
 namespace MinGo.Infrastructure.Migrations
 {
     [DbContext(typeof(ApiDbContext))]
-    [Migration("20260306110019_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260406145741_Init")]
+    partial class Init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
 
             modelBuilder.Entity("MinGo.Core.Entities.ApiCertificateEntity", b =>
                 {
