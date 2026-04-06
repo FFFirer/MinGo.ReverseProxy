@@ -40,6 +40,7 @@ WORKDIR /app
 
 # 复制 .Net 的项目文件及解决方案文件，用于缓存
 COPY MinGo.ReverseProxy.slnx .
+COPY Directory.Packages.props .
 COPY src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj src/MinGo.ReverseProxy/
 COPY src/MinGo.Application/MinGo.Application.csproj src/MinGo.Application/
 COPY src/MinGo.Core/MinGo.Core.csproj src/MinGo.Core/
