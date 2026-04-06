@@ -66,7 +66,7 @@ RUN dotnet tool list -g
 RUN dotnet ef migrations bundle --configuration Release --no-build --output /app/publish/efbundle -f
 
 # 第三阶段：发布
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 # 设置工作目录
 WORKDIR /app
