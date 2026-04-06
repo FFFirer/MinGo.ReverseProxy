@@ -11,6 +11,8 @@ Console.WriteLine("Starting MinGo Reverse Proxy...");
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddUserSecrets<Program>();
+
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
@@ -28,11 +30,11 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
-builder.Services.AddHttpClient();
+builder.Services.AddNamedHttpClients(builder.Configuration);
 
 // 配置数据库
 builder.Services.AddDbContext<ApiDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default"))
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
 
 // 注册遥测存储
@@ -58,7 +60,7 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
-app.UseDevelopmentAutoMigration();
+// app.UseDevelopmentAutoMigration();
 
 if(!app.Environment.IsDevelopment())
 {

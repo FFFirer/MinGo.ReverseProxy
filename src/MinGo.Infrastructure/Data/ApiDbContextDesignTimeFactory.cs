@@ -14,11 +14,15 @@ public class ApiDbContextDesignTimeFactory : IDesignTimeDbContextFactory<ApiDbCo
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
+            .AddUserSecrets(typeof(ApiDbContextDesignTimeFactory).Assembly)
+            .AddEnvironmentVariables()
             .Build();
 
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        Console.WriteLine("Current using connectin string: {0}", connectionString);
         // 配置 DbContextOptions
         var optionsBuilder = new DbContextOptionsBuilder<ApiDbContext>();
-        optionsBuilder.UseSqlite();
+        optionsBuilder.UseSqlite(connectionString, sqlite => sqlite.MigrationsAssembly(typeof(ApiDbContextDesignTimeFactory).Assembly));
 
         return new ApiDbContext(optionsBuilder.Options);
     }

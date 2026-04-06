@@ -1,9 +1,13 @@
 @page "/certificates"
 @inject IApiManagementService ApiManagementService
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager NavigationManager
 @using System.Security.Cryptography.X509Certificates
 @using System.Net.Http.Json
+
+@code {
+    private HttpClient Http => HttpClientFactory.CreateClient("Default");
+}
 
 <PageTitle>证书管理 - MinGo API网关</PageTitle>
 
