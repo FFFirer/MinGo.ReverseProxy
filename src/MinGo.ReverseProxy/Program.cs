@@ -8,6 +8,7 @@ using MinGo.Core.Services;
 using MinGo.Core.Interfaces;
 using MinGo.Infrastructure.ExternalServices;
 using System.Security.Cryptography.X509Certificates;
+using MinGo.ReverseProxy.Kestrel;
 
 Console.WriteLine("Starting MinGo Reverse Proxy...");
 
@@ -53,103 +54,17 @@ builder.Services.AddSingleton<IMessageNotificationService, MinGo.Application.Ser
 builder.Services.AddHostedService<MinGo.Infrastructure.ExternalServices.ConfigUpdateEventListener>();
 
 // 注册证书管理器
-builder.Services.AddCertificateManager();
+builder.Services.AddCertificateServices();
 
 // 反向代理
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration)
     .LoadFromDatabase();
 
-// 配置 Kestrel 使用 HTTPS 和 SNI 证书选择
-builder.WebHost.ConfigureKestrel((context, options) =>
-{
-    // 原逻辑（Fallback）：使用 ConfigureHttpsDefaults 配置默认 SNI 选择器
-    options.ConfigureHttpsDefaults(httpsOptions =>
-    {
-        httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | 
-                                   System.Security.Authentication.SslProtocols.Tls13;
-        
-        // Fallback 证书选择器：基于域名查找数据库证书，找不到时静默降级
-        httpsOptions.ServerCertificateSelector = (connectionContext, serverName) =>
-        {
-            var certificateManager = CertificateSelector.CertificateManager;
-            if (certificateManager != null)
-            {
-                return certificateManager.GetCertificate(serverName ?? "")!;
-            }
-            return null!;
-        };
-    });
-
-    // 为代理端口配置监听
-    foreach (var port in ProxyPorts)
-    {
-        options.ListenAnyIP(port, listenOptions =>
-        {
-            // 新逻辑：使用 HttpsConnectionAdapterOptions 的 ServerCertificateSelector
-            // 这会覆盖 ConfigureHttpsDefaults 中的默认配置
-            listenOptions.UseHttps(httpsOptions =>
-            {
-                httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | 
-                                          System.Security.Authentication.SslProtocols.Tls13;
-                
-                // 新的证书选择器：优先使用域名精确匹配
-                // 找不到时 fallback 到原逻辑
-                httpsOptions.ServerCertificateSelector = (connectionContext, serverName) =>
-                {
-                    var domain = serverName ?? "";
-                    
-                    try
-                    {
-                        var certificateManager = CertificateSelector.CertificateManager;
-                        if (certificateManager != null)
-                        {
-                            var cert = certificateManager.GetCertificate(domain);
-                            if (cert != null)
-                            {
-                                return cert;
-                            }
-                        }
-                        
-                        // 新逻辑失败，fallback
-                        var fallback = CertificateSelector.FallbackSelector;
-                        return fallback != null 
-                            ? fallback(connectionContext!, domain)! 
-                            : null!;
-                    }
-                    catch
-                    {
-                        // 任何异常都 fallback
-                        var fallback = CertificateSelector.FallbackSelector;
-                        return fallback != null 
-                            ? fallback(connectionContext!, domain)! 
-                            : null!;
-                    }
-                };
-            });
-        });
-    }
-    
-    // 管理端口保持 HTTP
-    foreach (var port in AdminPorts)
-    {
-        options.ListenAnyIP(port);
-    }
-});
-
 var app = builder.Build();
 
 // 初始化证书并设置静态引用
 await app.InitializeCertificatesAsync();
-var certManager = app.Services.GetService<ICertificateManager>();
-CertificateSelector.CertificateManager = certManager;
-
-// 设置 Fallback 选择器（指向 ConfigureHttpsDefaults 中的默认逻辑）
-CertificateSelector.FallbackSelector = (connectionContext, serverName) =>
-{
-    var manager = CertificateSelector.CertificateManager;
-    return manager != null ? manager.GetCertificate(serverName) : null;
-};
 
 app.UseDevelopmentAutoMigration();
 

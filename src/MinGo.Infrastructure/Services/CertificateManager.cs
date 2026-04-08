@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Models;
 using MinGo.Infrastructure.Data;
+using MinGo.ReverseProxy.Kestrel;
 
 namespace MinGo.Infrastructure.Services;
 
@@ -15,7 +17,7 @@ namespace MinGo.Infrastructure.Services;
 /// 证书管理器实现
 /// 根据请求域名从数据库中选择匹配的证书
 /// </summary>
-public class CertificateManager : ICertificateManager
+public class CertificateManager : ICertificateManager, IServerCertificateSelector
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<CertificateManager> _logger;
@@ -279,8 +281,9 @@ public class CertificateManager : ICertificateManager
 
             // 导出并重新导入以使其可导出
             var pfxBytes = cert.Export(X509ContentType.Pfx, "development");
-            return new X509Certificate2(pfxBytes, "development",
-                X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+            return X509CertificateLoader.LoadPkcs12(pfxBytes, "development", X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+            // return new X509Certificate2(pfxBytes, "development",
+            //     X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
         }
         catch (Exception ex)
         {
@@ -369,5 +372,12 @@ public class CertificateManager : ICertificateManager
     public X509Certificate2? GetDefaultCertificate()
     {
         return _fallbackCertificate ?? GetDevCertificate();
+    }
+
+    public X509Certificate2? Select(ConnectionContext? context, string? domainName)
+    {
+        if(domainName is null) return null;
+
+        return GetCertificate(domainName);
     }
 }

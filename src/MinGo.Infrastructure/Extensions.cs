@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using MinGo.Core.Interfaces;
 using MinGo.Infrastructure.ExternalServices;
 using MinGo.Infrastructure.Services;
+using MinGo.ReverseProxy.Kestrel;
 using Yarp.ReverseProxy.Configuration;
 
 namespace MinGo.Infrastructure;
@@ -28,9 +29,6 @@ public static class ReverseProxyExtensions
         // 注册数据库配置提供程序
         builder.Services.AddSingleton<DatabaseProxyConfigProvider>();
         builder.Services.AddSingleton<IProxyConfigProvider>(sp => sp.GetRequiredService<DatabaseProxyConfigProvider>());
-
-        // 注册证书管理器
-        builder.Services.AddSingleton<ICertificateManager, CertificateManager>();
 
         return builder;
     }
@@ -69,11 +67,12 @@ public static class ReverseProxyExtensions
     /// </summary>
     /// <param name="services">服务集合</param>
     /// <returns>服务集合</returns>
+    [Obsolete]
     public static IServiceCollection AddCertificateManager(this IServiceCollection services)
     {
         // 注册证书管理器
         services.AddSingleton<ICertificateManager, CertificateManager>();
-        
+
         return services;
     }
 
@@ -85,7 +84,7 @@ public static class ReverseProxyExtensions
     /// <param name="isDevelopment">是否为开发环境</param>
     /// <param name="logger">日志记录器</param>
     public static void ConfigureKestrelSni(
-        this KestrelServerOptions builder, 
+        this KestrelServerOptions builder,
         X509Certificate2? defaultCertificate,
         bool isDevelopment,
         ILogger? logger = null)
@@ -103,15 +102,15 @@ public static class ReverseProxyExtensions
                 // 配置 HTTPS
                 listenOptions.UseHttps(httpsOptions =>
                 {
-                    httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | 
+                    httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 |
                                                 System.Security.Authentication.SslProtocols.Tls13;
-                    
+
                     // 设置默认证书
                     if (defaultCertificate != null)
                     {
                         httpsOptions.ServerCertificate = defaultCertificate;
                     }
-                    
+
                     // 在开发环境下，启用证书选择回调（如果可用）
                     if (isDevelopment)
                     {
