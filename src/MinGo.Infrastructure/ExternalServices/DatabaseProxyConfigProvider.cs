@@ -22,17 +22,45 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     private readonly ILogger<DatabaseProxyConfigProvider> _logger;
     private volatile DatabaseProxyConfig _config;
     private bool _disposed;
+    private readonly SemaphoreSlim _loadLock = new(1, 1);
 
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="apiDbService">API 数据库服务</param>
+    /// <param name="serviceScopeFactory">服务作用域工厂</param>
     /// <param name="logger">日志记录器</param>
     public DatabaseProxyConfigProvider(IServiceScopeFactory serviceScopeFactory, ILogger<DatabaseProxyConfigProvider> logger)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
-        _config = LoadConfigFromDatabase();
+        // 初始空配置，避免启动时阻塞
+        _config = new DatabaseProxyConfig(Array.Empty<YarpRouteConfig>(), Array.Empty<YarpClusterConfig>(), DateTime.UtcNow);
+        
+        // 异步初始化配置（非阻塞）
+        Task.Run(InitializeAsync);
+    }
+
+    /// <summary>
+    /// 异步初始化配置
+    /// </summary>
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            await _loadLock.WaitAsync();
+            var latest = await LoadConfigFromDatabaseAsync();
+            var oldConfig = Interlocked.Exchange(ref _config, latest);
+            oldConfig.Dispose();
+            _logger.LogInformation("配置初始化完成");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置初始化失败");
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
     }
 
     /// <summary>
@@ -42,9 +70,9 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     public IProxyConfig GetConfig() => _config;
 
     /// <summary>
-    /// 从数据库加载配置
+    /// 从数据库加载配置（异步）
     /// </summary>
-    private DatabaseProxyConfig LoadConfigFromDatabase()
+    private async Task<DatabaseProxyConfig> LoadConfigFromDatabaseAsync()
     {
         var routes = new List<YarpRouteConfig>();
         var clusters = new List<YarpClusterConfig>();
@@ -52,17 +80,13 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
         try
         {
             using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var _apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
+            var apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
 
             _logger.LogInformation("正在从数据库加载配置");
 
-            // 同步获取路由和集群配置
-            var routesTask = _apiDbService.GetRoutesAsync();
-            var clustersTask = _apiDbService.GetClustersAsync();
-            Task.WaitAll(routesTask, clustersTask);
-
-            var dbRoutes = routesTask.Result;
-            var dbClusters = clustersTask.Result;
+            // 异步获取路由和集群配置
+            var dbRoutes = await apiDbService.GetRoutesAsync();
+            var dbClusters = await apiDbService.GetClustersAsync();
 
             // 转换集群配置
             foreach (var cluster in dbClusters)
@@ -122,11 +146,21 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     /// <summary>
     /// 手动刷新配置
     /// </summary>
-    public void Refresh()
+    public async Task RefreshAsync()
     {
-        var latest = LoadConfigFromDatabase();
-        var oldConfig = Interlocked.Exchange(ref _config, latest);
-        oldConfig.SignalChange();
+        await _loadLock.WaitAsync();
+        try
+        {
+            var latest = await LoadConfigFromDatabaseAsync();
+            var oldConfig = Interlocked.Exchange(ref _config, latest);
+            oldConfig.SignalChange();
+            oldConfig.Dispose();
+            _logger.LogInformation("配置已刷新");
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
     }
 
     /// <summary>
@@ -136,6 +170,8 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     {
         if (!_disposed)
         {
+            _loadLock.Dispose();
+            _config?.Dispose();
             _disposed = true;
         }
     }
@@ -146,10 +182,12 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
 /// </summary>
 internal class DatabaseProxyConfig : IProxyConfig
 {
-    private CancellationTokenSource _cts = new CancellationTokenSource();
+    private CancellationTokenSource _cts;
+    private bool _disposed;
 
     public DatabaseProxyConfig(IReadOnlyList<YarpRouteConfig> routes, IReadOnlyList<YarpClusterConfig> clusters, DateTime changeTime)
     {
+        _cts = new CancellationTokenSource();
         Routes = routes;
         Clusters = clusters;
         ChangeTime = changeTime;
@@ -161,11 +199,29 @@ internal class DatabaseProxyConfig : IProxyConfig
     public DateTime ChangeTime { get; }
     public IChangeToken ChangeToken { get; private set; }
 
-    // 供 Provider 调用：表示"这份配置已经过期了"
+    /// <summary>
+    /// 发送配置变更信号
+    /// </summary>
     public void SignalChange()
     {
         var previousCts = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
         ChangeToken = new CancellationChangeToken(_cts.Token);
         previousCts.Cancel();  // 通知 YARP 重新拉配置
+        
+        // 释放旧的 CTS，避免内存泄漏
+        previousCts.Dispose();
+    }
+
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _disposed = true;
+        }
     }
 }

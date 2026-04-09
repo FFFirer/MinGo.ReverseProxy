@@ -53,7 +53,7 @@ public class ConfigUpdateEventListener : IHostedService, IDisposable
     /// </summary>
     /// <param name="gatewayEvent">网关事件</param>
     /// <returns>任务</returns>
-    private Task HandleConfigUpdateEventAsync(GatewayEvent gatewayEvent)
+    private async Task HandleConfigUpdateEventAsync(GatewayEvent gatewayEvent)
     {
         _logger.LogInformation("收到配置更新事件: {EventId}, 类型: {EventType}", gatewayEvent.EventId, gatewayEvent.EventType);
 
@@ -62,16 +62,14 @@ public class ConfigUpdateEventListener : IHostedService, IDisposable
             using var scope = _serviceProvider.CreateScope();
             var proxyConfigProvider = scope.ServiceProvider.GetRequiredService<DatabaseProxyConfigProvider>();
 
-            // 刷新配置
-            proxyConfigProvider.Refresh();
+            // 异步刷新配置
+            await proxyConfigProvider.RefreshAsync();
             _logger.LogInformation("配置已成功刷新");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "处理配置更新事件时发生错误");
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
