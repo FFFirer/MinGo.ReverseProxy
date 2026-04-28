@@ -1,0 +1,127 @@
+@page "/profile"
+@attribute [Authorize]
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+@inject AuthService AuthService
+
+<PageTitle>个人资料 - MinGo API网关</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-6">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+                个人资料
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                查看和管理您的账户信息
+            </p>
+        </div>
+
+        @if (IsLoading)
+        {
+            <div class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 px-4 py-3 rounded-md" role="alert">
+                @ErrorMessage
+            </div>
+        }
+        else if (UserInfo != null)
+        {
+            <div class="space-y-6">
+                <div class="text-center">
+                    <div class="flex items-center justify-center h-16 w-16 rounded-full bg-indigo-600 text-white flex-shrink-0 mx-auto">
+                        <i class="fa fa-user text-xl"></i>
+                    </div>
+                    <h3 class="mt-4 text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+                        @UserInfo.Email
+                    </h3>
+                    <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                        已验证的邮箱
+                    </p>
+                </div>
+
+                <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm border border-gray-200 dark:border-dark-200 p-6">
+                    <h3 class="font-semibold mb-4">账户信息</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center">
+                            <span class="w-1/3 text-sm font-medium text-gray-500 dark:text-gray-400">用户ID</span>
+                            <span class="w-2/3 text-sm text-gray-900 dark:text-gray-100">@UserInfo.Id</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-1/3 text-sm font-medium text-gray-500 dark:text-gray-400">邮箱</span>
+                            <span class="w-2/3 text-sm text-gray-900 dark:text-gray-100">@UserInfo.Email</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-1/3 text-sm font-medium text-gray-500 dark:text-gray-400">用户名</span>
+                            <span class="w-2/3 text-sm text-gray-900 dark:text-gray-100">@UserInfo.UserName ?? "未设置"</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-1/3 text-sm font-medium text-gray-500 dark:text-gray-400">手机号</span>
+                            <span class="w-2/3 text-sm text-gray-900 dark:text-gray-100">@UserInfo.PhoneNumber ?? "未设置"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-8">
+                <p class="text-sm text-gray-500 dark:text-gray-400">暂无用户信息</p>
+            </div>
+        }
+
+        <div class="mt-6 flex justify-center">
+            <button @onclick="HandleLogout"
+                    class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:pointer-events-none">
+                退出登录
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private AuthService.UserInfoDto? UserInfo;
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserInfo();
+    }
+
+    private async Task LoadUserInfo()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            UserInfo = await AuthService.GetUserInfoAsync();
+            if (UserInfo is null)
+            {
+                // 未登录或 token 无效，跳转到登录页（由 AuthorizeRouteView 处理）
+                return;
+            }
+        }
+        catch
+        {
+            ErrorMessage = "加载失败，请重新登录";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/login", true);
+    }
+}

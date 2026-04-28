@@ -1,18 +1,48 @@
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject AuthService AuthService
+
+@using Microsoft.AspNetCore.Components
 
 @code {
     private string? currentPage;
-
+    private bool isAuthenticated = false;
+    private string userEmail = string.Empty;
+    private bool showAvatarDropdown = false;
+    
     [Parameter]
     public bool IsMobileMenuOpen { get; set; }
-
+    
     [Parameter]
     public EventCallback<bool> IsMobileMenuOpenChanged { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         NavigationManager.LocationChanged += OnLocationChanged;
         UpdateCurrentPage();
+        await CheckAuthState();
+    }
+
+    private async Task CheckAuthState()
+    {
+        try
+        {
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            if (isAuthenticated)
+            {
+                var userInfo = await AuthService.GetUserInfoAsync();
+                userEmail = userInfo?.Email ?? "用户";
+            }
+            else
+            {
+                userEmail = string.Empty;
+            }
+        }
+        catch
+        {
+            isAuthenticated = false;
+            userEmail = string.Empty;
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -42,6 +72,20 @@
         }
     }
 
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        isAuthenticated = false;
+        userEmail = string.Empty;
+        showAvatarDropdown = false;
+        NavigationManager.NavigateTo("/login", true);
+    }
+
+    private void ToggleAvatarDropdown()
+    {
+        showAvatarDropdown = !showAvatarDropdown;
+    }
+
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
@@ -54,9 +98,9 @@
             <i class="fa fa-tachometer w-6 text-center"></i>
             <span>仪表盘</span>
         </a>
-        <a href="javascript:void(0)" class="@GetSidebarItemClass("routes")" @onclick="@(() => NavigateTo("routes"))">
-            <i class="fa fa-random w-6 text-center"></i>
-            <span>路由管理</span>
+        <a href="javascript:void(0)" class="@GetSidebarItemClass("instances")" @onclick="@(() => NavigateTo("instances"))">
+            <i class="fa fa-server w-6 text-center"></i>
+            <span>实例管理</span>
         </a>
         <a href="javascript:void(0)" class="@GetSidebarItemClass("clusters")" @onclick="@(() => NavigateTo("clusters"))">
             <i class="fa fa-server w-6 text-center"></i>
@@ -66,28 +110,57 @@
             <i class="fa fa-certificate w-6 text-center"></i>
             <span>证书管理</span>
         </a>
-        @* <a href="javascript:void(0)" class="@GetSidebarItemClass("security")" @onclick="@(() => NavigateTo("security"))">
-            <i class="fa fa-shield w-6 text-center"></i>
-            <span>安全管理</span>
+        <a href="javascript:void(0)" class="@GetSidebarItemClass("logs")" @onclick="@(() => NavigateTo("logs"))">
+            <i class="fa fa-list-alt w-6 text-center"></i>
+            <span>日志管理</span>
         </a>
         <a href="javascript:void(0)" class="@GetSidebarItemClass("monitoring")" @onclick="@(() => NavigateTo("monitoring"))">
             <i class="fa fa-line-chart w-6 text-center"></i>
             <span>监控</span>
         </a>
-        <a href="javascript:void(0)" class="@GetSidebarItemClass("logs")" @onclick="@(() => NavigateTo("logs"))">
-            <i class="fa fa-list-alt w-6 text-center"></i>
-            <span>日志管理</span>
-        </a> *@
-        @* <a href="javascript:void(0)" class="@GetSidebarItemClass("instances")" @onclick="@(() => NavigateTo("instances"))">
-            <i class="fa fa-server w-6 text-center"></i>
-            <span>实例管理</span>
-        </a> *@
+        <a href="javascript:void(0)" class="@GetSidebarItemClass("security")" @onclick="@(() => NavigateTo("security"))">
+            <i class="fa fa-shield w-6 text-center"></i>
+            <span>安全管理</span>
+        </a>
         <a href="javascript:void(0)" class="@GetSidebarItemClass("settings")" @onclick="@(() => NavigateTo("settings"))">
             <i class="fa fa-cog w-6 text-center"></i>
             <span>设置</span>
         </a>
     </nav>
     <div class="p-4 border-t border-gray-200 dark:border-dark-200">
+        @if (isAuthenticated)
+        {
+            <div class="relative">
+                <div class="flex items-center space-x-3 cursor-pointer" @onclick="ToggleAvatarDropdown">
+                    <img src="https://via.placeholder.com/36" class="h-9 w-9 rounded-full" alt="User avatar" />
+                    <div>
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100" title="@userEmail">
+                            @userEmail
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            <a href="/profile" class="underline hover:text-indigo-600 dark:hover:text-indigo-400" @onclick:stopPropagation>个人资料</a>
+                        </p>
+                    </div>
+                    <i class="fa fa-chevron-down text-xs text-gray-400 ml-auto transition-transform duration-200 @(showAvatarDropdown ? "rotate-180" : "")"></i>
+                </div>
+                @if (showAvatarDropdown)
+                {
+                    <div class="absolute left-0 right-0 mt-1 bg-white dark:bg-dark-100 border border-gray-200 dark:border-dark-200 rounded-md shadow-lg z-50 py-1">
+                        <button @onclick="HandleLogout" class="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                            <i class="fa fa-sign-out-alt mr-2"></i>
+                            退出登录
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <a href="/login" class="w-flex w-full items-center justify-center px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-600 rounded-md">
+                <i class="fa fa-sign-in-alt mr-2"></i>
+                登录
+            </a>
+        }
     </div>
 </aside>
 

@@ -9,6 +9,12 @@ using MinGo.Core.Interfaces;
 using MinGo.Infrastructure.ExternalServices;
 using System.Security.Cryptography.X509Certificates;
 using MinGo.ReverseProxy.Kestrel;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using System.Security.Claims;
+using MinGo.ReverseProxy.Services;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 
 Console.WriteLine("Starting MinGo Reverse Proxy...");
 
@@ -24,6 +30,11 @@ int[] AdminPorts = builder.Configuration.GetSection(nameof(AdminPorts)).Get<int[
 int[] ProxyPorts = builder.Configuration.GetSection(nameof(ProxyPorts)).Get<int[]>() ?? [];
 
 builder.Host.UseSerilog();
+
+// 配置 Data Protection（用于 Cookie 加密）
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "..", "keys")));
+
 builder.Services.AddViteServices();
 
 builder.Services.AddRazorPages();
@@ -32,10 +43,61 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddControllers();
 builder.Services.AddNamedHttpClients(builder.Configuration);
 
+// 注册 AuthMessageHandler for HttpClient
+builder.Services.AddScoped<AuthMessageHandler>();
+
+// 注册 AuthService - 使用 Scoped HttpClient
+builder.Services.AddScoped<AuthService>();
+
+// Register AuthenticationStateProvider for Blazor authorization
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+builder.Services.AddCascadingAuthenticationState();
+
 // 配置数据库
 builder.Services.AddDbContext<ApiDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 配置 Identity (Cookie 认证方案 - 适合 Blazor Server)
+// 使用现有 Blazor 登录/注册页面，不需要 AddDefaultUI()
+builder.Services
+    .AddIdentity<IdentityUser, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+// 配置 Cookie 认证选项
+builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(options =>
+{
+    options.LoginPath = "/Login";
+    options.LogoutPath = "/Logout";
+    options.AccessDeniedPath = "/AccessDenied";
+    options.ExpireTimeSpan = TimeSpan.FromDays(7);
+    options.SlidingExpiration = true;
+});
+
+// 配置 Identity 选项
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    // Password settings - 宽松配置便于开发
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 4;
+    
+    // Lockout settings
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
+    
+    // User settings
+    options.User.RequireUniqueEmail = true;
+});
+
+builder.Services.AddAuthorization();
 
 // 注册遥测存储
 builder.Services.AddSingleton<TelemetryStore>();
@@ -75,6 +137,17 @@ if(!app.Environment.IsDevelopment())
 }
 
 app.UseGatewayTelemetry();
+
+// 添加 Cookie 策略中间件
+app.UseCookiePolicy();
+
+// 添加认证和授权中间件 - 正确顺序
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Identity UI 通过 AddDefaultUI() 自动映射
+// app.MapIdentityApi<IdentityUser>(); // 已移除 - Bearer Token 方案
 
 app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
 {

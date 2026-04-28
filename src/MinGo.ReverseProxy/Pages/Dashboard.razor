@@ -1,5 +1,6 @@
 @page "/"
 @page "/dashboard"
+@attribute [Authorize]
 
 @inject MinGo.Core.Interfaces.IMonitoringService monitoringService
 @inject MinGo.Core.Interfaces.IGatewayInstanceService instanceService

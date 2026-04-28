@@ -1,0 +1,120 @@
+@page "/register"
+@attribute [AllowAnonymous]
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+@inject AuthService AuthService
+
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>注册 - MinGo API网关</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+                创建您的账户
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                加入我们，开始使用MinGo API网关
+            </p>
+        </div>
+        <EditForm Model="@registerModel" OnValidSubmit="HandleRegister" class="mt-8 space-y-6">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="rounded-md shadow-sm -space-y-px">
+                <div>
+                    <label for="email" class="sr-only">电子邮件</label>
+                    <InputText id="email" @bind="registerModel.Email" type="email" autocomplete="email" required
+                           class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                           placeholder="电子邮件地址" />
+                </div>
+                <div>
+                    <label for="password" class="sr-only">密码</label>
+                    <InputText id="password" @bind-Value="registerModel.Password" type="password" autocomplete="new-password" required
+                           minlength="4"
+                           class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                           placeholder="密码" />
+                </div>
+                <div>
+                    <label for="confirmPassword" class="sr-only">确认密码</label>
+                    <InputText id="confirmPassword" @bind-Value="registerModel.ConfirmPassword" type="password" autocomplete="new-password" required
+                           minlength="4"
+                           class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                           placeholder="确认密码" />
+                </div>
+            </div>
+
+            <div>
+                <button type="submit"
+                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none">
+                    注册中...
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="mt-3 text-sm text-red-600 dark:text-red-400">
+                    @ErrorMessage
+                </div>
+            }
+            
+            @if (!string.IsNullOrEmpty(SuccessMessage))
+            {
+                <div class="mt-3 text-sm text-green-600 dark:text-green-400">
+                    @SuccessMessage
+                </div>
+            }
+        </EditForm>
+        
+        <div class="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+            已有账户？<a href="/login" class="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">点击登录</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterModel registerModel = new();
+    private string ErrorMessage = "";
+    private string SuccessMessage = "";
+    private bool IsLoading = false;
+
+    private async Task HandleRegister()
+    {
+        IsLoading = true;
+        ErrorMessage = "";
+        SuccessMessage = "";
+
+        try
+        {
+            await AuthService.RegisterAsync(registerModel.Email, registerModel.Password);
+            SuccessMessage = "注册成功！请登录。";
+            // Clear form after successful registration
+            registerModel = new RegisterModel();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"注册失败：{ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    public class RegisterModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, MinimumLength = 4)]
+        public string Password { get; set; } = "";
+
+        [Required]
+        [StringLength(100, MinimumLength = 4)]
+        [Compare("Password", ErrorMessage = "两次输入的密码不一致")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}
