@@ -1,32 +1,51 @@
 version: '3.8'
 
 services:
-  reverse-proxy:
+  control-plane:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: min-go-reverse-proxy
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-control-plane
     ports:
-      - "8080:8080"
-      - "6139:6139"
-      - "58074:58074"
-      - "5286:5286"
-      - "7064:7064"
+      - "5000:5000"     # REST API
+      - "5001:5001"     # gRPC
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - Kestrel__Endpoints__Http__Url=http://+:5000
+      - Kestrel__Endpoints__Http__Protocols=Http1
+      - Kestrel__Endpoints__gRPC__Url=http://+:5001
+      - Kestrel__Endpoints__gRPC__Protocols=Http2
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+    volumes:
+      - cp-data:/app/data
+    restart: unless-stopped
+
+  data-plane:
+    build:
+      context: .
+      dockerfile: DataPlane.Dockerfile
+    container_name: min-go-data-plane
+    ports:
+      - "8080:8080"     # 代理端口
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-      - Serilog__MinimumLevel=Information
-      - Vite__Server__AutoRun=false
-    volumes:
-      - sqlite-data:/app/data
+      - ControlPlane__GrpcUrl=http://control-plane:5001
+    depends_on:
+      - control-plane
     restart: unless-stopped
-    networks:
-      - min-go-network
+
+  frontend:
+    build:
+      context: frontend/min-go-console
+      dockerfile: Dockerfile
+    container_name: min-go-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - control-plane
+    restart: unless-stopped
 
 volumes:
-  sqlite-data:
-    driver: local
-
-networks:
-  min-go-network:
-    driver: bridge
+  cp-data:
