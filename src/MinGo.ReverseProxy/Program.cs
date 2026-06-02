@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using System.Security.Claims;
 using MinGo.ReverseProxy.Services;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 
 Console.WriteLine("Starting MinGo Reverse Proxy...");
@@ -43,14 +42,8 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddControllers();
 builder.Services.AddNamedHttpClients(builder.Configuration);
 
-// 注册 AuthMessageHandler for HttpClient
-builder.Services.AddScoped<AuthMessageHandler>();
-
-// 注册 AuthService - 使用 Scoped HttpClient
+// 注册 AuthService - 基于 ASP.NET Core Identity Cookie 认证
 builder.Services.AddScoped<AuthService>();
-
-// Register AuthenticationStateProvider for Blazor authorization
-builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 builder.Services.AddCascadingAuthenticationState();
 
 // 配置数据库
@@ -128,6 +121,9 @@ var app = builder.Build();
 // 初始化证书并设置静态引用
 await app.InitializeCertificatesAsync();
 
+// 从数据库加载配置（同步等待，避免启动后空配置竞争条件）
+await app.InitializeDatabaseProxyConfigAsync();
+
 app.UseDevelopmentAutoMigration();
 
 if(!app.Environment.IsDevelopment())
@@ -141,14 +137,6 @@ app.UseGatewayTelemetry();
 // 添加 Cookie 策略中间件
 app.UseCookiePolicy();
 
-// 添加认证和授权中间件 - 正确顺序
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Identity UI 通过 AddDefaultUI() 自动映射
-// app.MapIdentityApi<IdentityUser>(); // 已移除 - Bearer Token 方案
-
 app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
 {
     if (app.Environment.IsDevelopment())
@@ -159,6 +147,8 @@ app.MapWhen(x => AdminPorts.Contains(x.Connection.LocalPort), b =>
     b.UseStaticFiles();
 
     b.UseRouting();
+    b.UseAuthentication();
+    b.UseAuthorization();
 
     b.UseEndpoints(e =>
     {

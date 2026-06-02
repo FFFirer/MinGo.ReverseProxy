@@ -1,8 +1,6 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @inject NavigationManager NavigationManager
-@inject HttpClient HttpClient
-@inject IJSRuntime JSRuntime
 @inject AuthService AuthService
 
 @using System.ComponentModel.DataAnnotations
@@ -38,9 +36,9 @@
             </div>
 
             <div>
-                <button type="submit"
+                <button type="submit" disabled="@IsLoading"
                         class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none">
-                    登录中...
+                    @(IsLoading ? "登录中..." : "登录")
                 </button>
             </div>
 
@@ -64,19 +62,18 @@
         IsLoading = true;
         ErrorMessage = "";
 
-        try
+        var result = await AuthService.LoginAsync(loginModel.Email, loginModel.Password);
+
+        if (result.Succeeded)
         {
-            await AuthService.LoginAsync(loginModel.Email, loginModel.Password);
             NavigationManager.NavigateTo("/dashboard");
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = $"登录失败：{ex.Message}";
+            ErrorMessage = $"登录失败：{result.ErrorMessage}";
         }
-        finally
-        {
-            IsLoading = false;
-        }
+
+        IsLoading = false;
     }
 
     public class LoginModel

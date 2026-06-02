@@ -125,25 +125,27 @@ namespace MinGo.ReverseProxy.Controllers
             return NoContent();
         }
 
-        private string ExtractDomainFromCertificate(byte[] certificateData, string? password)
+        private static X509Certificate2 LoadCertificate(byte[] certificateData, string? password)
         {
-            X509Certificate2 certificate;
-
             if (!string.IsNullOrEmpty(password))
             {
-                certificate = new X509Certificate2(certificateData, password, X509KeyStorageFlags.Exportable);
+                return X509CertificateLoader.LoadPkcs12(certificateData, password, X509KeyStorageFlags.Exportable);
             }
-            else
+
+            // Try PKCS#12/PFX first (no password), fall back to DER certificate
+            try
             {
-                try
-                {
-                    certificate = new X509Certificate2(certificateData, (string?)null, X509KeyStorageFlags.Exportable);
-                }
-                catch
-                {
-                    certificate = new X509Certificate2(certificateData);
-                }
+                return X509CertificateLoader.LoadPkcs12(certificateData, null, X509KeyStorageFlags.Exportable);
             }
+            catch
+            {
+                return X509CertificateLoader.LoadCertificate(certificateData);
+            }
+        }
+
+        private string ExtractDomainFromCertificate(byte[] certificateData, string? password)
+        {
+            var certificate = LoadCertificate(certificateData, password);
 
             var subject = certificate.Subject;
             var cnMatch = System.Text.RegularExpressions.Regex.Match(subject, @"CN=([^,]+)");
@@ -157,23 +159,7 @@ namespace MinGo.ReverseProxy.Controllers
 
         private CertificateConfig ParseCertificate(byte[] certificateData, string? password, string domainName)
         {
-            X509Certificate2 certificate;
-
-            if (!string.IsNullOrEmpty(password))
-            {
-                certificate = new X509Certificate2(certificateData, password, X509KeyStorageFlags.Exportable);
-            }
-            else
-            {
-                try
-                {
-                    certificate = new X509Certificate2(certificateData, (string?)null, X509KeyStorageFlags.Exportable);
-                }
-                catch
-                {
-                    certificate = new X509Certificate2(certificateData);
-                }
-            }
+            var certificate = LoadCertificate(certificateData, password);
 
             return new CertificateConfig
             {

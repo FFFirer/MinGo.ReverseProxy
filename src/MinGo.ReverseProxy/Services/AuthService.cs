@@ -1,129 +1,116 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
 
 namespace MinGo.ReverseProxy.Services;
 
+/// <summary>
+/// 认证服务 - 使用 ASP.NET Core Identity Cookie 认证
+/// 适用于 Blazor Server，通过 SignInManager 直接管理 Cookie
+/// </summary>
 public class AuthService
 {
-    private readonly HttpClient _httpClient;
-    private readonly IJSRuntime _jsRuntime;
-    private readonly NavigationManager _navigationManager;
-    private const string AccessTokenKey = "access_token";
-    private const string RefreshTokenKey = "refresh_token";
+    private readonly SignInManager<IdentityUser> _signInManager;
+    private readonly UserManager<IdentityUser> _userManager;
+    private readonly AuthenticationStateProvider _authStateProvider;
 
-    public AuthService(HttpClient httpClient, IJSRuntime jsRuntime, NavigationManager navigationManager)
+    public AuthService(
+        SignInManager<IdentityUser> signInManager,
+        UserManager<IdentityUser> userManager,
+        AuthenticationStateProvider authStateProvider)
     {
-        _httpClient = httpClient;
-        _jsRuntime = jsRuntime;
-        _navigationManager = navigationManager;
+        _signInManager = signInManager;
+        _userManager = userManager;
+        _authStateProvider = authStateProvider;
     }
 
-    public async Task<bool> IsAuthenticatedAsync()
+    /// <summary>
+    /// 使用邮箱和密码登录，通过 Cookie 建立认证会话
+    /// </summary>
+    public async Task<AuthResult> LoginAsync(string email, string password)
     {
-        var token = await GetAccessTokenAsync();
-        return !string.IsNullOrEmpty(token);
-    }
-
-    public async Task<string?> GetAccessTokenAsync()
-    {
-        return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", AccessTokenKey);
-    }
-
-    public async Task<string?> GetRefreshTokenAsync()
-    {
-        return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", RefreshTokenKey);
-    }
-
-    public async Task LoginAsync(string email, string password)
-    {
-        var loginData = new
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
         {
-            email = email,
-            password = password,
-            useCookies = false
-        };
-
-        var response = await _httpClient.PostAsJsonAsync("api/account/login", loginData);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        if (result != null)
-        {
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AccessTokenKey, result.AccessToken);
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
+            return AuthResult.Fail("用户不存在");
         }
+
+        var result = await _signInManager.PasswordSignInAsync(
+            user.UserName ?? email,
+            password,
+            isPersistent: true,
+            lockoutOnFailure: false);
+
+        if (result.Succeeded)
+            return AuthResult.Ok();
+
+        if (result.IsLockedOut)
+            return AuthResult.Fail("账户已被锁定，请稍后再试");
+
+        if (result.RequiresTwoFactor)
+            return AuthResult.Fail("需要两步验证");
+
+        return AuthResult.Fail("邮箱或密码错误");
     }
 
-    public async Task RegisterAsync(string email, string password)
+    /// <summary>
+    /// 注册新用户
+    /// </summary>
+    public async Task<AuthResult> RegisterAsync(string email, string password)
     {
-        var registerData = new
+        var user = new IdentityUser
         {
-            email = email,
-            password = password
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
         };
 
-        var response = await _httpClient.PostAsJsonAsync("api/account/register", registerData);
-        response.EnsureSuccessStatusCode();
+        var result = await _userManager.CreateAsync(user, password);
+
+        if (result.Succeeded)
+            return AuthResult.Ok();
+
+        var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+        return AuthResult.Fail(errors);
     }
 
+    /// <summary>
+    /// 登出，清除 Cookie
+    /// </summary>
     public async Task LogoutAsync()
     {
-        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", AccessTokenKey);
-        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", RefreshTokenKey);
+        await _signInManager.SignOutAsync();
     }
 
-    public async Task<bool> RefreshTokenAsync()
+    /// <summary>
+    /// 检查当前用户是否已认证（基于 Cookie）
+    /// </summary>
+    public async Task<bool> IsAuthenticatedAsync()
     {
-        var refreshToken = await GetRefreshTokenAsync();
-        if (string.IsNullOrEmpty(refreshToken))
-            return false;
-
-        var refreshData = new { refresh_token = refreshToken };
-        var response = await _httpClient.PostAsJsonAsync("api/account/refresh", refreshData);
-        
-        if (!response.IsSuccessStatusCode)
-            return false;
-
-        var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        if (result == null)
-            return false;
-
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AccessTokenKey, result.AccessToken);
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
-        
-        return true;
+        var state = await _authStateProvider.GetAuthenticationStateAsync();
+        return state.User.Identity?.IsAuthenticated ?? false;
     }
 
+    /// <summary>
+    /// 获取当前登录用户信息
+    /// </summary>
     public async Task<UserInfoDto?> GetUserInfoAsync()
     {
-        var token = await GetAccessTokenAsync();
-        if (string.IsNullOrEmpty(token))
+        var state = await _authStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated != true)
             return null;
 
-        try
-        {
-            var response = await _httpClient.GetAsync("api/account/me");
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            return await response.Content.ReadFromJsonAsync<UserInfoDto>();
-        }
-        catch
-        {
+        var identityUser = await _userManager.GetUserAsync(state.User);
+        if (identityUser == null)
             return null;
-        }
-    }
 
-    private class LoginResponse
-    {
-        [JsonPropertyName("token")]
-        public string AccessToken { get; set; } = "";
-        [JsonPropertyName("refreshToken")]
-        public string RefreshToken { get; set; } = "";
-        [JsonPropertyName("expiresIn")]
-        public int ExpiresIn { get; set; }
+        return new UserInfoDto
+        {
+            Id = identityUser.Id,
+            Email = identityUser.Email ?? "",
+            UserName = identityUser.UserName,
+            PhoneNumber = identityUser.PhoneNumber,
+            EmailConfirmed = identityUser.EmailConfirmed
+        };
     }
 
     public class UserInfoDto
@@ -134,4 +121,13 @@ public class AuthService
         public string? PhoneNumber { get; set; }
         public bool EmailConfirmed { get; set; }
     }
+}
+
+public class AuthResult
+{
+    public bool Succeeded { get; private set; }
+    public string ErrorMessage { get; private set; } = string.Empty;
+
+    public static AuthResult Ok() => new() { Succeeded = true };
+    public static AuthResult Fail(string error) => new() { Succeeded = false, ErrorMessage = error };
 }

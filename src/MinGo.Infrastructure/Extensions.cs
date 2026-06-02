@@ -63,17 +63,15 @@ public static class ReverseProxyExtensions
     }
 
     /// <summary>
-    /// 注册证书管理服务
+    /// 在应用启动时从数据库加载反向代理配置（避免空配置竞争条件）
     /// </summary>
-    /// <param name="services">服务集合</param>
-    /// <returns>服务集合</returns>
-    [Obsolete]
-    public static IServiceCollection AddCertificateManager(this IServiceCollection services)
+    /// <param name="app">Web应用</param>
+    /// <returns>任务</returns>
+    public static async Task InitializeDatabaseProxyConfigAsync(this WebApplication app)
     {
-        // 注册证书管理器
-        services.AddSingleton<ICertificateManager, CertificateManager>();
-
-        return services;
+        var provider = app.Services.GetRequiredService<DatabaseProxyConfigProvider>();
+        await provider.InitializeAsync();
+        app.Logger.LogInformation("Database proxy config initialized successfully");
     }
 
     /// <summary>

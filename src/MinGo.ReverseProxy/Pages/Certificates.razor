@@ -255,23 +255,7 @@ else
             await selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(memoryStream);
             var certificateData = memoryStream.ToArray();
 
-            X509Certificate2 certificate;
-
-            if (!string.IsNullOrEmpty(certificatePassword))
-            {
-                certificate = new X509Certificate2(certificateData, certificatePassword, X509KeyStorageFlags.Exportable);
-            }
-            else
-            {
-                try
-                {
-                    certificate = new X509Certificate2(certificateData, (string?)null, X509KeyStorageFlags.Exportable);
-                }
-                catch
-                {
-                    certificate = new X509Certificate2(certificateData);
-                }
-            }
+            var certificate = LoadCertificateFile(certificateData, certificatePassword);
 
             var subject = certificate.Subject;
             var cnMatch = System.Text.RegularExpressions.Regex.Match(subject, @"CN=([^,]+)");
@@ -318,23 +302,7 @@ else
             await selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(memoryStream);
             var certificateData = memoryStream.ToArray();
 
-            X509Certificate2 certificate;
-
-            if (!string.IsNullOrEmpty(certificatePassword))
-            {
-                certificate = new X509Certificate2(certificateData, certificatePassword, X509KeyStorageFlags.Exportable);
-            }
-            else
-            {
-                try
-                {
-                    certificate = new X509Certificate2(certificateData, (string?)null, X509KeyStorageFlags.Exportable);
-                }
-                catch
-                {
-                    certificate = new X509Certificate2(certificateData);
-                }
-            }
+            var certificate = LoadCertificateFile(certificateData, certificatePassword);
 
             var certificateConfig = new CertificateConfig
             {
@@ -378,5 +346,22 @@ else
     {
         await ApiManagementService.DeleteCertificateAsync(id);
         await LoadCertificatesAsync();
+    }
+
+    private static X509Certificate2 LoadCertificateFile(byte[] certificateData, string? password)
+    {
+        if (!string.IsNullOrEmpty(password))
+        {
+            return X509CertificateLoader.LoadPkcs12(certificateData, password, X509KeyStorageFlags.Exportable);
+        }
+
+        try
+        {
+            return X509CertificateLoader.LoadPkcs12(certificateData, null, X509KeyStorageFlags.Exportable);
+        }
+        catch
+        {
+            return X509CertificateLoader.LoadCertificate(certificateData);
+        }
     }
 }

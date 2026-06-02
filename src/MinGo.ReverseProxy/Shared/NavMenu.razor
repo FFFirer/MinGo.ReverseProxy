@@ -78,8 +78,6 @@
 
 @code {
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private HttpClient HttpClient { get; set; } = default!;
-    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private AuthService AuthService { get; set; } = default!;
 
     private bool IsAuthenticated = false;
