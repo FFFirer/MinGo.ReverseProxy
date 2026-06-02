@@ -4,7 +4,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # 缓存依赖
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 RUN corepack enable && pnpm install --frozen-lockfile
 
 # 构建
