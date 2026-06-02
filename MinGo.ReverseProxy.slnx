@@ -1,9 +1,12 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/MinGo.Application/MinGo.Application.csproj" />
     <Project Path="src/MinGo.Core/MinGo.Core.csproj" />
+    <Project Path="src/MinGo.Application/MinGo.Application.csproj" />
     <Project Path="src/MinGo.Infrastructure/MinGo.Infrastructure.csproj" />
-    <Project Path="src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj" />
-    <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" />
+    <Project Path="src/MinGo.ControlPlane.Api/MinGo.ControlPlane.Api.csproj" />
+    <Project Path="src/MinGo.DataPlane/MinGo.DataPlane.csproj" />
+    <!-- TODO: 迁移完成后移除以下项目 -->
+    <!-- <Project Path="src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj" /> -->
+    <!-- <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" /> -->
   </Folder>
 </Solution>
