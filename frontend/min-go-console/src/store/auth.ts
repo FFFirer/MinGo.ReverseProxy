@@ -5,10 +5,12 @@ import type { UserInfo } from '../types';
 export { user, loading, setUser };
 
 export async function fetchUser() {
+  setLoading(true);
   try {
     const userData = await api.get<UserInfo>('/auth/me');
     setUser(userData);
-  } catch {
+  } catch (err) {
+    console.error('[fetchUser] failed:', err);
     setUser(null);
   } finally {
     setLoading(false);

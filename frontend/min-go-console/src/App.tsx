@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Suspense } from 'solid-js';
+import { createEffect, onCleanup, Suspense, Switch, Match } from 'solid-js';
 import { Router, Route, Navigate } from '@solidjs/router';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -15,19 +15,26 @@ import SecurityPage from './pages/Security';
 import { user, loading, fetchUser } from './store/auth';
 
 function ProtectedLayout(props: { children: any }) {
-  if (loading()) return <div class="flex items-center justify-center min-h-screen text-secondary">验证登录状态...</div>;
-  if (!user()) return <Navigate href="/login" />;
-
   return (
-    <div class="h-screen flex flex-col overflow-hidden">
-      <Header />
-      <div class="flex flex-1 overflow-hidden relative">
-        <Sidebar />
-        <main class="flex-1 overflow-y-auto p-6 md:ml-64">
-          {props.children}
-        </main>
-      </div>
-    </div>
+    <Switch>
+      <Match when={loading()}>
+        <div class="flex items-center justify-center min-h-screen text-secondary">验证登录状态...</div>
+      </Match>
+      <Match when={!user()}>
+        <Navigate href="/login" />
+      </Match>
+      <Match when={user()}>
+        <div class="h-screen flex flex-col overflow-hidden">
+          <Header />
+          <div class="flex flex-1 overflow-hidden relative">
+            <Sidebar />
+            <main class="flex-1 overflow-y-auto p-6 md:ml-64">
+              {props.children}
+            </main>
+          </div>
+        </div>
+      </Match>
+    </Switch>
   );
 }
 
