@@ -1,12 +1,17 @@
+using MinGo.Core.Logging;
 using MinGo.Core.Services;
 using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Heartbeat;
 using MinGo.DataPlane.Telemetry;
 using MinGo.DataPlane.Kestrel;
+using Serilog;
 
 Console.WriteLine("Starting MinGo Data Plane...");
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Serilog — 共享配置
+builder.Host.UseSerilog(SerilogSetup.ConfigureSharedSerilog());
 
 // 配置端口 - 从环境变量或配置读取
 var proxyPorts = builder.Configuration.GetSection("ProxyPorts").Get<int[]>() ?? [8080];
