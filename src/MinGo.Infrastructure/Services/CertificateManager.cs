@@ -145,7 +145,7 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
         try
         {
             using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var certificates = await dbContext.Certificates
                 .Where(c => c.IsValid && c.CertificateData != null)

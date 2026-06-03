@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-migrate
+    entrypoint: ["./efbundle"]
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+    volumes:
+      - cp-data:/app/data
+    restart: "no"
+
   control-plane:
     build:
       context: .
@@ -17,6 +30,9 @@ services:
       - Kestrel__Endpoints__gRPC__Url=http://+:5001
       - Kestrel__Endpoints__gRPC__Protocols=Http2
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - cp-data:/app/data
     restart: unless-stopped
@@ -42,7 +58,7 @@ services:
       dockerfile: Dockerfile
     container_name: min-go-frontend
     ports:
-      - "80:80"
+      - "8081:80"
     depends_on:
       - control-plane
     restart: unless-stopped

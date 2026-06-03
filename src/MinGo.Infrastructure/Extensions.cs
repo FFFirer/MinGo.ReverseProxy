@@ -55,7 +55,7 @@ public static class ReverseProxyExtensions
         {
             using var scope = app.Services.CreateScope();
             var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("AutoMigration");
-            var dbContext = scope.ServiceProvider.GetRequiredService<Data.ApiDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
             dbContext.Database.Migrate();
 
             logger.LogInformation("Auto apply migrations!");

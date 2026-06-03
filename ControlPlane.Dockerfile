@@ -23,7 +23,7 @@ RUN dotnet publish src/MinGo.ControlPlane.Api -c Release -o /app/publish
 
 # 生成 EF Core 迁移 Bundle
 WORKDIR /src/src/MinGo.Infrastructure
-RUN dotnet ef migrations bundle -c ApiDbContext --configuration Release --no-build -o /app/publish/efbundle
+RUN dotnet ef migrations bundle -c AppDbContext --configuration Release --no-build -o /app/publish/efbundle
 
 # 运行阶段
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

@@ -12,7 +12,7 @@ namespace MinGo.Infrastructure.Data;
 /// </summary>
 public class ApiDbService : IApiDbService
 {
-    private readonly ApiDbContext _dbContext;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<ApiDbService> _logger;
 
     /// <summary>
@@ -20,7 +20,7 @@ public class ApiDbService : IApiDbService
     /// </summary>
     /// <param name="dbContext">数据库上下文</param>
     /// <param name="logger">日志记录器</param>
-    public ApiDbService(ApiDbContext dbContext, ILogger<ApiDbService> logger)
+    public ApiDbService(AppDbContext dbContext, ILogger<ApiDbService> logger)
     {
         _dbContext = dbContext;
         _logger = logger;
