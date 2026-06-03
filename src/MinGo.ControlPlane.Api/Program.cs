@@ -3,9 +3,10 @@ using Microsoft.AspNetCore.Identity;
 using MinGo.Infrastructure.Data;
 using MinGo.Application.Services;
 using MinGo.Core.Interfaces;
+using MinGo.Core.Logging;
 using MinGo.Core.Services;
-using Serilog;
 using MinGo.ControlPlane.Api.GrpcServices;
+using Serilog;
 
 Console.WriteLine("Starting MinGo Control Plane...");
 
@@ -13,11 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddUserSecrets<Program>();
 
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
-
-builder.Host.UseSerilog();
+// Serilog — 共享配置
+builder.Host.UseSerilog(SerilogSetup.ConfigureSharedSerilog());
 
 // 数据库（统一 AppDbContext）
 builder.Services.AddDbContext<AppDbContext>(options =>
