@@ -5,6 +5,7 @@ using MinGo.Application.Services;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Logging;
 using MinGo.Core.Services;
+using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
 using Serilog;
 
@@ -93,10 +94,13 @@ app.UseCors("Frontend");
 
 if (app.Environment.IsDevelopment())
 {
-    // 自动迁移（所有环境）
     using (var scope = app.Services.CreateScope())
     {
-        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+        var sp = scope.ServiceProvider;
+        sp.GetRequiredService<AppDbContext>().Database.Migrate();
+
+        // 种子数据：首次运行时创建默认管理员
+        await DbInitializer.SeedDevelopmentDataAsync(sp, app.Configuration);
     }
 }
 
