@@ -1,19 +1,13 @@
-import { createSignal } from 'solid-js';
+import { user, setUser, loading, setLoading } from './user-signal';
+import { api } from '../api/client';
 import type { UserInfo } from '../types';
 
-const [user, setUser] = createSignal<UserInfo | null>(null);
-const [loading, setLoading] = createSignal(true);
-
-export { user, loading };
+export { user, loading, setUser };
 
 export async function fetchUser() {
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
-    if (res.ok) {
-      setUser(await res.json());
-    } else {
-      setUser(null);
-    }
+    const userData = await api.get<UserInfo>('/auth/me');
+    setUser(userData);
   } catch {
     setUser(null);
   } finally {

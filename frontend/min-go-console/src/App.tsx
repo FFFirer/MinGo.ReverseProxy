@@ -1,4 +1,4 @@
-import { createEffect, Suspense } from 'solid-js';
+import { createEffect, onCleanup, Suspense } from 'solid-js';
 import { Router, Route, Navigate } from '@solidjs/router';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -34,6 +34,12 @@ function ProtectedLayout(props: { children: any }) {
 export default function App() {
   createEffect(() => {
     fetchUser();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') fetchUser();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    onCleanup(() => document.removeEventListener('visibilitychange', onVisibility));
   });
 
   return (

@@ -1,3 +1,5 @@
+import { setUser } from '../store/user-signal';
+
 const API_BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -8,7 +10,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (res.status === 401) {
-    window.location.href = '/login';
+    setUser(null);
     throw new Error('Unauthorized');
   }
 
