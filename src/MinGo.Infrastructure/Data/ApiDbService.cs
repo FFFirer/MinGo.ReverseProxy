@@ -147,11 +147,11 @@ public class ApiDbService : IApiDbService
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
         // 添加目标
-        foreach (var destination in cluster.Destinations.Values)
+        foreach (var destination in cluster.Destinations)
         {
             var destinationEntity = new ApiDestinationEntity
             {
-                Id = destination.Address, // 使用地址作为ID
+                Id = destination.Id,
                 Address = destination.Address,
                 Healthy = destination.Healthy,
                 ClusterId = entity.Id,
@@ -196,11 +196,11 @@ public class ApiDbService : IApiDbService
         existing.Destinations.Clear();
 
         // 添加新的目标
-        foreach (var destination in cluster.Destinations.Values)
+        foreach (var destination in cluster.Destinations)
         {
             var destinationEntity = new ApiDestinationEntity
             {
-                Id = destination.Address, // 使用地址作为ID
+                Id = destination.Id,
                 Address = destination.Address,
                 Healthy = destination.Healthy,
                 ClusterId = existing.Id,
@@ -435,10 +435,10 @@ public class ApiDbService : IApiDbService
             Id = "cluster1",
             Name = "user-cluster",
             LoadBalancingPolicy = "RoundRobin",
-            Destinations = new Dictionary<string, DestinationConfig>
+            Destinations = new List<DestinationConfig>
             {
-                { "destination1", new DestinationConfig { Address = "http://localhost:5001", Healthy = true } },
-                { "destination2", new DestinationConfig { Address = "http://localhost:5002", Healthy = true } }
+                new DestinationConfig { Id = "destination1", Address = "http://localhost:5001", Healthy = true },
+                new DestinationConfig { Id = "destination2", Address = "http://localhost:5002", Healthy = true }
             },
             HealthCheck = new HealthCheckConfig
             {
@@ -457,10 +457,10 @@ public class ApiDbService : IApiDbService
             Id = "cluster2",
             Name = "product-cluster",
             LoadBalancingPolicy = "LeastRequests",
-            Destinations = new Dictionary<string, DestinationConfig>
+            Destinations = new List<DestinationConfig>
             {
-                { "destination1", new DestinationConfig { Address = "http://localhost:6001", Healthy = true } },
-                { "destination2", new DestinationConfig { Address = "http://localhost:6002", Healthy = false } }
+                new DestinationConfig { Id = "destination1", Address = "http://localhost:6001", Healthy = true },
+                new DestinationConfig { Id = "destination2", Address = "http://localhost:6002", Healthy = false }
             },
             HealthCheck = new HealthCheckConfig
             {
@@ -604,19 +604,13 @@ public class ApiDbService : IApiDbService
             Name = entity.Name,
             LoadBalancingPolicy = entity.LoadBalancingPolicy,
             HealthCheck = JsonSerializer.Deserialize<HealthCheckConfig>(entity.HealthCheckJson) ?? new HealthCheckConfig(),
-            Destinations = new Dictionary<string, DestinationConfig>()
-        };
-
-        // 映射目标
-        foreach (var destinationEntity in entity.Destinations)
-        {
-            var destination = new DestinationConfig
+            Destinations = entity.Destinations.Select(d => new DestinationConfig
             {
-                Address = destinationEntity.Address,
-                Healthy = destinationEntity.Healthy
-            };
-            model.Destinations[destinationEntity.Id] = destination;
-        }
+                Id = d.Id,
+                Address = d.Address,
+                Healthy = d.Healthy,
+            }).ToList()
+        };
 
         return model;
     }

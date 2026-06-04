@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import type { GatewayInstance } from '../types';
 
@@ -54,14 +54,14 @@ export default function InstancesPage() {
               </tr>
             </thead>
             <tbody>
-              {instances().map((inst) => (
+              <For each={instances()}>{(inst) => (
                 <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                   <td class="py-3 px-4 font-medium">{inst.name}</td>
                   <td class="py-3 px-4">{inst.ipAddress}</td>
                   <td class="py-3 px-4"><span class={`badge ${statusBadge(inst.status)}`}>{inst.status}</span></td>
                   <td class="py-3 px-4">{inst.lastHeartbeat ? new Date(inst.lastHeartbeat).toLocaleString() : '-'}</td>
                 </tr>
-              ))}
+              )}</For>
               {instances().length === 0 && (
                 <tr><td colspan="4" class="py-8 text-center text-secondary">暂无实例</td></tr>
               )}

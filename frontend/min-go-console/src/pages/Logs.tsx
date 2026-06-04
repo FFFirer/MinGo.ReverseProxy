@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createSignal, For } from 'solid-js';
 import { api } from '../api/client';
 import type { AccessLog } from '../types';
 
@@ -42,11 +42,11 @@ export default function LogsPage() {
 
         <div class="bg-gray-50 dark:bg-dark-200 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-sm">
           {logs().length > 0 ? (
-            logs().map((log) => (
+            <For each={logs()}>{(log) => (
               <div class={`mb-2 ${logClass(log.statusCode)}`}>
                 {new Date(log.timestamp).toLocaleTimeString()} [{log.method}] {log.path} {log.statusCode} {log.durationMs}ms {log.clientIp}
               </div>
-            ))
+            )}</For>
           ) : (
             <div class="text-center text-secondary py-8">
               <p>点击"查询"查看日志</p>

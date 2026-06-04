@@ -93,9 +93,9 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
                 {
                     foreach (var dest in cluster.Destinations)
                     {
-                        destinations[dest.Key] = new YarpDestinationConfig
+                        destinations[dest.Id] = new YarpDestinationConfig
                         {
-                            Address = dest.Value.Address
+                            Address = dest.Address
                         };
                     }
                 }

@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import type { MetricsSummary, RequestMetrics } from '../types';
 
@@ -86,12 +86,12 @@ export default function Dashboard() {
                 {/* Chart.js 集成在这里 */}
                 <p class="text-secondary text-center">请求趋势图表 (Chart.js)</p>
                 <div class="mt-4 space-y-2">
-                  {requestMetrics().slice(-10).map((rm) => (
+                  <For each={requestMetrics().slice(-10)}>{(rm) => (
                     <div class="flex items-center justify-between text-sm">
                       <span>{new Date(rm.timestamp).toLocaleTimeString()}</span>
                       <span>{rm.count} 请求</span>
                     </div>
-                  ))}
+                  )}</For>
                 </div>
               </div>
             ) : (

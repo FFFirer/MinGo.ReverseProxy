@@ -39,13 +39,14 @@ public class ClusterConfig
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public Dictionary<string, DestinationConfig> Destinations { get; set; } = new();
+    public List<DestinationConfig> Destinations { get; set; } = new();
     public string LoadBalancingPolicy { get; set; } = "RoundRobin";
     public HealthCheckConfig HealthCheck { get; set; } = new();
 }
 
 public class DestinationConfig
 {
+    public string Id { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public bool Healthy { get; set; } = true;
 }

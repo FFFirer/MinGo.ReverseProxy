@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 
 export default function MonitoringPage() {
@@ -38,7 +38,7 @@ export default function MonitoringPage() {
       <div class="card">
         <h3 class="font-semibold mb-4">告警记录</h3>
         <div class="space-y-4">
-          {alerts().map((alert) => (
+          <For each={alerts()}>{(alert) => (
             <div class={`p-4 border-l-4 border-${alert.level} bg-${alert.level}/5 dark:bg-${alert.level}/10 rounded-r-lg`}>
               <div class="flex items-center justify-between">
                 <h4 class="font-medium">{alert.title}</h4>
@@ -46,7 +46,7 @@ export default function MonitoringPage() {
               </div>
               <p class="text-sm mt-1">{alert.desc}</p>
             </div>
-          ))}
+          )}</For>
         </div>
       </div>
     </div>

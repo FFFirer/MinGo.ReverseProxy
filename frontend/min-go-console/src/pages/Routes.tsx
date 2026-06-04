@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { RouteConfig, ClusterConfig } from '../types';
@@ -103,7 +103,7 @@ export default function RoutesPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRoutes().map((route) => (
+              <For each={filteredRoutes()}>{(route) => (
                 <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                   <td class="py-3 px-4 font-medium">{route.name}</td>
                   <td class="py-3 px-4 font-mono text-sm">{route.match?.path || '-'}</td>
@@ -124,7 +124,7 @@ export default function RoutesPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )}</For>
               {!loading() && filteredRoutes().length === 0 && (
                 <tr><td colspan="5" class="py-8 text-center text-secondary">暂无路由</td></tr>
               )}
@@ -204,9 +204,9 @@ function RouteFormModal(props: {
               onChange={(e) => setClusterId(e.currentTarget.value)}
             >
               <option value="">-- 请选择集群 --</option>
-              {props.clusters.map((c) => (
+              <For each={props.clusters}>{(c) => (
                 <option value={c.id}>{c.name || c.id}</option>
-              ))}
+              )}</For>
             </select>
             {errors().clusterId && <p class="text-danger text-xs mt-1">{errors().clusterId}</p>}
           </div>

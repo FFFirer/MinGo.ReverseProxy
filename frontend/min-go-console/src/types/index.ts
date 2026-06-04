@@ -21,12 +21,13 @@ export interface RouteTransforms {
 export interface ClusterConfig {
   id: string;
   name: string;
-  destinations: Record<string, DestinationConfig>;
+  destinations: DestinationConfig[];
   loadBalancingPolicy: string;
   healthCheck: HealthCheckConfig;
 }
 
 export interface DestinationConfig {
+  id: string;
   address: string;
   healthy: boolean;
 }

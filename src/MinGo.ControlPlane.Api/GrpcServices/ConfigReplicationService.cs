@@ -115,11 +115,11 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
 
             if (cluster.Destinations != null)
             {
-                foreach (var (destId, dest) in cluster.Destinations)
+                foreach (var dest in cluster.Destinations)
                 {
                     clusterConfig.Destinations.Add(new DestinationConfig
                     {
-                        Id = destId,
+                        Id = dest.Id,
                         Address = dest.Address,
                         Healthy = dest.Healthy
                     });
@@ -193,11 +193,11 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             };
             if (cluster.Destinations != null)
             {
-                foreach (var (did, dest) in cluster.Destinations)
+                foreach (var dest in cluster.Destinations)
                 {
                     cc.Destinations.Add(new DestinationConfig
                     {
-                        Id = did,
+                        Id = dest.Id,
                         Address = dest.Address,
                         Healthy = dest.Healthy
                     });

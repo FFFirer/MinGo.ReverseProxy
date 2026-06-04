@@ -1,3 +1,4 @@
+import { For } from 'solid-js';
 import { toasts, removeToast, type ToastType } from '../../store/toast';
 
 const typeStyles: Record<ToastType, string> = {
@@ -18,7 +19,7 @@ export default function Toast() {
 
   return (
     <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-      {items.map((t) => (
+      <For each={items}>{(t) => (
         <div
           class={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg transition-all duration-300 animate-slide-in ${typeStyles[t.type]}`}
         >
@@ -31,7 +32,7 @@ export default function Toast() {
             <i class="fa fa-times" />
           </button>
         </div>
-      ))}
+      )}</For>
     </div>
   );
 }

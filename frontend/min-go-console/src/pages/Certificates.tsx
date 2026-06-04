@@ -1,4 +1,4 @@
-import { createSignal, onMount } from 'solid-js';
+import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { CertificateConfig } from '../types';
@@ -71,7 +71,7 @@ export default function CertificatesPage() {
               </tr>
             </thead>
             <tbody>
-              {certs().map((cert) => {
+              <For each={certs()}>{(cert) => {
                 const days = daysUntilExpiry(cert);
                 return (
                   <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
@@ -105,7 +105,7 @@ export default function CertificatesPage() {
                     </td>
                   </tr>
                 );
-              })}
+              }}</For>
               {!loading() && certs().length === 0 && (
                 <tr><td colspan="7" class="py-8 text-center text-secondary">暂无证书</td></tr>
               )}
