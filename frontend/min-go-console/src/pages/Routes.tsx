@@ -1,18 +1,30 @@
 import { createSignal, onMount } from 'solid-js';
 import { api } from '../api/client';
-import type { RouteConfig } from '../types';
+import { addToast } from '../store/toast';
+import type { RouteConfig, ClusterConfig } from '../types';
 
 export default function RoutesPage() {
   const [routes, setRoutes] = createSignal<RouteConfig[]>([]);
+  const [clusters, setClusters] = createSignal<ClusterConfig[]>([]);
   const [search, setSearch] = createSignal('');
   const [filterEnabled, setFilterEnabled] = createSignal<string>('all');
   const [editingRoute, setEditingRoute] = createSignal<RouteConfig | null>(null);
   const [showModal, setShowModal] = createSignal(false);
+  const [loading, setLoading] = createSignal(true);
 
   onMount(async () => {
     try {
-      setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
-    } catch { /* ignore */ }
+      const [r, c] = await Promise.all([
+        api.get<RouteConfig[]>('/apimanagement/routes'),
+        api.get<ClusterConfig[]>('/apimanagement/clusters'),
+      ]);
+      setRoutes(r);
+      setClusters(c);
+    } catch (err) {
+      addToast('error', '加载路由或集群列表失败');
+    } finally {
+      setLoading(false);
+    }
   });
 
   const filteredRoutes = () => routes().filter(r => {
@@ -27,19 +39,30 @@ export default function RoutesPage() {
   });
 
   const handleSave = async (route: RouteConfig) => {
-    if (route.id) {
-      await api.put(`/apimanagement/routes/${route.id}`, route);
-    } else {
-      await api.post('/apimanagement/routes', route);
+    try {
+      if (route.id) {
+        await api.put(`/apimanagement/routes/${route.id}`, route);
+        addToast('success', '路由已更新');
+      } else {
+        await api.post('/apimanagement/routes', route);
+        addToast('success', '路由已创建');
+      }
+      setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
+      setShowModal(false);
+    } catch (err) {
+      addToast('error', `保存路由失败: ${(err as Error).message}`);
     }
-    setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
-    setShowModal(false);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('确定删除此路由？')) return;
-    await api.delete(`/apimanagement/routes/${id}`);
-    setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
+    try {
+      await api.delete(`/apimanagement/routes/${id}`);
+      setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
+      addToast('success', '路由已删除');
+    } catch (err) {
+      addToast('error', `删除路由失败: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -83,7 +106,7 @@ export default function RoutesPage() {
               {filteredRoutes().map((route) => (
                 <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                   <td class="py-3 px-4 font-medium">{route.name}</td>
-                  <td class="py-3 px-4">{route.match?.path || '-'}</td>
+                  <td class="py-3 px-4 font-mono text-sm">{route.match?.path || '-'}</td>
                   <td class="py-3 px-4">{route.clusterId}</td>
                   <td class="py-3 px-4">
                     <span class={`badge ${route.enabled ? 'badge-success' : 'badge-warning'}`}>
@@ -102,8 +125,11 @@ export default function RoutesPage() {
                   </td>
                 </tr>
               ))}
-              {filteredRoutes().length === 0 && (
+              {!loading() && filteredRoutes().length === 0 && (
                 <tr><td colspan="5" class="py-8 text-center text-secondary">暂无路由</td></tr>
+              )}
+              {loading() && (
+                <tr><td colspan="5" class="py-8 text-center text-secondary">加载中...</td></tr>
               )}
             </tbody>
           </table>
@@ -113,6 +139,7 @@ export default function RoutesPage() {
       {showModal() && (
         <RouteFormModal
           route={editingRoute()}
+          clusters={clusters()}
           onSave={handleSave}
           onClose={() => setShowModal(false)}
         />
@@ -121,14 +148,30 @@ export default function RoutesPage() {
   );
 }
 
-function RouteFormModal(props: { route: RouteConfig | null; onSave: (r: RouteConfig) => void; onClose: () => void }) {
+function RouteFormModal(props: {
+  route: RouteConfig | null;
+  clusters: ClusterConfig[];
+  onSave: (r: RouteConfig) => void;
+  onClose: () => void;
+}) {
   const [name, setName] = createSignal(props.route?.name || '');
   const [path, setPath] = createSignal(props.route?.match?.path || '');
   const [clusterId, setClusterId] = createSignal(props.route?.clusterId || '');
   const [enabled, setEnabled] = createSignal(props.route?.enabled ?? true);
+  const [errors, setErrors] = createSignal<Record<string, string>>({});
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!name().trim()) errs.name = '路由名称不能为空';
+    if (!path().trim()) errs.path = '匹配路径不能为空';
+    if (!clusterId()) errs.clusterId = '请选择目标集群';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
+    if (!validate()) return;
     props.onSave({
       id: props.route?.id || '',
       name: name(),
@@ -145,15 +188,27 @@ function RouteFormModal(props: { route: RouteConfig | null; onSave: (r: RouteCon
         <form onSubmit={handleSubmit} class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1">路由名称</label>
-            <input class="input" value={name()} onInput={(e) => setName(e.currentTarget.value)} required />
+            <input class="input" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
+            {errors().name && <p class="text-danger text-xs mt-1">{errors().name}</p>}
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">匹配路径</label>
             <input class="input" value={path()} onInput={(e) => setPath(e.currentTarget.value)} placeholder="/api/{**catch-all}" />
+            {errors().path && <p class="text-danger text-xs mt-1">{errors().path}</p>}
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">目标集群</label>
-            <input class="input" value={clusterId()} onInput={(e) => setClusterId(e.currentTarget.value)} />
+            <select
+              class="input"
+              value={clusterId()}
+              onChange={(e) => setClusterId(e.currentTarget.value)}
+            >
+              <option value="">-- 请选择集群 --</option>
+              {props.clusters.map((c) => (
+                <option value={c.id}>{c.name || c.id}</option>
+              ))}
+            </select>
+            {errors().clusterId && <p class="text-danger text-xs mt-1">{errors().clusterId}</p>}
           </div>
           <div class="flex items-center space-x-2">
             <input type="checkbox" id="enabled" checked={enabled()} onChange={(e) => setEnabled(e.currentTarget.checked)} />

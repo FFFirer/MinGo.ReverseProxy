@@ -12,6 +12,7 @@ import LogsPage from './pages/Logs';
 import InstancesPage from './pages/Instances';
 import SettingsPage from './pages/Settings';
 import SecurityPage from './pages/Security';
+import Toast from './components/shared/Toast';
 import { user, loading, fetchUser } from './store/auth';
 
 function ProtectedLayout(props: { children: any }) {
@@ -51,6 +52,7 @@ export default function App() {
 
   return (
     <Suspense fallback={<div class="flex items-center justify-center min-h-screen text-secondary">加载中...</div>}>
+      <Toast />
       <Router>
         <Route path="/login" component={Login} />
         <Route path="/" component={() => <Navigate href="/dashboard" />} />
