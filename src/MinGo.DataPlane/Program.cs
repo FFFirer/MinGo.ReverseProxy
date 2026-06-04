@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog(SerilogSetup.ConfigureSharedSerilog());
 
 // 配置端口 - 从环境变量或配置读取
-var proxyPorts = builder.Configuration.GetSection("ProxyPorts").Get<int[]>() ?? [8080];
+// var proxyPorts = builder.Configuration.GetSection("ProxyPorts").Get<int[]>() ?? [8080];
 
 // gRPC 客户端 - 连接控制面
 var controlPlaneGrpcUrl = builder.Configuration["ControlPlane:GrpcUrl"] ?? "http://localhost:5001";
@@ -51,15 +51,8 @@ await configSync.StartAsync(CancellationToken.None);
 // 等待首次配置到达
 await configSync.WaitForInitialConfigAsync(TimeSpan.FromSeconds(30));
 
-app.MapWhen(ctx => proxyPorts.Contains(ctx.Connection.LocalPort), proxyApp =>
-{
-    proxyApp.UseGatewayTelemetry();
-    proxyApp.UseRouting();
-    proxyApp.UseEndpoints(endpoints =>
-    {
-        endpoints.MapReverseProxy();
-    });
-});
+app.UseGatewayTelemetry();
+app.MapReverseProxy();
 
 // 启动心跳后台服务
 _ = app.Services.GetRequiredService<HeartbeatReporter>().StartAsync(CancellationToken.None);

@@ -66,16 +66,19 @@ export interface GatewayInstance {
   instanceId: string;
   name: string;
   version: string;
-  ipAddress: string;
-  port: number;
+  address: string;
+  listenerAddresses?: string[];
   status: InstanceStatus;
   isHealthy: boolean;
   lastHeartbeat: string;
   registeredAt: string;
+  uptime: string;
   cpuUsage: number;
   memoryUsage: number;
   totalRequests: number;
   errorRequests: number;
+  errorRate: number;
+  metadata?: Record<string, string>;
 }
 
 export type InstanceStatus = 'Online' | 'Offline' | 'HeartbeatTimeout' | 'Unhealthy' | 'Starting' | 'Unknown';

@@ -1,4 +1,6 @@
 using Grpc.Core;
+using MinGo.Core.Entities;
+using MinGo.Core.Interfaces;
 using MinGo.DataPlane.Grpc;
 
 namespace MinGo.ControlPlane.Api.GrpcServices;
@@ -9,13 +11,16 @@ namespace MinGo.ControlPlane.Api.GrpcServices;
 public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
 {
     private readonly DataPlaneConnectionManager _connectionManager;
+    private readonly IGatewayInstanceService _instanceService;
     private readonly ILogger<HeartbeatCollectService> _logger;
 
     public HeartbeatCollectService(
         DataPlaneConnectionManager connectionManager,
+        IGatewayInstanceService instanceService,
         ILogger<HeartbeatCollectService> logger)
     {
         _connectionManager = connectionManager;
+        _instanceService = instanceService;
         _logger = logger;
     }
 
@@ -32,8 +37,19 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
             {
                 dataPlaneId = request.DataPlaneId;
 
-                // 更新心跳时间
+                // 更新连接管理器心跳
                 _connectionManager.UpdateHeartbeat(request.DataPlaneId);
+
+                // 更新实例服务（内存存储）
+                await _instanceService.UpdateHeartbeatAsync(new GatewayInstanceHeartbeatRequest
+                {
+                    InstanceId = request.DataPlaneId,
+                    CpuUsage = request.CpuUsage,
+                    MemoryUsage = request.MemoryUsage,
+                    TotalRequests = request.TotalRequests,
+                    ErrorRequests = request.ErrorRequests,
+                    IsHealthy = request.IsHealthy
+                });
 
                 // 记录指标日志
                 _logger.LogDebug(

@@ -75,7 +75,7 @@ builder.Services.AddScoped<IApiDbService, ApiDbService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IApiManagementService, ApiManagementService>();
-builder.Services.AddScoped<IGatewayInstanceService, GatewayInstanceService>();
+builder.Services.AddSingleton<IGatewayInstanceService, GatewayInstanceService>();
 builder.Services.AddScoped<IGatewayEventSender, GatewayEventSender>();
 builder.Services.AddScoped<IGatewayEventService, GatewayEventService>();
 builder.Services.AddSingleton<IMessageNotificationService, MemoryMessageNotificationService>();

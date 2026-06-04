@@ -1,4 +1,5 @@
 using Grpc.Core;
+using MinGo.Core.Entities;
 using MinGo.Core.Interfaces;
 using MinGo.DataPlane.Grpc;
 using MinGo.Infrastructure.Data;
@@ -12,15 +13,18 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly DataPlaneConnectionManager _connectionManager;
+    private readonly IGatewayInstanceService _instanceService;
     private readonly ILogger<ConfigReplicationService> _logger;
 
     public ConfigReplicationService(
         IServiceScopeFactory scopeFactory,
         DataPlaneConnectionManager connectionManager,
+        IGatewayInstanceService instanceService,
         ILogger<ConfigReplicationService> logger)
     {
         _scopeFactory = scopeFactory;
         _connectionManager = connectionManager;
+        _instanceService = instanceService;
         _logger = logger;
     }
 
@@ -37,8 +41,17 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         _logger.LogInformation("Data plane {DataPlaneId} subscribed (version: {Version})",
             subscription.DataPlaneId, subscription.CurrentConfigVersion);
 
-        // 注册连接
+        // 注册 gRPC 连接
         _connectionManager.Register(subscription.DataPlaneId, responseStream, context);
+
+        // 自动注册实例（仅内存）
+        var name = $"DataPlane-{subscription.DataPlaneId[..Math.Min(subscription.DataPlaneId.Length, 8)]}";
+        await _instanceService.RegisterInstanceAsync(new GatewayInstanceRegisterRequest
+        {
+            InstanceId = subscription.DataPlaneId,
+            Name = name,
+            Version = "unknown"
+        });
 
         try
         {
@@ -67,6 +80,14 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         finally
         {
             _connectionManager.Unregister(subscription.DataPlaneId);
+
+            // 标记实例为离线
+            var instance = await _instanceService.GetInstanceAsync(subscription.DataPlaneId);
+            if (instance != null)
+            {
+                instance.Status = GatewayInstanceStatus.Offline;
+                _logger.LogInformation("Data plane {DataPlaneId} marked as Offline", subscription.DataPlaneId);
+            }
         }
     }
 
