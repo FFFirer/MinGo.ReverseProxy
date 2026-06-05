@@ -1,7 +1,4 @@
-# cluster-destination-validation Specification
-
-## Purpose
-Define validation rules for cluster destinations. With auto-generated IDs, duplicate ID checks and health state preservation by ID matching are no longer needed.
+# cluster-destination-validation Specification (Delta)
 
 ## REMOVED Requirements
 

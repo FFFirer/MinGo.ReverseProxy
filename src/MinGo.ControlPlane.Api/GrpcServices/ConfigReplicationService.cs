@@ -129,7 +129,6 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             var clusterConfig = new ClusterConfig
             {
                 Id = cluster.Id,
-                Name = cluster.Name,
                 LoadBalancingPolicy = cluster.LoadBalancingPolicy,
                 HealthCheckJson = System.Text.Json.JsonSerializer.Serialize(cluster.HealthCheck)
             };
@@ -209,7 +208,6 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             var cc = new ClusterConfig
             {
                 Id = cluster.Id,
-                Name = cluster.Name,
                 LoadBalancingPolicy = cluster.LoadBalancingPolicy
             };
             if (cluster.Destinations != null)

@@ -14,3 +14,10 @@
 - When the application starts in Development mode
 - Then no new users are created
 
+### Requirement: Cluster seed data uses names as IDs
+
+When the system initializes sample data, cluster IDs SHALL be human-readable names rather than GUIDs.
+
+#### Scenario: Seed clusters use names as IDs
+- **WHEN** the system seeds sample data
+- **THEN** clusters SHALL have IDs like `"user-cluster"`, `"product-cluster"` (not GUIDs)

@@ -38,7 +38,6 @@ public class RouteTransforms
 public class ClusterConfig
 {
     public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
     public List<DestinationConfig> Destinations { get; set; } = new();
     public string LoadBalancingPolicy { get; set; } = "RoundRobin";
     public HealthCheckConfig HealthCheck { get; set; } = new();

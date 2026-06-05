@@ -42,7 +42,6 @@ public class ApiRouteEntity
 public class ApiClusterEntity
 {
     public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
     public string LoadBalancingPolicy { get; set; } = "RoundRobin";
     public string HealthCheckJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

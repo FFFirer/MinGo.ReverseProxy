@@ -79,7 +79,7 @@ export default function ClustersPage() {
           {(cluster) => (
             <div class="card">
               <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold">{cluster.name || cluster.id}</h3>
+                <h3 class="font-semibold">{cluster.id}</h3>
                 <span
                   class={`badge ${allHealthy(cluster) ? "badge-success" : "badge-warning"}`}
                 >
@@ -90,12 +90,9 @@ export default function ClustersPage() {
                 <For each={cluster.destinations ?? []}>
                   {(dest) => (
                     <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
-                      <div>
-                        <p class="font-medium">{dest.id}</p>
-                        <p class="text-sm text-secondary">{dest.address}</p>
-                      </div>
+                      <p class="font-medium text-sm break-all">{dest.address}</p>
                       <span
-                        class={`badge ${dest.healthy ? "badge-success" : "badge-warning"}`}
+                        class={`badge shrink-0 ml-2 ${dest.healthy ? "badge-success" : "badge-warning"}`}
                       >
                         {dest.healthy ? "在线" : "离线"}
                       </span>
@@ -161,19 +158,19 @@ function ClusterFormModal(props: {
   onSave: (c: ClusterConfig) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = createSignal(props.cluster?.name || "");
+  const [clusterId, setClusterId] = createSignal(props.cluster?.id || "");
   const [policy, setPolicy] = createSignal(
     props.cluster?.loadBalancingPolicy || "RoundRobin",
   );
   const [destinations, setDestinations] = createSignal<
-    { id: string; address: string }[]
+    { _internalId?: string; address: string }[]
   >(
     props.cluster?.destinations
       ? props.cluster.destinations.map((d) => ({
-          id: d.id,
+          _internalId: d.id,
           address: d.address,
         }))
-      : [{ id: "", address: "" }],
+      : [{ address: "" }],
   );
   const [activeEnabled, setActiveEnabled] = createSignal(
     props.cluster?.healthCheck?.active?.enabled ?? false,
@@ -201,31 +198,20 @@ function ClusterFormModal(props: {
   const [showPassive, setShowPassive] = createSignal(passiveEnabled());
 
   const addDestination = () =>
-    setDestinations((prev) => [...prev, { id: "", address: "" }]);
+    setDestinations((prev) => [...prev, { address: "" }]);
   const removeDestination = (idx: number) =>
     setDestinations((prev) => prev.filter((_, i) => i !== idx));
-  const updateDestination = (
-    idx: number,
-    field: "id" | "address",
-    value: string,
-  ) =>
+  const updateDestinationAddress = (idx: number, value: string) =>
     setDestinations((prev) =>
-      prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)),
+      prev.map((d, i) => (i === idx ? { ...d, address: value } : d)),
     );
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!name().trim()) errs.name = "集群名称不能为空";
-    const validDests = destinations().filter(
-      (d) => d.id.trim() && d.address.trim(),
-    );
+    if (!clusterId().trim()) errs.clusterId = "集群名称不能为空";
+    const validDests = destinations().filter((d) => d.address.trim());
     if (validDests.length === 0) {
       errs.destinations = "至少添加一个目标";
-    } else {
-      const ids = validDests.map((d) => d.id);
-      if (new Set(ids).size !== ids.length) {
-        errs.destinations = "目标 ID 不能重复";
-      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -236,17 +222,12 @@ function ClusterFormModal(props: {
     if (!validate()) return;
 
     const destList: DestinationConfig[] = destinations()
-      .filter((d) => d.id.trim() && d.address.trim())
-      .map((d) => {
-        const original = props.cluster?.destinations?.find(
-          (od) => od.id === d.id,
-        );
-        return {
-          id: d.id,
-          address: d.address,
-          healthy: original?.healthy ?? true,
-        };
-      });
+      .filter((d) => d.address.trim())
+      .map((d) => ({
+        id: d._internalId ?? "",
+        address: d.address,
+        healthy: true,
+      }));
 
     const healthCheck: HealthCheckConfig = {
       active: {
@@ -263,8 +244,7 @@ function ClusterFormModal(props: {
     };
 
     props.onSave({
-      id: props.cluster?.id || "",
-      name: name(),
+      id: clusterId(),
       destinations: destList,
       loadBalancingPolicy: policy(),
       healthCheck,
@@ -285,15 +265,19 @@ function ClusterFormModal(props: {
         </h3>
         <form onSubmit={handleSubmit} class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1">集群名称</label>
-            <input
-              class="input"
-              value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
-              required
-            />
-            {errors().name && (
-              <p class="text-danger text-xs mt-1">{errors().name}</p>
+            <label class="block text-sm font-medium mb-1">集群名称（即集群 ID）</label>
+            {props.cluster ? (
+              <p class="input bg-gray-100 dark:bg-dark-200 cursor-not-allowed">{clusterId()}</p>
+            ) : (
+              <input
+                class="input"
+                value={clusterId()}
+                onInput={(e) => setClusterId(e.currentTarget.value)}
+                required
+              />
+            )}
+            {errors().clusterId && (
+              <p class="text-danger text-xs mt-1">{errors().clusterId}</p>
             )}
           </div>
 
@@ -330,22 +314,10 @@ function ClusterFormModal(props: {
                   <div class="flex items-center gap-2">
                     <input
                       class="input flex-1"
-                      placeholder="目标名称"
-                      value={dest().id}
-                      onInput={(e) =>
-                        updateDestination(idx, "id", e.currentTarget.value)
-                      }
-                    />
-                    <input
-                      class="input flex-2"
                       placeholder="http://localhost:5001"
                       value={dest().address}
                       onInput={(e) =>
-                        updateDestination(
-                          idx,
-                          "address",
-                          e.currentTarget.value,
-                        )
+                        updateDestinationAddress(idx, e.currentTarget.value)
                       }
                     />
                     <button

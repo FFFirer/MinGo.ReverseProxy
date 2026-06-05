@@ -20,7 +20,6 @@ export interface RouteTransforms {
 
 export interface ClusterConfig {
   id: string;
-  name: string;
   destinations: DestinationConfig[];
   loadBalancingPolicy: string;
   healthCheck: HealthCheckConfig;

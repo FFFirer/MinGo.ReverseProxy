@@ -205,7 +205,7 @@ function RouteFormModal(props: {
             >
               <option value="">-- 请选择集群 --</option>
               <For each={props.clusters}>{(c) => (
-                <option value={c.id}>{c.name || c.id}</option>
+                <option value={c.id}>{c.id}</option>
               )}</For>
             </select>
             {errors().clusterId && <p class="text-danger text-xs mt-1">{errors().clusterId}</p>}

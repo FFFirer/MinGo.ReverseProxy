@@ -1,7 +1,4 @@
-# destination-array-format Specification
-
-## Purpose
-Define the JSON array format for destinations in API requests and responses, with auto-generated IDs.
+# destination-array-format Specification (Delta)
 
 ## MODIFIED Requirements
 
