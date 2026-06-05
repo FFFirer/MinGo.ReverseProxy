@@ -1,6 +1,18 @@
 # ControlPlane.Dockerfile
-# 构建阶段
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Stage 1: 前端构建
+FROM node:22-alpine AS frontend-build
+WORKDIR /app
+
+# 缓存前端依赖
+COPY frontend/min-go-console/package.json frontend/min-go-console/pnpm-lock.yaml frontend/min-go-console/.npmrc /app/
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# 构建前端
+COPY frontend/min-go-console/ /app/
+RUN pnpm run build
+
+# Stage 2: 后端构建
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 WORKDIR /src
 
 # 安装 ef 工具
@@ -17,18 +29,19 @@ COPY src/MinGo.ControlPlane.Api/MinGo.ControlPlane.Api.csproj src/MinGo.ControlP
 COPY src/MinGo.ControlPlane.Api/GrpcServices/Protos/dataplane.proto src/MinGo.ControlPlane.Api/GrpcServices/Protos/
 RUN dotnet restore src/MinGo.ControlPlane.Api/MinGo.ControlPlane.Api.csproj
 
-# 构建
+# 构建后端 + 复制前端产物
 COPY . .
 RUN dotnet publish src/MinGo.ControlPlane.Api -c Release -o /app/publish
+COPY --from=frontend-build /app/dist /app/publish/wwwroot
 
 # 生成 EF Core 迁移 Bundle
 WORKDIR /src/src/MinGo.Infrastructure
 RUN dotnet ef migrations bundle -c AppDbContext --configuration Release --no-build -o /app/publish/efbundle
 
-# 运行阶段
+# Stage 3: 运行阶段
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+COPY --from=backend-build /app/publish .
 EXPOSE 5000 5001
 VOLUME ["/app/data"]
 ENTRYPOINT ["dotnet", "MinGo.ControlPlane.Api.dll"]
