@@ -14,6 +14,9 @@ importers:
       chart.js:
         specifier: ^4.5.1
         version: 4.5.1
+      solid-icons:
+        specifier: ^1.2.0
+        version: 1.2.0(solid-js@1.9.13)
       solid-js:
         specifier: ^1.9.0
         version: 1.9.13
@@ -817,6 +820,11 @@ packages:
     resolution: {integrity: sha512-46uFvgrXTVxZcUorgSSRZ4y+ieqLLQRMlG4bnCZKW3qI6BZm7Rg4ntMW4p1mILEEBZWrFlcpp0AyIIlM6jD9iw==}
     engines: {node: '>=10'}
 
+  solid-icons@1.2.0:
+    resolution: {integrity: sha512-yjQxWQMi9l19P5Af9vjsvalTMDFPDL4XD6etrUdNxNVhFp1bMYF0SFwUa5VYDfJ7u0SF3Qkz/F7BZxqcLUwklw==}
+    peerDependencies:
+      solid-js: '*'
+
   solid-js@1.9.13:
     resolution: {integrity: sha512-6hJeJMOcEX8ktqjpDoJZEmld3ijvcvWBDtiXBm7f4332SiFN66QeAQI1REQshvyUoISsSeJ4PHDauKYbwao9JQ==}
 
@@ -1540,6 +1548,10 @@ snapshots:
       seroval: 1.5.4
 
   seroval@1.5.4: {}
+
+  solid-icons@1.2.0(solid-js@1.9.13):
+    dependencies:
+      solid-js: 1.9.13
 
   solid-js@1.9.13:
     dependencies:
