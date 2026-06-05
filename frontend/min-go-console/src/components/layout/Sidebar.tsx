@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from '@solidjs/router';
-import { createEffect, createSignal } from 'solid-js';
+import { createEffect, createSignal, type Component } from 'solid-js';
+import { FaSolidTachometer, FaSolidRandom, FaSolidServer, FaSolidShield, FaSolidLock, FaSolidLineChart, FaSolidListAlt, FaSolidCubes, FaSolidCog } from 'solid-icons/fa';
 
 const navItems = [
   { path: '/dashboard', icon: 'fa-tachometer', label: '仪表盘' },
@@ -12,6 +13,18 @@ const navItems = [
   { path: '/instances', icon: 'fa-cubes', label: '实例管理' },
   { path: '/settings', icon: 'fa-cog', label: '设置' },
 ];
+
+const iconMap: Record<string, Component> = {
+  'fa-tachometer': FaSolidTachometer,
+  'fa-random': FaSolidRandom,
+  'fa-server': FaSolidServer,
+  'fa-shield': FaSolidShield,
+  'fa-lock': FaSolidLock,
+  'fa-line-chart': FaSolidLineChart,
+  'fa-list-alt': FaSolidListAlt,
+  'fa-cubes': FaSolidCubes,
+  'fa-cog': FaSolidCog,
+};
 
 export default function Sidebar() {
   const location = useLocation();
@@ -58,7 +71,7 @@ export default function Sidebar() {
                   : 'hover:bg-gray-100 dark:hover:bg-dark-200'
               }`}
             >
-              <i class={`fa ${item.icon} w-6 text-center`}></i>
+              {(() => { const Icon = iconMap[item.icon]; return <Icon class="w-6 text-center" />; })()}
               <span>{item.label}</span>
             </a>
           ))}

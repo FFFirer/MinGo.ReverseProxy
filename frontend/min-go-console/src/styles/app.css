@@ -66,6 +66,12 @@
   }
 }
 
+/* Override Tailwind preflight: SVG icons in buttons should be inline with text */
+.btn svg, .btn-text svg, .btn-icon svg {
+  display: inline;
+  vertical-align: middle;
+}
+
 @keyframes slide-in {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }

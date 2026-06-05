@@ -1,6 +1,7 @@
 import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import type { MetricsSummary, RequestMetrics } from '../types';
+import { FaSolidArrowUp, FaSolidRefresh, FaSolidExclamationCircle, FaSolidClock, FaSolidServer } from 'solid-icons/fa';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = createSignal<MetricsSummary | null>(null);
@@ -34,10 +35,10 @@ export default function Dashboard() {
             <div>
               <p class="text-secondary text-sm">总请求数</p>
               <h3 class="text-2xl font-bold">{metrics()?.totalRequests.toLocaleString() || '0'}</h3>
-              <p class="text-success text-sm mt-1"><i class="fa fa-arrow-up"></i> 实时</p>
+              <p class="text-success text-sm mt-1"><FaSolidArrowUp /> 实时</p>
             </div>
             <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <i class="fa fa-refresh"></i>
+              <FaSolidRefresh />
             </div>
           </div>
         </div>
@@ -48,7 +49,7 @@ export default function Dashboard() {
               <h3 class="text-2xl font-bold">{metrics()?.errorRate.toFixed(1) || '0'}%</h3>
             </div>
             <div class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
-              <i class="fa fa-exclamation-circle"></i>
+              <FaSolidExclamationCircle />
             </div>
           </div>
         </div>
@@ -59,7 +60,7 @@ export default function Dashboard() {
               <h3 class="text-2xl font-bold">{metrics()?.averageResponseTime.toFixed(0) || '0'}ms</h3>
             </div>
             <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
-              <i class="fa fa-clock-o"></i>
+              <FaSolidClock />
             </div>
           </div>
         </div>
@@ -70,7 +71,7 @@ export default function Dashboard() {
               <h3 class="text-2xl font-bold">{metrics()?.activeConnections || 0}</h3>
             </div>
             <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning">
-              <i class="fa fa-server"></i>
+              <FaSolidServer />
             </div>
           </div>
         </div>

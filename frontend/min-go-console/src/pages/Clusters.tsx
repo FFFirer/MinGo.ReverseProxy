@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Index } from "solid-js";
+import { createSignal, onMount, For, Index, type Component } from "solid-js";
 import { api } from "../api/client";
 import { addToast } from "../store/toast";
 import type {
@@ -6,6 +6,7 @@ import type {
   DestinationConfig,
   HealthCheckConfig,
 } from "../types";
+import { FaSolidPlus, FaSolidEdit, FaSolidTrash, FaSolidTimes, FaSolidChevronRight, FaSolidChevronDown } from "solid-icons/fa";
 
 export default function ClustersPage() {
   const [clusters, setClusters] = createSignal<ClusterConfig[]>([]);
@@ -70,7 +71,7 @@ export default function ClustersPage() {
             setShowModal(true);
           }}
         >
-          <i class="fa fa-plus mr-2"></i>添加集群
+          <FaSolidPlus class="mr-2" />添加集群
         </button>
       </div>
 
@@ -117,13 +118,13 @@ export default function ClustersPage() {
                       setShowModal(true);
                     }}
                   >
-                    <i class="fa fa-edit mr-1"></i>编辑
+                    <FaSolidEdit class="mr-1" />编辑
                   </button>
                   <button
                     class="btn-text btn-text-danger"
                     onClick={() => handleDelete(cluster.id)}
                   >
-                    <i class="fa fa-trash mr-1"></i>删除
+                    <FaSolidTrash class="mr-1" />删除
                   </button>
                 </div>
               </div>
@@ -306,7 +307,7 @@ function ClusterFormModal(props: {
                 onClick={addDestination}
                 title="添加目标"
               >
-                <i class="fa fa-plus"></i>
+                <FaSolidPlus />
               </button>
             </div>
             <div class="space-y-2">
@@ -328,7 +329,7 @@ function ClusterFormModal(props: {
                       disabled={destinations().length <= 1}
                       title="删除"
                     >
-                      <i class="fa fa-times"></i>
+                      <FaSolidTimes />
                     </button>
                   </div>
                 )}
@@ -345,9 +346,7 @@ function ClusterFormModal(props: {
               class="flex items-center gap-2 text-sm font-medium"
               onClick={() => setShowActive(!showActive())}
             >
-              <i
-                class={`fa fa-chevron-${showActive() ? "down" : "right"} text-xs`}
-              ></i>
+              {showActive() ? <FaSolidChevronDown class="text-xs" /> : <FaSolidChevronRight class="text-xs" />}
               主动健康检查
             </button>
             {showActive() && (
@@ -407,9 +406,7 @@ function ClusterFormModal(props: {
               class="flex items-center gap-2 text-sm font-medium"
               onClick={() => setShowPassive(!showPassive())}
             >
-              <i
-                class={`fa fa-chevron-${showPassive() ? "down" : "right"} text-xs`}
-              ></i>
+              {showPassive() ? <FaSolidChevronDown class="text-xs" /> : <FaSolidChevronRight class="text-xs" />}
               被动健康检查
             </button>
             {showPassive() && (

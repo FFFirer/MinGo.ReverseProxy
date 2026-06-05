@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import { FaSolidUndo, FaSolidSave } from 'solid-icons/fa';
 
 export default function SettingsPage() {
   const [gatewayName, setGatewayName] = createSignal('MinGo API Gateway');
@@ -51,8 +52,8 @@ export default function SettingsPage() {
           </div>
         </div>
         <div class="mt-6 flex justify-end space-x-2">
-          <button class="btn btn-secondary"><i class="fa fa-undo mr-2"></i>重置</button>
-          <button class="btn btn-primary"><i class="fa fa-save mr-2"></i>保存设置</button>
+          <button class="btn btn-secondary"><FaSolidUndo class="mr-2" />重置</button>
+          <button class="btn btn-primary"><FaSolidSave class="mr-2" />保存设置</button>
         </div>
       </div>
     </div>

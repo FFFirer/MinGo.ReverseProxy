@@ -2,6 +2,7 @@ import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { RouteConfig, ClusterConfig } from '../types';
+import { FaSolidPlus, FaSolidSearch } from 'solid-icons/fa';
 
 export default function RoutesPage() {
   const [routes, setRoutes] = createSignal<RouteConfig[]>([]);
@@ -73,7 +74,7 @@ export default function RoutesPage() {
           <p class="text-secondary">配置和管理API路由规则</p>
         </div>
         <button class="btn btn-primary" onClick={() => { setEditingRoute(null); setShowModal(true); }}>
-          <i class="fa fa-plus mr-2"></i>添加路由
+          <FaSolidPlus class="mr-2" />添加路由
         </button>
       </div>
 
@@ -82,7 +83,7 @@ export default function RoutesPage() {
           <div class="relative flex-1 max-w-md">
             <input type="text" placeholder="搜索路由..." class="input pl-10"
               value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
-            <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            <FaSolidSearch class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           </div>
           <select class="input w-auto" value={filterEnabled()} onChange={(e) => setFilterEnabled(e.currentTarget.value)}>
             <option value="all">所有状态</option>

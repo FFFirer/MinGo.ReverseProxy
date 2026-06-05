@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js';
+import { FaSolidKey, FaSolidPlus, FaSolidSave } from 'solid-icons/fa';
 
 export default function SecurityPage() {
   const [rateLimit, setRateLimit] = createSignal(1000);
@@ -14,7 +15,7 @@ export default function SecurityPage() {
         <div class="card">
           <h3 class="font-semibold mb-4">API密钥管理</h3>
           <div class="p-8 text-center text-secondary">
-            <i class="fa fa-key text-4xl mb-4"></i>
+            <FaSolidKey class="text-4xl mb-4" />
             <p>API密钥管理功能开发中</p>
           </div>
         </div>
@@ -25,7 +26,7 @@ export default function SecurityPage() {
             <div>
               <div class="flex items-center justify-between mb-2">
                 <h4 class="font-medium">IP白名单</h4>
-                <button class="text-primary hover:text-primary/80 text-sm"><i class="fa fa-plus mr-1"></i>添加</button>
+                <button class="text-primary hover:text-primary/80 text-sm"><FaSolidPlus class="mr-1" />添加</button>
               </div>
               <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
                 <p class="text-sm">192.168.1.0/24</p>
@@ -60,7 +61,7 @@ export default function SecurityPage() {
             </div>
           </div>
           <div class="mt-4 flex justify-end">
-            <button class="btn btn-primary"><i class="fa fa-save mr-2"></i>保存配置</button>
+            <button class="btn btn-primary"><FaSolidSave class="mr-2" />保存配置</button>
           </div>
         </div>
       </div>

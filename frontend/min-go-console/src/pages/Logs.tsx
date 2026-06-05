@@ -1,6 +1,7 @@
 import { createSignal, For } from 'solid-js';
 import { api } from '../api/client';
 import type { AccessLog } from '../types';
+import { FaSolidSearch, FaSolidRefresh } from 'solid-icons/fa';
 
 export default function LogsPage() {
   const [logs, setLogs] = createSignal<AccessLog[]>([]);
@@ -31,11 +32,11 @@ export default function LogsPage() {
           <div class="relative flex-1 max-w-md">
             <input type="text" placeholder="搜索日志..." class="input pl-10"
               value={search()} onInput={(e) => setSearch(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-            <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            <FaSolidSearch class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           </div>
           <div class="flex space-x-2">
             <button class="btn btn-secondary" onClick={handleSearch}>
-              <i class="fa fa-refresh mr-2"></i>查询
+              <FaSolidRefresh class="mr-2" />查询
             </button>
           </div>
         </div>

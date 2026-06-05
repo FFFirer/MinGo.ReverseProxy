@@ -2,6 +2,7 @@ import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { CertificateConfig } from '../types';
+import { FaSolidPlus, FaSolidUpload } from 'solid-icons/fa';
 
 export default function CertificatesPage() {
   const [certs, setCerts] = createSignal<CertificateConfig[]>([]);
@@ -48,10 +49,10 @@ export default function CertificatesPage() {
         </div>
         <div class="flex space-x-2">
           <button class="btn btn-secondary" onClick={() => { setShowManual(true); setShowUpload(false); }}>
-            <i class="fa fa-plus mr-2"></i>手动添加
+            <FaSolidPlus class="mr-2" />手动添加
           </button>
           <button class="btn btn-primary" onClick={() => { setShowUpload(true); setShowManual(false); }}>
-            <i class="fa fa-upload mr-2"></i>上传证书
+            <FaSolidUpload class="mr-2" />上传证书
           </button>
         </div>
       </div>
