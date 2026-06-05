@@ -90,7 +90,16 @@ builder.Services.AddHostedService<MinGo.ControlPlane.Api.Services.ConfigUpdateGr
 
 var app = builder.Build();
 
-app.UseCors("Frontend");
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("Frontend");
+}
+else
+{
+    // 生产环境：从 wwwroot 提供前端静态文件
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -112,5 +121,11 @@ app.MapControllers();
 app.MapGrpcService<ConfigReplicationService>();
 app.MapGrpcService<HeartbeatCollectService>();
 app.MapGrpcService<EventSubscriptionService>();
+
+// SPA 回退：必须放在所有路由映射之后，防止吞掉 API/gRPC 404
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
