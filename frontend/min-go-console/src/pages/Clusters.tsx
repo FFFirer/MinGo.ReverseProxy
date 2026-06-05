@@ -111,7 +111,7 @@ export default function ClustersPage() {
                 </div>
                 <div class="flex space-x-2">
                   <button
-                    class="btn btn-secondary text-sm"
+                    class="btn-text btn-text-primary"
                     onClick={() => {
                       setEditingCluster(cluster);
                       setShowModal(true);
@@ -120,7 +120,7 @@ export default function ClustersPage() {
                     <i class="fa fa-edit mr-1"></i>编辑
                   </button>
                   <button
-                    class="btn btn-secondary text-sm"
+                    class="btn-text btn-text-danger"
                     onClick={() => handleDelete(cluster.id)}
                   >
                     <i class="fa fa-trash mr-1"></i>删除
@@ -302,10 +302,11 @@ function ClusterFormModal(props: {
               <label class="block text-sm font-medium">目标地址</label>
               <button
                 type="button"
-                class="text-primary hover:text-primary/80 text-sm"
+                class="btn-icon btn-icon-primary"
                 onClick={addDestination}
+                title="添加目标"
               >
-                <i class="fa fa-plus mr-1"></i>添加目标
+                <i class="fa fa-plus"></i>
               </button>
             </div>
             <div class="space-y-2">
@@ -322,9 +323,10 @@ function ClusterFormModal(props: {
                     />
                     <button
                       type="button"
-                      class="text-danger hover:text-danger/80 p-2"
+                      class="btn-icon btn-icon-danger"
                       onClick={() => removeDestination(idx)}
                       disabled={destinations().length <= 1}
+                      title="删除"
                     >
                       <i class="fa fa-times"></i>
                     </button>

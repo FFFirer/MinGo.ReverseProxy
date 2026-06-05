@@ -44,6 +44,26 @@
   .badge-danger {
     @apply bg-danger/10 text-danger;
   }
+
+  .btn-icon {
+    @apply p-2 rounded-lg text-sm cursor-pointer transition-colors duration-200;
+  }
+  .btn-icon-primary {
+    @apply text-primary hover:bg-primary/10;
+  }
+  .btn-icon-danger {
+    @apply text-danger hover:bg-danger/10;
+  }
+
+  .btn-text {
+    @apply px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors duration-200;
+  }
+  .btn-text-primary {
+    @apply text-primary hover:bg-primary/10;
+  }
+  .btn-text-danger {
+    @apply text-danger hover:bg-danger/10;
+  }
 }
 
 @keyframes slide-in {

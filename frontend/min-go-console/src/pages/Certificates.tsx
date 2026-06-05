@@ -95,11 +95,11 @@ export default function CertificatesPage() {
                     </td>
                     <td class="py-3 px-4">
                       <div class="flex space-x-2">
-                        <button class="text-primary hover:text-primary/80" onClick={() => { setEditingCert(cert); setShowManual(true); setShowUpload(false); }}>
-                          <i class="fa fa-edit"></i>
+                        <button class="btn-text btn-text-primary" onClick={() => { setEditingCert(cert); setShowManual(true); setShowUpload(false); }}>
+                          编辑
                         </button>
-                        <button class="text-danger hover:text-danger/80" onClick={() => handleDelete(cert.id)}>
-                          <i class="fa fa-trash"></i>
+                        <button class="btn-text btn-text-danger" onClick={() => handleDelete(cert.id)}>
+                          删除
                         </button>
                       </div>
                     </td>
