@@ -26,7 +26,7 @@ export default function ClustersPage() {
 
   const handleSave = async (cluster: ClusterConfig) => {
     try {
-      if (cluster.id) {
+      if (editingCluster()) {
         await api.put(`/apimanagement/clusters/${cluster.id}`, cluster);
         addToast("success", "集群已更新");
       } else {
