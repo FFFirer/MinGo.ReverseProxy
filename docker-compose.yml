@@ -2,19 +2,20 @@ version: '3.8'
 
 services:
   migrate:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
     build:
       context: .
       dockerfile: ControlPlane.Dockerfile
     container_name: min-go-migrate
-    entrypoint: ["./efbundle"]
+    entrypoint: ["./efbundle", "--connection", "Data Source=/app/data/mingocp.db"]
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
     volumes:
-      - cp-data:/app/data
+      - ./data:/app/data
     restart: "no"
 
   control-plane:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
     build:
       context: .
       dockerfile: ControlPlane.Dockerfile
@@ -34,10 +35,11 @@ services:
       migrate:
         condition: service_completed_successfully
     volumes:
-      - cp-data:/app/data
+      - ./data:/app/data
     restart: unless-stopped
 
   data-plane:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-dp:latest
     build:
       context: .
       dockerfile: DataPlane.Dockerfile
@@ -53,6 +55,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-fe:latest
     build:
       context: frontend/min-go-console
       dockerfile: Dockerfile
@@ -62,6 +65,3 @@ services:
     depends_on:
       - control-plane
     restart: unless-stopped
-
-volumes:
-  cp-data:

@@ -9,11 +9,25 @@ env:
   CONTAINER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   CONTAINER_REGISTRY_USERNAME: ${{ vars.DOCKER_USERNAME }}
   CONTAINER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-  IMAGE_NAME: mingo-reverseproxy
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - name: cp
+            dockerfile: ControlPlane.Dockerfile
+            context: .
+            image: reverseproxy-cp
+          - name: dp
+            dockerfile: DataPlane.Dockerfile
+            context: .
+            image: reverseproxy-dp
+          - name: fe
+            dockerfile: Dockerfile
+            context: frontend/min-go-console
+            image: reverseproxy-fe
 
     steps:
       - name: Checkout code
@@ -42,8 +56,9 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ${{ matrix.component.context }}
+          file: ${{ matrix.component.dockerfile }}
           push: true
           tags: |
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.CONTAINER_REGISTRY }}/1mingo/${{ matrix.component.image }}:${{ env.VERSION }}
+            ${{ env.CONTAINER_REGISTRY }}/1mingo/${{ matrix.component.image }}:latest
