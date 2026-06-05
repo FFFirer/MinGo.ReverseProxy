@@ -54,14 +54,8 @@ services:
       - control-plane
     restart: unless-stopped
 
-  frontend:
-    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-fe:latest
-    build:
-      context: frontend/min-go-console
-      dockerfile: Dockerfile
-    container_name: min-go-frontend
-    ports:
-      - "8081:80"
-    depends_on:
-      - control-plane
-    restart: unless-stopped
+  # frontend 服务已合并到 control-plane 中
+  # 前端在 control-plane:5000 端口与 API 同源输出
+  # 独立运行/调试仍可使用 frontend/min-go-console/Dockerfile:
+  #   docker build -f frontend/min-go-console/Dockerfile -t fe-test frontend/min-go-console
+  #   docker run -p 8081:80 fe-test
