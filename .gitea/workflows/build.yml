@@ -24,10 +24,6 @@ jobs:
             dockerfile: DataPlane.Dockerfile
             context: .
             image: reverseproxy-dp
-          - name: fe
-            dockerfile: ./frontend/min-go-console/Dockerfile
-            context: frontend/min-go-console
-            image: reverseproxy-fe
 
     steps:
       - name: Checkout code
