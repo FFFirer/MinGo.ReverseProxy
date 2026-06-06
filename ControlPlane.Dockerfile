@@ -1,11 +1,21 @@
 # ControlPlane.Dockerfile
 # Stage 1: 前端构建
-FROM node:22-alpine AS frontend-build
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:22-alpine AS frontend-build
+
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN npm install -g corepack@latest && \
+    corepack enable && corepack prepare pnpm@latest --activate && \
+    pnpm config set registry https://registry.npmmirror.com
+
 WORKDIR /app
 
 # 缓存前端依赖
 COPY frontend/min-go-console/package.json frontend/min-go-console/pnpm-lock.yaml frontend/min-go-console/.npmrc /app/
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # 构建前端
 COPY frontend/min-go-console/ /app/
