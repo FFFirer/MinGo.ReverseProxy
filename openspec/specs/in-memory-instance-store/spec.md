@@ -59,6 +59,12 @@ The system SHALL provide query endpoints to retrieve instance information.
 - **WHEN** a client sends `GET /api/instances/{id}`
 - **THEN** the system SHALL return the matching instance, or `404` if not found
 
+#### Scenario: Query instance runtime config
+- **WHEN** a client sends `GET /api/instances/{id}/config`
+- **THEN** the system SHALL return the data plane's current YARP runtime configuration (`routes` and `clusters`)
+- **OR** return `503` if the instance is not connected
+- **OR** return `404` if the instance does not exist
+
 ### Requirement: In-memory instance deletion
 
 The system SHALL allow deleting instances from memory.

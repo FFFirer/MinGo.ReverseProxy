@@ -139,4 +139,6 @@ enum EventType {
     ERROR_ALERT = 4;
     PERFORMANCE_ALERT = 5;
     CERTIFICATE_UPDATE = 6;
+    CONFIG_QUERY = 7;
+    CONFIG_REPORT = 8;
 }

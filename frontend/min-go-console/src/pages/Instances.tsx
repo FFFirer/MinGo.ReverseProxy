@@ -1,9 +1,11 @@
-import { createSignal, onMount, For } from 'solid-js';
+import { createSignal, onMount, For, Show } from 'solid-js';
 import { api } from '../api/client';
 import type { GatewayInstance } from '../types';
+import InstanceConfigModal from '../components/shared/InstanceConfigModal';
 
 export default function InstancesPage() {
   const [instances, setInstances] = createSignal<GatewayInstance[]>([]);
+  const [configTarget, setConfigTarget] = createSignal<GatewayInstance | null>(null);
 
   const fetchInstances = async () => {
     try {
@@ -150,7 +152,12 @@ export default function InstancesPage() {
                   <td class="py-3 px-4 text-sm">
                     {inst.lastHeartbeat ? new Date(inst.lastHeartbeat).toLocaleString() : '-'}
                   </td>
-                  <td class="py-3 px-4">
+                  <td class="py-3 px-4 flex gap-2">
+                    <button
+                      onClick={() => setConfigTarget(inst)}
+                      class="btn-text-primary text-sm"
+                      title="查看实例配置"
+                    >查看</button>
                     <button
                       onClick={() => handleDelete(inst)}
                       class="text-danger hover:text-red-400 text-sm"
@@ -169,6 +176,15 @@ export default function InstancesPage() {
           </table>
         </div>
       </div>
+
+      <Show when={configTarget()}>
+        {(target) => (
+          <InstanceConfigModal
+            instance={target()}
+            onClose={() => setConfigTarget(null)}
+          />
+        )}
+      </Show>
     </div>
   );
 }

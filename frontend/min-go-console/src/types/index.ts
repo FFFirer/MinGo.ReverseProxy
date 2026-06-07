@@ -116,3 +116,33 @@ export interface UserInfo {
   userName: string;
   emailConfirmed: boolean;
 }
+
+// 实例配置查询
+export interface InstanceConfigResponse {
+  version: number;
+  changeTime: string;
+  routes: InstanceRouteInfo[];
+  clusters: InstanceClusterInfo[];
+}
+
+export interface InstanceRouteInfo {
+  routeId: string;
+  clusterId: string;
+  match?: {
+    path?: string;
+    hosts?: string[];
+  };
+  enabled?: boolean;
+}
+
+export interface InstanceClusterInfo {
+  clusterId: string;
+  loadBalancingPolicy: string;
+  destinations: InstanceDestinationInfo[];
+}
+
+export interface InstanceDestinationInfo {
+  id: string;
+  address: string;
+  healthy: boolean;
+}

@@ -7,6 +7,7 @@ using MinGo.Core.Logging;
 using MinGo.Core.Services;
 using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
+using MinGo.ControlPlane.Api.Services;
 using Serilog;
 
 Console.WriteLine("Starting MinGo Control Plane...");
@@ -85,6 +86,12 @@ builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddSingleton<DataPlaneConnectionManager>();
 builder.Services.AddSingleton<ConfigReplicationService>();
 
+// 实例配置查询服务（通过 EventSubscription 通道）
+builder.Services.AddSingleton<InstanceConfigQueryService>();
+
+// 事件订阅服务（同时作为 gRPC endpoint 和 DI 服务）
+builder.Services.AddSingleton<EventSubscriptionService>();
+
 // 配置变更 gRPC 广播
 builder.Services.AddHostedService<MinGo.ControlPlane.Api.Services.ConfigUpdateGrpcBroadcaster>();
 
@@ -111,6 +118,12 @@ if (app.Environment.IsDevelopment())
         // 种子数据：首次运行时创建默认管理员
         await DbInitializer.SeedDevelopmentDataAsync(sp, app.Configuration);
     }
+
+    // 连接配置查询服务与事件订阅服务
+    var configQueryService = app.Services.GetRequiredService<InstanceConfigQueryService>();
+    var eventSubService = app.Services.GetRequiredService<EventSubscriptionService>();
+    configQueryService.TrySendEventAsync = (instanceId, eventMsg) =>
+        eventSubService.TrySendEventAsync(instanceId, eventMsg);
 }
 
 app.UseRouting();

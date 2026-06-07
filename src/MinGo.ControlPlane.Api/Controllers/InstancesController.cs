@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using MinGo.ControlPlane.Api.Services;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Entities;
 
@@ -9,10 +11,17 @@ namespace MinGo.ControlPlane.Api.Controllers;
 public class InstancesController : ControllerBase
 {
     private readonly IGatewayInstanceService _gatewayInstanceService;
+    private readonly InstanceConfigQueryService _configQueryService;
+    private readonly ILogger<InstancesController> _logger;
 
-    public InstancesController(IGatewayInstanceService gatewayInstanceService)
+    public InstancesController(
+        IGatewayInstanceService gatewayInstanceService,
+        InstanceConfigQueryService configQueryService,
+        ILogger<InstancesController> logger)
     {
         _gatewayInstanceService = gatewayInstanceService;
+        _configQueryService = configQueryService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -55,5 +64,37 @@ public class InstancesController : ControllerBase
     {
         await _gatewayInstanceService.RemoveInstanceAsync(id);
         return NoContent();
+    }
+
+    /// <summary>
+    /// 获取指定网关实例的当前 YARP 运行时配置
+    /// </summary>
+    [HttpGet("{id}/config")]
+    public async Task<IActionResult> GetInstanceConfig(string id)
+    {
+        var result = await _configQueryService.QueryConfigAsync(id);
+
+        if (!result.IsSuccess)
+        {
+            return result.FailureReason switch
+            {
+                ConfigQueryFailureReason.NotFound => NotFound(new { message = result.ErrorMessage }),
+                ConfigQueryFailureReason.Offline => StatusCode(503, new { message = result.ErrorMessage }),
+                ConfigQueryFailureReason.Timeout => StatusCode(504, new { message = result.ErrorMessage }),
+                _ => StatusCode(500, new { message = result.ErrorMessage })
+            };
+        }
+
+        // 解析 JSON 并返回
+        try
+        {
+            var configDoc = JsonDocument.Parse(result.DataJson!);
+            return Ok(configDoc.RootElement);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse config JSON for instance {InstanceId}", id);
+            return StatusCode(500, new { message = "Invalid config data received from instance" });
+        }
     }
 }
