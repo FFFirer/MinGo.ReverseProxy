@@ -199,6 +199,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
                 Name = route.Name,
                 ClusterId = route.ClusterId,
                 MatchPath = route.Match?.Path ?? "",
+                MatchHost = route.Match?.Host ?? "",
                 Enabled = route.Enabled
             });
         }

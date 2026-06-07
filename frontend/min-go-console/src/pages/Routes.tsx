@@ -34,7 +34,7 @@ export default function RoutesPage() {
       if (r.enabled !== match) return false;
     }
     if (search()) {
-      return r.name.includes(search()) || (r.match?.path || '').includes(search());
+      return r.name.includes(search()) || (r.match?.path || '').includes(search()) || (r.match?.host || '').includes(search());
     }
     return true;
   });
@@ -98,6 +98,7 @@ export default function RoutesPage() {
               <tr class="border-b border-gray-200 dark:border-dark-200">
                 <th class="text-left py-3 px-4 font-medium text-secondary">路由名称</th>
                 <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
+                <th class="text-left py-3 px-4 font-medium text-secondary">匹配域名</th>
                 <th class="text-left py-3 px-4 font-medium text-secondary">集群</th>
                 <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
                 <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
@@ -108,6 +109,7 @@ export default function RoutesPage() {
                 <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
                   <td class="py-3 px-4 font-medium">{route.name}</td>
                   <td class="py-3 px-4 font-mono text-sm">{route.match?.path || '-'}</td>
+                  <td class="py-3 px-4 font-mono text-sm">{route.match?.host || '-'}</td>
                   <td class="py-3 px-4">{route.clusterId}</td>
                   <td class="py-3 px-4">
                     <span class={`badge ${route.enabled ? 'badge-success' : 'badge-warning'}`}>
@@ -127,10 +129,10 @@ export default function RoutesPage() {
                 </tr>
               )}</For>
               {!loading() && filteredRoutes().length === 0 && (
-                <tr><td colspan="5" class="py-8 text-center text-secondary">暂无路由</td></tr>
+                <tr><td colspan="6" class="py-8 text-center text-secondary">暂无路由</td></tr>
               )}
               {loading() && (
-                <tr><td colspan="5" class="py-8 text-center text-secondary">加载中...</td></tr>
+                <tr><td colspan="6" class="py-8 text-center text-secondary">加载中...</td></tr>
               )}
             </tbody>
           </table>
@@ -157,6 +159,7 @@ function RouteFormModal(props: {
 }) {
   const [name, setName] = createSignal(props.route?.name || '');
   const [path, setPath] = createSignal(props.route?.match?.path || '');
+  const [host, setHost] = createSignal(props.route?.match?.host || '');
   const [clusterId, setClusterId] = createSignal(props.route?.clusterId || '');
   const [enabled, setEnabled] = createSignal(props.route?.enabled ?? true);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
@@ -177,7 +180,7 @@ function RouteFormModal(props: {
       id: props.route?.id || '',
       name: name(),
       clusterId: clusterId(),
-      match: { path: path() },
+      match: { path: path(), host: host() || undefined },
       enabled: enabled(),
     });
   };
@@ -196,6 +199,10 @@ function RouteFormModal(props: {
             <label class="block text-sm font-medium mb-1">匹配路径</label>
             <input class="input" value={path()} onInput={(e) => setPath(e.currentTarget.value)} placeholder="/api/{**catch-all}" />
             {errors().path && <p class="text-danger text-xs mt-1">{errors().path}</p>}
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">匹配域名</label>
+            <input class="input font-mono text-sm" value={host()} onInput={(e) => setHost(e.currentTarget.value)} placeholder="例如：api.example.com" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">目标集群</label>
