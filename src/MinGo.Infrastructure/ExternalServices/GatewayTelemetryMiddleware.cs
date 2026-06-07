@@ -94,7 +94,8 @@ namespace MinGo.Infrastructure.ExternalServices
                 activity?.SetTag("duration", duration);
 
                 // 添加到遥测存储
-                _store.AddTrace(activity);
+                if (activity != null)
+                    _store.AddTrace(activity);
             }
             catch (Exception ex)
             {
@@ -132,7 +133,8 @@ namespace MinGo.Infrastructure.ExternalServices
                 activity?.SetTag("error", ex.Message);
 
                 // 添加到遥测存储
-                _store.AddTrace(activity);
+                if (activity != null)
+                    _store.AddTrace(activity);
 
                 throw;
             }

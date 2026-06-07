@@ -112,7 +112,6 @@ public class GatewayInstanceService : IGatewayInstanceService
                 InstanceId = inst.InstanceId,
                 Name = inst.Name,
                 Version = inst.Version,
-                Address = $"{inst.IpAddress}:{inst.Port}",
                 ListenerAddresses = inst.ListenerAddresses,
                 Status = inst.Status,
                 IsHealthy = inst.IsHealthy,

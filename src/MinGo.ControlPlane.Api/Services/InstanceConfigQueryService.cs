@@ -58,6 +58,10 @@ public class InstanceConfigQueryService
             };
 
             // EventSubscriptionService 会通过回调发送
+            if (TrySendEventAsync == null)
+            {
+                return ConfigQueryResult.CreateError(instanceId, "TrySendEventAsync not configured");
+            }
             var sent = await TrySendEventAsync(instanceId, queryEvent);
             if (!sent)
             {
