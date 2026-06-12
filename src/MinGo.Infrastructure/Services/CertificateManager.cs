@@ -162,10 +162,13 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                         continue;
                     }
 
+                    var isPfx = certEntity.CertificateType.Equals("Pfx", StringComparison.OrdinalIgnoreCase);
+                    var password = string.IsNullOrEmpty(certEntity.Password) ? null : certEntity.Password;
+
                     X509Certificate2 cert;
-                    if (!string.IsNullOrEmpty(certEntity.Password))
+                    if (isPfx)
                     {
-                        cert = X509CertificateLoader.LoadPkcs12(certData, certEntity.Password, 
+                        cert = X509CertificateLoader.LoadPkcs12(certData, password,
                             X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
                     }
                     else

@@ -66,10 +66,14 @@ public class DataPlaneCertificateSelector
                 {
                     if (certData.CertificateBytes.IsEmpty) continue;
 
-                    var cert = string.IsNullOrEmpty(certData.Password)
-                        ? X509CertificateLoader.LoadCertificate(certData.CertificateBytes.ToArray())
-                        : X509CertificateLoader.LoadPkcs12(certData.CertificateBytes.ToArray(), certData.Password,
-                            X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+                    var isPfx = certData.CertificateType.Equals("Pfx", StringComparison.OrdinalIgnoreCase);
+                    var certBytes = certData.CertificateBytes.ToArray();
+                    var password = string.IsNullOrEmpty(certData.Password) ? null : certData.Password;
+
+                    var cert = isPfx
+                        ? X509CertificateLoader.LoadPkcs12(certBytes, password,
+                            X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable)
+                        : X509CertificateLoader.LoadCertificate(certBytes);
 
                     var key = certData.DomainName.ToLowerInvariant();
                     _certCache[key] = cert;
