@@ -1,6 +1,7 @@
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using MinGo.DataPlane.Grpc;
+using MinGo.DataPlane.Kestrel;
 
 namespace MinGo.DataPlane.ConfigSync;
 
@@ -11,6 +12,7 @@ public class ConfigSyncService : IDisposable
 {
     private readonly ConfigReplication.ConfigReplicationClient _client;
     private readonly DataPlaneConfigProvider _configProvider;
+    private readonly DataPlaneCertificateSelector _certSelector;
     private readonly ILogger<ConfigSyncService> _logger;
     private readonly string _dataPlaneId;
     private AsyncDuplexStreamingCall<ConfigSubscription, ConfigSnapshot>? _call;
@@ -29,10 +31,12 @@ public class ConfigSyncService : IDisposable
     public ConfigSyncService(
         ConfigReplication.ConfigReplicationClient client,
         DataPlaneConfigProvider configProvider,
+        DataPlaneCertificateSelector certSelector,
         ILogger<ConfigSyncService> logger)
     {
         _client = client;
         _configProvider = configProvider;
+        _certSelector = certSelector;
         _logger = logger;
         _dataPlaneId = Guid.NewGuid().ToString("N")[..8];
     }
@@ -119,6 +123,7 @@ public class ConfigSyncService : IDisposable
                 if (snapshot.Certificates.Count > 0)
                 {
                     _configProvider.UpdateCertificates(snapshot.Certificates);
+                    _certSelector.ReloadFromProvider();
                 }
 
                 _initialConfigReceived = true;

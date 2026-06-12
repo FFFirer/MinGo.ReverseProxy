@@ -1,8 +1,8 @@
 using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MinGo.DataPlane.ConfigSync;
 
 namespace MinGo.DataPlane.Kestrel;
@@ -93,21 +93,24 @@ public static class KestrelCertificateExtensions
     public static IServiceCollection AddCertificateServices(this IServiceCollection services)
     {
         services.AddSingleton<DataPlaneCertificateSelector>();
-        return services;
-    }
 
-    public static void ConfigureKestrelHttps(this KestrelServerOptions options, bool isDev)
-    {
-        options.ConfigureHttpsDefaults(httpsOpt =>
+        // 注册 IConfigureOptions<KestrelServerOptions>，在 Kestrel 启动时将证书选择器挂载到 HTTPS 默认配置
+        services.AddSingleton<IConfigureOptions<KestrelServerOptions>>(sp =>
         {
-            httpsOpt.SslProtocols = System.Security.Authentication.SslProtocols.Tls12
-                                  | System.Security.Authentication.SslProtocols.Tls13;
-
-            httpsOpt.ServerCertificateSelector = (context, domainName) =>
+            var selector = sp.GetRequiredService<DataPlaneCertificateSelector>();
+            return new ConfigureOptions<KestrelServerOptions>(options =>
             {
-                var selector = context?.Features.Get<DataPlaneCertificateSelector>();
-                return selector?.SelectCertificate(domainName);
-            };
+                options.ConfigureHttpsDefaults(httpsOpt =>
+                {
+                    httpsOpt.SslProtocols = System.Security.Authentication.SslProtocols.Tls12
+                                          | System.Security.Authentication.SslProtocols.Tls13;
+
+                    httpsOpt.ServerCertificateSelector = (context, domainName) =>
+                        selector.SelectCertificate(domainName);
+                });
+            });
         });
+
+        return services;
     }
 }
