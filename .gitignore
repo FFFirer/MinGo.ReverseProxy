@@ -378,3 +378,4 @@ yarn.lock
 
 # npm
 package-lock.json
+.omo/
