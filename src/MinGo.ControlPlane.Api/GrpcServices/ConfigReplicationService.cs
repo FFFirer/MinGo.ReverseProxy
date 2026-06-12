@@ -150,6 +150,17 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         }
 
         // 添加证书
+        await AddCertificatesToSnapshotAsync(apiDbService, snapshot);
+
+        return snapshot;
+    }
+
+    /// <summary>
+    /// 将证书数据添加到 ConfigSnapshot
+    /// </summary>
+    private static async Task AddCertificatesToSnapshotAsync(IApiDbService apiDbService, ConfigSnapshot snapshot)
+    {
+        var certificates = await apiDbService.GetCertificatesAsync();
         foreach (var cert in certificates)
         {
             snapshot.Certificates.Add(new CertificateData
@@ -163,8 +174,6 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
                 ExpiresAtUnixMs = cert.ExpiresAt?.ToUnixTimeMilliseconds() ?? 0
             });
         }
-
-        return snapshot;
     }
 
     /// <summary>
@@ -225,6 +234,9 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             }
             snapshot.Clusters.Add(cc);
         }
+
+        // 广播时也包含证书数据
+        await AddCertificatesToSnapshotAsync(apiDbService, snapshot);
 
         await _connectionManager.BroadcastConfigAsync(snapshot);
         _logger.LogInformation("Broadcast config update version {Version} to {Count} data planes",

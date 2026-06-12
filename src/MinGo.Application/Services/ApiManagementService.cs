@@ -127,16 +127,21 @@ public class ApiManagementService : IApiManagementService
 
     public async Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate)
     {
-        return await _apiDbService.CreateCertificateAsync(certificate);
+        var result = await _apiDbService.CreateCertificateAsync(certificate);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate)
     {
-        return await _apiDbService.UpdateCertificateAsync(id, certificate);
+        var result = await _apiDbService.UpdateCertificateAsync(id, certificate);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task DeleteCertificateAsync(string id)
     {
         await _apiDbService.DeleteCertificateAsync(id);
+        await NotifyGatewayConfigChangeAsync();
     }
 }
