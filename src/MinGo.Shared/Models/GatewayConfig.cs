@@ -18,7 +18,7 @@ public class RouteConfig
     public string Name { get; set; } = string.Empty;
     public string ClusterId { get; set; } = string.Empty;
     public RouteMatch Match { get; set; } = new();
-    public RouteTransforms Transforms { get; set; } = new();
+    public List<Dictionary<string, string>>? Transforms { get; set; }
     public bool Enabled { get; set; } = true;
 }
 
@@ -27,12 +27,6 @@ public class RouteMatch
     public string Path { get; set; } = string.Empty;
     public string? Host { get; set; }
     public Dictionary<string, string>? Headers { get; set; }
-}
-
-public class RouteTransforms
-{
-    public Dictionary<string, string>? PathPattern { get; set; }
-    public Dictionary<string, string>? PathPrefix { get; set; }
 }
 
 public class ClusterConfig

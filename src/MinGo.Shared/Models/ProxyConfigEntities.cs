@@ -8,7 +8,7 @@ public class ApiRouteEntity
     public string Name { get; set; } = string.Empty;
     public string ClusterId { get; set; } = string.Empty;
     public string MatchJson { get; set; } = "{}";
-    public string TransformsJson { get; set; } = "{}";
+    public string TransformsJson { get; set; } = "[]";
     public bool Enabled { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -25,11 +25,13 @@ public class ApiRouteEntity
         }
     }
 
-    public RouteTransforms? GetTransforms()
+    public List<Dictionary<string, string>>? GetTransforms()
     {
+        if (string.IsNullOrWhiteSpace(TransformsJson) || TransformsJson is "{}" or "[]")
+            return null;
         try
         {
-            return JsonSerializer.Deserialize<RouteTransforms>(TransformsJson);
+            return JsonSerializer.Deserialize<List<Dictionary<string, string>>>(TransformsJson);
         }
         catch
         {
