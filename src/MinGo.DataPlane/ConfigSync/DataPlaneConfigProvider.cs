@@ -49,11 +49,20 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
                 Hosts = string.IsNullOrEmpty(route.MatchHost) ? null : new[] { route.MatchHost }
             };
 
+            // 反序列化 transforms
+            List<Dictionary<string, string>>? transforms = null;
+            if (!string.IsNullOrWhiteSpace(route.TransformsJson) && route.TransformsJson is not "[]" and not "{}")
+            {
+                try { transforms = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(route.TransformsJson); }
+                catch { }
+            }
+
             routes.Add(new YarpRouteConfig
             {
                 RouteId = route.Id,
                 ClusterId = route.ClusterId,
-                Match = match
+                Match = match,
+                Transforms = transforms
             });
         }
 

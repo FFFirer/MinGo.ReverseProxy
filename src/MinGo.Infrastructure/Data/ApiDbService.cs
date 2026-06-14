@@ -84,7 +84,7 @@ public class ApiDbService : IApiDbService
         existing.Name = route.Name;
         existing.ClusterId = route.ClusterId;
         existing.MatchJson = JsonSerializer.Serialize(route.Match);
-        existing.TransformsJson = JsonSerializer.Serialize(route.Transforms);
+        existing.TransformsJson = JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>());
         existing.Enabled = route.Enabled;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -558,7 +558,7 @@ public class ApiDbService : IApiDbService
             Name = entity.Name,
             ClusterId = entity.ClusterId,
             Match = JsonSerializer.Deserialize<RouteMatch>(entity.MatchJson) ?? new RouteMatch(),
-            Transforms = JsonSerializer.Deserialize<RouteTransforms>(entity.TransformsJson) ?? new RouteTransforms(),
+            Transforms = entity.GetTransforms(),
             Enabled = entity.Enabled
         };
     }
@@ -576,7 +576,7 @@ public class ApiDbService : IApiDbService
             Name = model.Name,
             ClusterId = model.ClusterId,
             MatchJson = JsonSerializer.Serialize(model.Match),
-            TransformsJson = JsonSerializer.Serialize(model.Transforms),
+            TransformsJson = JsonSerializer.Serialize(model.Transforms ?? new List<Dictionary<string, string>>()),
             Enabled = model.Enabled
         };
     }

@@ -122,7 +122,8 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
                         {
                             Path = route.Match?.Path,
                             Hosts = route.Match?.Host != null ? new[] { route.Match.Host } : Array.Empty<string>()
-                        }
+                        },
+                        Transforms = route.Transforms
                     };
                     routes.Add(routeConfig);
                 }
