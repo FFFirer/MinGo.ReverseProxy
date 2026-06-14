@@ -119,7 +119,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
                 ClusterId = route.ClusterId,
                 MatchPath = route.Match?.Path ?? "",
                 MatchHost = route.Match?.Host ?? "",
-                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms),
+                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>()),
                 Enabled = route.Enabled
             });
         }
@@ -209,6 +209,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
                 ClusterId = route.ClusterId,
                 MatchPath = route.Match?.Path ?? "",
                 MatchHost = route.Match?.Host ?? "",
+                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>()),
                 Enabled = route.Enabled
             });
         }
