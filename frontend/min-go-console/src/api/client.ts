@@ -30,4 +30,6 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  getTransformSchemas: () =>
+    request<import('../types').TransformSchema[]>('/transforms/schemas'),
 };

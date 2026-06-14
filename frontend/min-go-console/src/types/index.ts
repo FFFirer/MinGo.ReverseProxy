@@ -3,7 +3,7 @@ export interface RouteConfig {
   name: string;
   clusterId: string;
   match: RouteMatch;
-  transforms?: RouteTransforms;
+  transforms?: Record<string, string>[] | null;
   enabled: boolean;
 }
 
@@ -13,9 +13,28 @@ export interface RouteMatch {
   headers?: Record<string, string>;
 }
 
-export interface RouteTransforms {
-  pathPattern?: Record<string, string>;
-  pathPrefix?: Record<string, string>;
+// ── Transform Schema（从 GET /api/transforms/schemas 获取） ──
+
+export interface TransformFieldSchema {
+  key: string;
+  label: string;
+  type: 'text' | 'select';
+  options?: string[];
+  required: boolean;
+  placeholder?: string;
+  defaultValue?: string;
+  description?: string;
+}
+
+export interface TransformSchema {
+  type: string;
+  displayName: string;
+  category: string;
+  description?: string;
+  order: number;
+  isList: boolean;
+  fields: TransformFieldSchema[];
+  defaultEntries?: Record<string, string>[];
 }
 
 export interface ClusterConfig {
