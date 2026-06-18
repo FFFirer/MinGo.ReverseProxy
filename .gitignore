@@ -379,3 +379,4 @@ yarn.lock
 # npm
 package-lock.json
 .omo/
+/.opencode/worktree-session-state.json
