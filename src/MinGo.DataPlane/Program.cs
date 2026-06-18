@@ -52,6 +52,7 @@ await configSync.StartAsync(CancellationToken.None);
 await configSync.WaitForInitialConfigAsync(TimeSpan.FromSeconds(30));
 
 app.UseGatewayTelemetry();
+app.UseSerilogRequestLogging();
 app.MapReverseProxy();
 
 // 启动事件订阅后台服务（响应 CONFIG_QUERY）
