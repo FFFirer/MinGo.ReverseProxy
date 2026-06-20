@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using MinGo.Infrastructure.Data;
 using MinGo.Application.Services;
 using MinGo.Core.Interfaces;
@@ -53,6 +55,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Identity.IdentityOptions>(option
 });
 
 builder.Services.AddAuthorization();
+
+// 健康检查（就绪检查：EF Core DbContext）
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", HealthStatus.Unhealthy, tags: ["ready"]);
 
 // CORS - SolidJS 前端跨域
 builder.Services.AddCors(options =>
@@ -134,6 +140,22 @@ app.MapControllers();
 app.MapGrpcService<ConfigReplicationService>();
 app.MapGrpcService<HeartbeatCollectService>();
 app.MapGrpcService<EventSubscriptionService>();
+
+// 健康检查端点
+app.MapHealthChecks("/healthz/live", new HealthCheckOptions
+{
+    Predicate = _ => false // 存活检查：不运行任何检查，仅返回 200
+});
+app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResultStatusCodes =
+    {
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    }
+});
 
 // SPA 回退：必须放在所有路由映射之后，防止吞掉 API/gRPC 404
 if (!app.Environment.IsDevelopment())

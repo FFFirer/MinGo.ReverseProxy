@@ -31,6 +31,12 @@ services:
       - Kestrel__Endpoints__gRPC__Url=http://+:5001
       - Kestrel__Endpoints__gRPC__Protocols=Http2
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 2
+      start_period: 15s
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -52,7 +58,8 @@ services:
       - ASPNETCORE_URLS=http://+:8080;https://+:8443
       - ControlPlane__GrpcUrl=http://control-plane:5001
     depends_on:
-      - control-plane
+      control-plane:
+        condition: service_healthy
     restart: unless-stopped
 
   # frontend 服务已合并到 control-plane 中

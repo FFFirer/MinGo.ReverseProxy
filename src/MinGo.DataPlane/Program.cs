@@ -4,6 +4,7 @@ using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Heartbeat;
 using MinGo.DataPlane.Telemetry;
 using MinGo.DataPlane.Kestrel;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Serilog;
 
 Console.WriteLine("Starting MinGo Data Plane...");
@@ -43,17 +44,26 @@ builder.Services.AddReverseProxy()
 // Kestrel 证书选择
 builder.Services.AddCertificateServices();
 
+// 健康检查（仅存活检查，无依赖项）
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
 // 启动配置同步（等待首次配置就绪）
 var configSync = app.Services.GetRequiredService<ConfigSyncService>();
 await configSync.StartAsync(CancellationToken.None);
 // 等待首次配置到达
-await configSync.WaitForInitialConfigAsync(TimeSpan.FromSeconds(30));
+await configSync.WaitForInitialConfigAsync(TimeSpan.FromSeconds(60));
 
 app.UseGatewayTelemetry();
 app.UseSerilogRequestLogging();
 app.MapReverseProxy();
+
+// 健康检查端点（存活）
+app.MapHealthChecks("/healthz/live", new HealthCheckOptions
+{
+    Predicate = _ => false // 存活检查：不运行任何检查，仅返回 200
+});
 
 // 启动事件订阅后台服务（响应 CONFIG_QUERY）
 _ = app.Services.GetRequiredService<ConfigQueryHandler>().StartAsync(CancellationToken.None);
