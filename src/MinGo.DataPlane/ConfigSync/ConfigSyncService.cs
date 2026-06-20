@@ -127,12 +127,6 @@ public class ConfigSyncService : IDisposable
                 }
 
                 _initialConfigReceived = true;
-                _logger.LogInformation(
-                    "Config updated to version {Version} ({UpdateType}, {RouteCount} routes, {ClusterCount} clusters)",
-                    snapshot.Version,
-                    snapshot.UpdateType,
-                    snapshot.Routes.Count,
-                    snapshot.Clusters.Count);
             }
             catch (Exception ex)
             {

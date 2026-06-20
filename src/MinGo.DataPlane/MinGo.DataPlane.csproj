@@ -27,4 +27,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MinGo.DataPlane.Tests" />
+  </ItemGroup>
+
 </Project>

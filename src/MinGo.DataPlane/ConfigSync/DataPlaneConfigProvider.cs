@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using MinGo.DataPlane.Grpc;
 using Yarp.ReverseProxy.Configuration;
@@ -15,12 +16,20 @@ namespace MinGo.DataPlane.ConfigSync;
 /// </summary>
 public class DataPlaneConfigProvider : IProxyConfigProvider
 {
+    private static readonly HashSet<string> AllowedLoadBalancingPolicies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "RoundRobin", "LeastRequests", "PowerOfTwoChoices", "FirstAlphabetical", "Random"
+    };
+
     private volatile DataPlaneProxyConfig _config;
+    private readonly ILogger<DataPlaneConfigProvider> _logger;
     private readonly object _lock = new();
     private int _currentVersion;
+    private volatile bool _lastApplySucceeded;
 
-    public DataPlaneConfigProvider()
+    public DataPlaneConfigProvider(ILogger<DataPlaneConfigProvider> logger)
     {
+        _logger = logger;
         _config = new DataPlaneProxyConfig(
             Array.Empty<YarpRouteConfig>(),
             Array.Empty<YarpClusterConfig>(),
@@ -29,6 +38,8 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
 
     public int CurrentVersion => _currentVersion;
 
+    public bool LastApplySucceeded => _lastApplySucceeded;
+
     public IProxyConfig GetConfig() => _config;
 
     /// <summary>
@@ -36,6 +47,22 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
     /// </summary>
     public void ApplyConfig(ConfigSnapshot snapshot)
     {
+        // 版本单调递增检查
+        if (snapshot.Version <= _currentVersion)
+        {
+            _logger.LogDebug("Discarding config snapshot version {Version} (current: {CurrentVersion})", snapshot.Version, _currentVersion);
+            return;
+        }
+
+        // 预检校验
+        var (isValid, errors) = ValidateSnapshot(snapshot);
+        if (!isValid)
+        {
+            _logger.LogWarning("Config snapshot version {Version} failed validation ({ErrorCount} errors): {Errors}",
+                snapshot.Version, errors.Count, string.Join("; ", errors));
+            return;
+        }
+
         var routes = new List<YarpRouteConfig>();
         var clusters = new List<YarpClusterConfig>();
 
@@ -91,7 +118,77 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             _config = new DataPlaneProxyConfig(routes, clusters, DateTime.UtcNow);
             oldConfig.SignalChange();
             _currentVersion = snapshot.Version;
+            _lastApplySucceeded = true;
         }
+
+        _logger.LogInformation("Config updated to version {Version} ({UpdateType}, {RouteCount} routes, {ClusterCount} clusters)",
+            snapshot.Version, snapshot.UpdateType, routes.Count, clusters.Count);
+    }
+
+    /// <summary>
+    /// 校验 ConfigSnapshot 的合法性，仅检查会导致 YARP 崩溃的致命错误
+    /// </summary>
+    internal static (bool IsValid, List<string> Errors) ValidateSnapshot(ConfigSnapshot snapshot)
+    {
+        var errors = new List<string>();
+
+        // 收集所有 ClusterId 用于引用完整性检查
+        var clusterIds = new HashSet<string>(snapshot.Clusters.Select(c => c.Id));
+
+        // 校验 Clusters
+        foreach (var cluster in snapshot.Clusters)
+        {
+            if (string.IsNullOrEmpty(cluster.Id))
+            {
+                errors.Add("Cluster has empty Id");
+            }
+
+            // 校验 LoadBalancingPolicy
+            if (!string.IsNullOrEmpty(cluster.LoadBalancingPolicy)
+                && !AllowedLoadBalancingPolicies.Contains(cluster.LoadBalancingPolicy))
+            {
+                errors.Add($"Cluster '{cluster.Id}' has invalid LoadBalancingPolicy '{cluster.LoadBalancingPolicy}'");
+            }
+
+            // 校验 Destinations
+            foreach (var dest in cluster.Destinations)
+            {
+                if (string.IsNullOrEmpty(dest.Id))
+                {
+                    errors.Add($"Cluster '{cluster.Id}' has destination with empty Id");
+                }
+
+                if (string.IsNullOrEmpty(dest.Address) || !Uri.TryCreate(dest.Address, UriKind.Absolute, out _))
+                {
+                    errors.Add($"Cluster '{cluster.Id}' destination '{dest.Id}' has invalid Address '{dest.Address}'");
+                }
+            }
+        }
+
+        // 校验 Routes
+        var seenRouteIds = new HashSet<string>();
+        foreach (var route in snapshot.Routes)
+        {
+            if (string.IsNullOrEmpty(route.Id))
+            {
+                errors.Add("Route has empty Id");
+            }
+            else if (!seenRouteIds.Add(route.Id))
+            {
+                errors.Add($"Duplicate RouteId '{route.Id}'");
+            }
+
+            if (string.IsNullOrEmpty(route.ClusterId))
+            {
+                errors.Add($"Route '{route.Id}' has empty ClusterId");
+            }
+            else if (!clusterIds.Contains(route.ClusterId))
+            {
+                errors.Add($"Route '{route.Id}' references non-existent Cluster '{route.ClusterId}'");
+            }
+        }
+
+        return (errors.Count == 0, errors);
     }
 
     /// <summary>

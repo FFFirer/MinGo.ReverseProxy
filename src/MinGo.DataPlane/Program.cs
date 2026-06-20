@@ -44,25 +44,37 @@ builder.Services.AddReverseProxy()
 // Kestrel 证书选择
 builder.Services.AddCertificateServices();
 
-// 健康检查（仅存活检查，无依赖项）
+// 健康检查
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-// 启动配置同步（等待首次配置就绪）
+// 启动配置同步（不阻塞，配置异步到达后热加载）
 var configSync = app.Services.GetRequiredService<ConfigSyncService>();
-await configSync.StartAsync(CancellationToken.None);
-// 等待首次配置到达
-await configSync.WaitForInitialConfigAsync(TimeSpan.FromSeconds(60));
+_ = configSync.StartAsync(CancellationToken.None);
 
 app.UseGatewayTelemetry();
 app.UseSerilogRequestLogging();
 app.MapReverseProxy();
 
-// 健康检查端点（存活）
+// 健康检查端点
+var configProvider = app.Services.GetRequiredService<DataPlaneConfigProvider>();
+
 app.MapHealthChecks("/healthz/live", new HealthCheckOptions
 {
     Predicate = _ => false // 存活检查：不运行任何检查，仅返回 200
+});
+
+app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var status = configProvider.LastApplySucceeded ? "Healthy" : "Unhealthy";
+        context.Response.StatusCode = configProvider.LastApplySucceeded ? 200 : 503;
+        await context.Response.WriteAsync($"{{\"status\":\"{status}\"}}");
+    }
 });
 
 // 启动事件订阅后台服务（响应 CONFIG_QUERY）
