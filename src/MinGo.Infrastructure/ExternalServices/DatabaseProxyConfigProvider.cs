@@ -33,17 +33,14 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
-        // 初始空配置，避免启动时阻塞
+        // 初始化空配置，避免首次 GetConfig() 返回 null
         _config = new DatabaseProxyConfig(Array.Empty<YarpRouteConfig>(), Array.Empty<YarpClusterConfig>(), DateTime.UtcNow);
-        
-        // 异步初始化配置（非阻塞）
-        Task.Run(InitializeAsync);
     }
 
     /// <summary>
-    /// 异步初始化配置
+    /// 异步初始化配置（由 Program.cs 在 Build() 后 await 完成）
     /// </summary>
-    private async Task InitializeAsync()
+    public async Task InitializeAsync()
     {
         try
         {
@@ -96,9 +93,9 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
                 {
                     foreach (var dest in cluster.Destinations)
                     {
-                        destinations[dest.Key] = new YarpDestinationConfig
+                        destinations[dest.Id] = new YarpDestinationConfig
                         {
-                            Address = dest.Value.Address
+                            Address = dest.Address
                         };
                     }
                 }
@@ -125,7 +122,8 @@ public class DatabaseProxyConfigProvider : IProxyConfigProvider, IDisposable
                         {
                             Path = route.Match?.Path,
                             Hosts = route.Match?.Host != null ? new[] { route.Match.Host } : Array.Empty<string>()
-                        }
+                        },
+                        Transforms = route.Transforms
                     };
                     routes.Add(routeConfig);
                 }

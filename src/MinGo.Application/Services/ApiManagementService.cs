@@ -78,16 +78,9 @@ public class ApiManagementService : IApiManagementService
         await NotifyGatewayConfigChangeAsync();
     }
 
-    public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
+    public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, DestinationConfig destination)
     {
-        var result = await _apiDbService.AddDestinationAsync(clusterId, destinationId, destination);
-        await NotifyGatewayConfigChangeAsync();
-        return result;
-    }
-
-    public async Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
-    {
-        var result = await _apiDbService.UpdateDestinationAsync(clusterId, destinationId, destination);
+        var result = await _apiDbService.AddDestinationAsync(clusterId, destination);
         await NotifyGatewayConfigChangeAsync();
         return result;
     }
@@ -134,16 +127,21 @@ public class ApiManagementService : IApiManagementService
 
     public async Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate)
     {
-        return await _apiDbService.CreateCertificateAsync(certificate);
+        var result = await _apiDbService.CreateCertificateAsync(certificate);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate)
     {
-        return await _apiDbService.UpdateCertificateAsync(id, certificate);
+        var result = await _apiDbService.UpdateCertificateAsync(id, certificate);
+        await NotifyGatewayConfigChangeAsync();
+        return result;
     }
 
     public async Task DeleteCertificateAsync(string id)
     {
         await _apiDbService.DeleteCertificateAsync(id);
+        await NotifyGatewayConfigChangeAsync();
     }
 }

@@ -24,6 +24,8 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
+dist/
+
 # Visual Studio cache/options directory
 .vs/
 
@@ -359,6 +361,7 @@ coverage/
 
 # Test results
 TestResults/
+test-results/
 *.trx
 
 # Publish output

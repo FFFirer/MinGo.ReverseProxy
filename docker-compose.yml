@@ -1,32 +1,69 @@
 version: '3.8'
 
 services:
-  reverse-proxy:
+  migrate:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: min-go-reverse-proxy
-    ports:
-      - "8080:8080"
-      - "6139:6139"
-      - "58074:58074"
-      - "5286:5286"
-      - "7064:7064"
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-migrate
+    entrypoint: ["./efbundle", "--connection", "Data Source=/app/data/mingocp.db"]
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-      - Serilog__MinimumLevel=Information
-      - Vite__Server__AutoRun=false
     volumes:
-      - sqlite-data:/app/data
+      - ./data:/app/data
+    restart: "no"
+
+  control-plane:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
+    build:
+      context: .
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-control-plane
+    ports:
+      - "5000:5000"     # REST API
+      - "5001:5001"     # gRPC
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - Kestrel__Endpoints__Http__Url=http://+:5000
+      - Kestrel__Endpoints__Http__Protocols=Http1
+      - Kestrel__Endpoints__gRPC__Url=http://+:5001
+      - Kestrel__Endpoints__gRPC__Protocols=Http2
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 2
+      start_period: 15s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
-    networks:
-      - min-go-network
 
-volumes:
-  sqlite-data:
-    driver: local
+  data-plane:
+    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-dp:latest
+    build:
+      context: .
+      dockerfile: DataPlane.Dockerfile
+    container_name: min-go-data-plane
+    ports:
+      - "8080:8080"     # HTTP 代理端口
+      - "8443:8443"     # HTTPS 代理端口
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080;https://+:8443
+      - ControlPlane__GrpcUrl=http://control-plane:5001
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    restart: unless-stopped
 
-networks:
-  min-go-network:
-    driver: bridge
+  # frontend 服务已合并到 control-plane 中
+  # 前端在 control-plane:5000 端口与 API 同源输出
+  # 独立运行/调试仍可使用 frontend/min-go-console/Dockerfile:
+  #   docker build -f frontend/min-go-console/Dockerfile -t fe-test frontend/min-go-console
+  #   docker run -p 8081:80 fe-test

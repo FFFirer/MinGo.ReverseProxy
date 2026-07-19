@@ -34,8 +34,7 @@ public interface IApiManagementService
     Task<ClusterConfig?> UpdateClusterAsync(string id, ClusterConfig cluster);
     Task DeleteClusterAsync(string id);
 
-    Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
-    Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig?> AddDestinationAsync(string clusterId, DestinationConfig destination);
     Task<ClusterConfig?> RemoveDestinationAsync(string clusterId, string destinationId);
 
     Task<IEnumerable<CertificateConfig>> GetCertificatesAsync();

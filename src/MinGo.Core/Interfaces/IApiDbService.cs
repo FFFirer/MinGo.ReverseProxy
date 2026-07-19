@@ -76,22 +76,12 @@ public interface IApiDbService
     Task DeleteClusterAsync(string id);
 
     /// <summary>
-    /// 添加目标
+    /// 添加目标（后端自动生成 ID）
     /// </summary>
     /// <param name="clusterId">集群ID</param>
-    /// <param name="destinationId">目标ID</param>
-    /// <param name="destination">目标配置</param>
+    /// <param name="destination">目标配置（不需传id）</param>
     /// <returns>更新后的集群</returns>
-    Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
-
-    /// <summary>
-    /// 更新目标
-    /// </summary>
-    /// <param name="clusterId">集群ID</param>
-    /// <param name="destinationId">目标ID</param>
-    /// <param name="destination">目标配置</param>
-    /// <returns>更新后的集群</returns>
-    Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination);
+    Task<ClusterConfig?> AddDestinationAsync(string clusterId, DestinationConfig destination);
 
     /// <summary>
     /// 移除目标

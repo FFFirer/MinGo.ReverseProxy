@@ -1,0 +1,68 @@
+# docker-compose.local.yml
+# 本地开发+集成验证专用配置
+# 使用: docker compose -f docker-compose.local.yml up -d
+# 重置: docker compose -f docker-compose.local.yml down -v
+
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-migrate
+    entrypoint: ["./efbundle", "--connection", "Data Source=/app/data/mingocp.db"]
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    volumes:
+      - mingocp-data:/app/data
+    restart: "no"
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: ControlPlane.Dockerfile
+    container_name: min-go-control-plane
+    ports:
+      - "5000:5000"     # REST API + 前端
+      - "5001:5001"     # gRPC
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - Kestrel__Endpoints__Http__Url=http://+:5000
+      - Kestrel__Endpoints__Http__Protocols=Http1
+      - Kestrel__Endpoints__gRPC__Url=http://+:5001
+      - Kestrel__Endpoints__gRPC__Protocols=Http2
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+      - Serilog__MinimumLevel__Default=Debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 2
+      start_period: 15s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - mingocp-data:/app/data
+    restart: "no"
+
+  data-plane:
+    build:
+      context: .
+      dockerfile: DataPlane.Dockerfile
+    container_name: min-go-data-plane
+    ports:
+      - "8080:8080"     # HTTP 代理
+      - "8443:8443"     # HTTPS 代理（证书由业务层加载）
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080;https://+:8443
+      - ControlPlane__GrpcUrl=http://control-plane:5001
+      - Serilog__MinimumLevel__Default=Debug
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  mingocp-data:

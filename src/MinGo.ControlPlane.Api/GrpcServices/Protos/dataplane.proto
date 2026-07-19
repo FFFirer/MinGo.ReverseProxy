@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package mingogo.dataplane;
+
+option csharp_namespace = "MinGo.DataPlane.Grpc";
+
+// ============================================================
+// ConfigReplication: 控制面 → 数据面 配置同步
+// 数据面作为客户端建立双向流，控制面推送配置变更
+// ============================================================
+
+service ConfigReplication {
+    // 双向流：数据面订阅 → 控制面持续推送配置更新
+    rpc ReplicateConfig(stream ConfigSubscription) returns (stream ConfigSnapshot);
+}
+
+message ConfigSubscription {
+    string data_plane_id = 1;
+    int32 current_config_version = 2;
+    bool subscribe_certificates = 3;
+}
+
+message ConfigSnapshot {
+    int32 version = 1;
+    UpdateType update_type = 2;
+    string checksum = 3;
+    repeated RouteConfig routes = 4;
+    repeated ClusterConfig clusters = 5;
+    repeated CertificateData certificates = 6;
+}
+
+enum UpdateType {
+    FULL_SYNC = 0;
+    INCREMENTAL = 1;
+}
+
+message RouteConfig {
+    string id = 1;
+    string name = 2;
+    string cluster_id = 3;
+    string match_path = 4;
+    string match_host = 5;
+    string transforms_json = 6;
+    bool enabled = 7;
+}
+
+message ClusterConfig {
+    string id = 1;
+    string name = 2;
+    string load_balancing_policy = 3;
+    string health_check_json = 4;
+    repeated DestinationConfig destinations = 5;
+}
+
+message DestinationConfig {
+    string id = 1;
+    string address = 2;
+    bool healthy = 3;
+}
+
+message CertificateData {
+    string domain_name = 1;
+    string certificate_type = 2;
+    bytes certificate_bytes = 3;
+    string password = 4;
+    string thumbprint = 5;
+    bool is_valid = 6;
+    int64 expires_at_unix_ms = 7;
+}
+
+// ============================================================
+// HeartbeatCollect: 数据面 → 控制面 心跳 + 指标上报
+// 控制面可通过响应下发指令
+// ============================================================
+
+service HeartbeatCollect {
+    rpc ReportHeartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse);
+}
+
+message HeartbeatRequest {
+    string data_plane_id = 1;
+    double cpu_usage = 2;
+    double memory_usage = 3;
+    int64 total_requests = 4;
+    int64 error_requests = 5;
+    bool is_healthy = 6;
+    repeated MetricPoint metrics = 7;
+    int64 timestamp_unix_ms = 8;
+}
+
+message MetricPoint {
+    string name = 1;
+    double value = 2;
+    int64 timestamp_unix_ms = 3;
+    map<string, string> tags = 4;
+}
+
+message HeartbeatResponse {
+    bool ack = 1;
+    string message = 2;
+    repeated ControlCommand commands = 3;
+}
+
+message ControlCommand {
+    CommandType type = 1;
+    string payload_json = 2;
+}
+
+enum CommandType {
+    CMD_UNSPECIFIED = 0;
+    CMD_RELOAD_CONFIG = 1;
+    CMD_RELOAD_CERTS = 2;
+    CMD_SHUTDOWN = 3;
+}
+
+// ============================================================
+// EventSubscription: 双向事件通道
+// 控制面和数据面均可发送事件
+// ============================================================
+
+service EventSubscription {
+    rpc SubscribeEvents(stream EventMessage) returns (stream EventMessage);
+}
+
+message EventMessage {
+    string event_id = 1;
+    EventType type = 2;
+    string source = 3;
+    string data_json = 4;
+    int64 timestamp_unix_ms = 5;
+    int32 priority = 6;
+}
+
+enum EventType {
+    EVENT_UNSPECIFIED = 0;
+    CONFIG_UPDATE = 1;
+    INSTANCE_STATUS_CHANGE = 2;
+    HEALTH_STATUS_CHANGE = 3;
+    ERROR_ALERT = 4;
+    PERFORMANCE_ALERT = 5;
+    CERTIFICATE_UPDATE = 6;
+    CONFIG_QUERY = 7;
+    CONFIG_REPORT = 8;
+}

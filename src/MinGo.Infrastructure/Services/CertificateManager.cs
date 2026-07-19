@@ -145,7 +145,7 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
         try
         {
             using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var certificates = await dbContext.Certificates
                 .Where(c => c.IsValid && c.CertificateData != null)
@@ -162,15 +162,18 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                         continue;
                     }
 
+                    var isPfx = certEntity.CertificateType.Equals("Pfx", StringComparison.OrdinalIgnoreCase);
+                    var password = string.IsNullOrEmpty(certEntity.Password) ? null : certEntity.Password;
+
                     X509Certificate2 cert;
-                    if (!string.IsNullOrEmpty(certEntity.Password))
+                    if (isPfx)
                     {
-                        cert = new X509Certificate2(certData, certEntity.Password, 
+                        cert = X509CertificateLoader.LoadPkcs12(certData, password,
                             X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
                     }
                     else
                     {
-                        cert = new X509Certificate2(certData);
+                        cert = X509CertificateLoader.LoadCertificate(certData);
                     }
 
                     // 使用域名作为缓存键
@@ -231,7 +234,7 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                 {
                     // 开发证书通常没有密码或使用 "development" 密码
                     var certBytes = File.ReadAllBytes(certPath);
-                    _devCertificate = new X509Certificate2(certBytes, "", 
+                    _devCertificate = X509CertificateLoader.LoadPkcs12(certBytes, "", 
                         X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
                     _logger.LogInformation("Development certificate loaded from {Path}, thumbprint: {Thumbprint}", 
                         certPath, _devCertificate.Thumbprint);

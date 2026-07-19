@@ -12,7 +12,7 @@ namespace MinGo.Infrastructure.Data;
 /// </summary>
 public class ApiDbService : IApiDbService
 {
-    private readonly ApiDbContext _dbContext;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<ApiDbService> _logger;
 
     /// <summary>
@@ -20,7 +20,7 @@ public class ApiDbService : IApiDbService
     /// </summary>
     /// <param name="dbContext">数据库上下文</param>
     /// <param name="logger">日志记录器</param>
-    public ApiDbService(ApiDbContext dbContext, ILogger<ApiDbService> logger)
+    public ApiDbService(AppDbContext dbContext, ILogger<ApiDbService> logger)
     {
         _dbContext = dbContext;
         _logger = logger;
@@ -84,7 +84,7 @@ public class ApiDbService : IApiDbService
         existing.Name = route.Name;
         existing.ClusterId = route.ClusterId;
         existing.MatchJson = JsonSerializer.Serialize(route.Match);
-        existing.TransformsJson = JsonSerializer.Serialize(route.Transforms);
+        existing.TransformsJson = JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>());
         existing.Enabled = route.Enabled;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -137,23 +137,23 @@ public class ApiDbService : IApiDbService
     /// <summary>
     /// 创建集群
     /// </summary>
-    /// <param name="cluster">集群配置</param>
-    /// <returns>创建的集群</returns>
     public async Task<ClusterConfig> CreateClusterAsync(ClusterConfig cluster)
     {
         var entity = MapToClusterEntity(cluster);
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id = cluster.Id;
         entity.CreatedAt = DateTimeOffset.UtcNow;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        // 添加目标
-        foreach (var destination in cluster.Destinations.Values)
+        // 添加目标 — 自动生成 ID
+        var seq = 1;
+        foreach (var destination in cluster.Destinations)
         {
+            var generatedId = $"{entity.Id}-{seq++}";
             var destinationEntity = new ApiDestinationEntity
             {
-                Id = destination.Address, // 使用地址作为ID
+                Id = generatedId,
                 Address = destination.Address,
-                Healthy = destination.Healthy,
+                Healthy = true,
                 ClusterId = entity.Id,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
@@ -186,7 +186,6 @@ public class ApiDbService : IApiDbService
         }
 
         // 更新集群信息
-        existing.Name = cluster.Name;
         existing.LoadBalancingPolicy = cluster.LoadBalancingPolicy;
         existing.HealthCheckJson = JsonSerializer.Serialize(cluster.HealthCheck);
         existing.UpdatedAt = DateTimeOffset.UtcNow;
@@ -195,14 +194,19 @@ public class ApiDbService : IApiDbService
         _dbContext.Destinations.RemoveRange(existing.Destinations);
         existing.Destinations.Clear();
 
-        // 添加新的目标
-        foreach (var destination in cluster.Destinations.Values)
+        // 添加新的目标 — 保留已有 ID，新目标自动生成
+        var seq = await GetNextDestinationSequenceAsync(id);
+        foreach (var destination in cluster.Destinations)
         {
+            var destId = string.IsNullOrEmpty(destination.Id)
+                ? $"{id}-{seq++}"
+                : destination.Id;
+
             var destinationEntity = new ApiDestinationEntity
             {
-                Id = destination.Address, // 使用地址作为ID
+                Id = destId,
                 Address = destination.Address,
-                Healthy = destination.Healthy,
+                Healthy = true,
                 ClusterId = existing.Id,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
@@ -232,13 +236,12 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 添加目标
+    /// 添加目标（后端自动生成 ID）
     /// </summary>
     /// <param name="clusterId">集群ID</param>
-    /// <param name="destinationId">目标ID</param>
-    /// <param name="destination">目标配置</param>
+    /// <param name="destination">目标配置（不需传id）</param>
     /// <returns>更新后的集群</returns>
-    public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
+    public async Task<ClusterConfig?> AddDestinationAsync(string clusterId, DestinationConfig destination)
     {
         var cluster = await _dbContext.Clusters
             .Include(c => c.Destinations)
@@ -248,11 +251,14 @@ public class ApiDbService : IApiDbService
             return null;
         }
 
+        var seq = await GetNextDestinationSequenceAsync(clusterId);
+        var generatedId = $"{clusterId}-{seq}";
+
         var destinationEntity = new ApiDestinationEntity
         {
-            Id = destinationId,
+            Id = generatedId,
             Address = destination.Address,
-            Healthy = destination.Healthy,
+            Healthy = true,
             ClusterId = clusterId,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -262,41 +268,7 @@ public class ApiDbService : IApiDbService
         cluster.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _dbContext.SaveChangesAsync();
-        _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", destinationId, clusterId);
-
-        return MapToClusterModel(cluster);
-    }
-
-    /// <summary>
-    /// 更新目标
-    /// </summary>
-    /// <param name="clusterId">集群ID</param>
-    /// <param name="destinationId">目标ID</param>
-    /// <param name="destination">目标配置</param>
-    /// <returns>更新后的集群</returns>
-    public async Task<ClusterConfig?> UpdateDestinationAsync(string clusterId, string destinationId, DestinationConfig destination)
-    {
-        var cluster = await _dbContext.Clusters
-            .Include(c => c.Destinations)
-            .FirstOrDefaultAsync(c => c.Id == clusterId);
-        if (cluster == null)
-        {
-            return null;
-        }
-
-        var destinationEntity = cluster.Destinations.FirstOrDefault(d => d.Id == destinationId);
-        if (destinationEntity == null)
-        {
-            return null;
-        }
-
-        destinationEntity.Address = destination.Address;
-        destinationEntity.Healthy = destination.Healthy;
-        destinationEntity.UpdatedAt = DateTimeOffset.UtcNow;
-        cluster.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await _dbContext.SaveChangesAsync();
-        _logger.LogInformation("Updated destination {DestinationId} in cluster {ClusterId}", destinationId, clusterId);
+        _logger.LogInformation("Added destination {DestinationId} to cluster {ClusterId}", generatedId, clusterId);
 
         return MapToClusterModel(cluster);
     }
@@ -330,6 +302,26 @@ public class ApiDbService : IApiDbService
         _logger.LogInformation("Removed destination {DestinationId} from cluster {ClusterId}", destinationId, clusterId);
 
         return MapToClusterModel(cluster);
+    }
+
+    /// <summary>
+    /// 获取集群内下一个目标序号（单调递增，永不重复）
+    /// </summary>
+    private async Task<int> GetNextDestinationSequenceAsync(string clusterId)
+    {
+        var prefix = clusterId + "-";
+        var maxId = await _dbContext.Destinations
+            .Where(d => d.ClusterId == clusterId)
+            .OrderByDescending(d => d.Id)
+            .Select(d => d.Id)
+            .FirstOrDefaultAsync() ?? "";
+
+        var maxSeq = 0;
+        if (maxId.StartsWith(prefix))
+        {
+            int.TryParse(maxId[prefix.Length..], out maxSeq);
+        }
+        return maxSeq + 1;
     }
 
     /// <summary>
@@ -429,16 +421,15 @@ public class ApiDbService : IApiDbService
             return;
         }
 
-        // 创建示例集群
+        // 创建示例集群（名称即 ID）
         var cluster1 = new ClusterConfig
         {
-            Id = "cluster1",
-            Name = "user-cluster",
+            Id = "user-cluster",
             LoadBalancingPolicy = "RoundRobin",
-            Destinations = new Dictionary<string, DestinationConfig>
+            Destinations = new List<DestinationConfig>
             {
-                { "destination1", new DestinationConfig { Address = "http://localhost:5001", Healthy = true } },
-                { "destination2", new DestinationConfig { Address = "http://localhost:5002", Healthy = true } }
+                new DestinationConfig { Address = "http://localhost:5001", Healthy = true },
+                new DestinationConfig { Address = "http://localhost:5002", Healthy = true }
             },
             HealthCheck = new HealthCheckConfig
             {
@@ -454,13 +445,12 @@ public class ApiDbService : IApiDbService
 
         var cluster2 = new ClusterConfig
         {
-            Id = "cluster2",
-            Name = "product-cluster",
+            Id = "product-cluster",
             LoadBalancingPolicy = "LeastRequests",
-            Destinations = new Dictionary<string, DestinationConfig>
+            Destinations = new List<DestinationConfig>
             {
-                { "destination1", new DestinationConfig { Address = "http://localhost:6001", Healthy = true } },
-                { "destination2", new DestinationConfig { Address = "http://localhost:6002", Healthy = false } }
+                new DestinationConfig { Address = "http://localhost:6001", Healthy = true },
+                new DestinationConfig { Address = "http://localhost:6002", Healthy = false }
             },
             HealthCheck = new HealthCheckConfig
             {
@@ -483,7 +473,7 @@ public class ApiDbService : IApiDbService
         {
             Id = "route1",
             Name = "用户服务路由",
-            ClusterId = "cluster1",
+            ClusterId = "user-cluster",
             Match = new RouteMatch { Path = "/api/users/{**catch-all}" },
             Enabled = true
         };
@@ -492,7 +482,7 @@ public class ApiDbService : IApiDbService
         {
             Id = "route2",
             Name = "产品服务路由",
-            ClusterId = "cluster2",
+            ClusterId = "product-cluster",
             Match = new RouteMatch { Path = "/api/products/{**catch-all}" },
             Enabled = true
         };
@@ -501,7 +491,7 @@ public class ApiDbService : IApiDbService
         {
             Id = "route3",
             Name = "API网关用户服务",
-            ClusterId = "cluster1",
+            ClusterId = "user-cluster",
             Match = new RouteMatch { Host = "api.example.com", Path = "/api/users/{**catch-all}" },
             Enabled = true
         };
@@ -510,7 +500,7 @@ public class ApiDbService : IApiDbService
         {
             Id = "route4",
             Name = "管理后台API",
-            ClusterId = "cluster2",
+            ClusterId = "product-cluster",
             Match = new RouteMatch { Host = "admin.example.com", Path = "/api/{**catch-all}" },
             Enabled = false
         };
@@ -568,7 +558,7 @@ public class ApiDbService : IApiDbService
             Name = entity.Name,
             ClusterId = entity.ClusterId,
             Match = JsonSerializer.Deserialize<RouteMatch>(entity.MatchJson) ?? new RouteMatch(),
-            Transforms = JsonSerializer.Deserialize<RouteTransforms>(entity.TransformsJson) ?? new RouteTransforms(),
+            Transforms = entity.GetTransforms(),
             Enabled = entity.Enabled
         };
     }
@@ -586,7 +576,7 @@ public class ApiDbService : IApiDbService
             Name = model.Name,
             ClusterId = model.ClusterId,
             MatchJson = JsonSerializer.Serialize(model.Match),
-            TransformsJson = JsonSerializer.Serialize(model.Transforms),
+            TransformsJson = JsonSerializer.Serialize(model.Transforms ?? new List<Dictionary<string, string>>()),
             Enabled = model.Enabled
         };
     }
@@ -601,22 +591,15 @@ public class ApiDbService : IApiDbService
         var model = new ClusterConfig
         {
             Id = entity.Id,
-            Name = entity.Name,
             LoadBalancingPolicy = entity.LoadBalancingPolicy,
             HealthCheck = JsonSerializer.Deserialize<HealthCheckConfig>(entity.HealthCheckJson) ?? new HealthCheckConfig(),
-            Destinations = new Dictionary<string, DestinationConfig>()
-        };
-
-        // 映射目标
-        foreach (var destinationEntity in entity.Destinations)
-        {
-            var destination = new DestinationConfig
+            Destinations = entity.Destinations.Select(d => new DestinationConfig
             {
-                Address = destinationEntity.Address,
-                Healthy = destinationEntity.Healthy
-            };
-            model.Destinations[destinationEntity.Id] = destination;
-        }
+                Id = d.Id,
+                Address = d.Address,
+                Healthy = d.Healthy,
+            }).ToList()
+        };
 
         return model;
     }
@@ -631,7 +614,6 @@ public class ApiDbService : IApiDbService
         return new ApiClusterEntity
         {
             Id = model.Id,
-            Name = model.Name,
             LoadBalancingPolicy = model.LoadBalancingPolicy,
             HealthCheckJson = JsonSerializer.Serialize(model.HealthCheck),
             Destinations = new List<ApiDestinationEntity>()
