@@ -124,13 +124,13 @@ if (app.Environment.IsDevelopment())
         // 种子数据：首次运行时创建默认管理员
         await DbInitializer.SeedDevelopmentDataAsync(sp, app.Configuration);
     }
-
-    // 连接配置查询服务与事件订阅服务
-    var configQueryService = app.Services.GetRequiredService<InstanceConfigQueryService>();
-    var eventSubService = app.Services.GetRequiredService<EventSubscriptionService>();
-    configQueryService.TrySendEventAsync = (instanceId, eventMsg) =>
-        eventSubService.TrySendEventAsync(instanceId, eventMsg);
 }
+
+// 连接配置查询服务与事件订阅服务（所有环境均需装配）
+var configQueryService = app.Services.GetRequiredService<InstanceConfigQueryService>();
+var eventSubService = app.Services.GetRequiredService<EventSubscriptionService>();
+configQueryService.TrySendEventAsync = (instanceId, eventMsg) =>
+    eventSubService.TrySendEventAsync(instanceId, eventMsg);
 
 app.UseRouting();
 app.UseAuthentication();
