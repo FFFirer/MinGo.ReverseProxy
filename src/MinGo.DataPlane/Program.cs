@@ -27,7 +27,6 @@ builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.EventSubscription.EventSubsc
 builder.Services.AddSingleton<TelemetryStore>();
 
 // 配置同步服务
-builder.Services.AddSingleton<DataPlaneConfigProvider>();
 builder.Services.AddSingleton<ConfigSyncService>();
 
 // 配置查询处理器（响应控制面的 CONFIG_QUERY 事件）

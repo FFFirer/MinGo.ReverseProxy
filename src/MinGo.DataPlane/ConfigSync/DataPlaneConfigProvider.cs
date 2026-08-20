@@ -81,7 +81,7 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             if (!string.IsNullOrWhiteSpace(route.TransformsJson) && route.TransformsJson is not "[]" and not "{}")
             {
                 try { transforms = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(route.TransformsJson); }
-                catch { }
+                catch (JsonException ex) { _logger.LogWarning(ex, "Failed to deserialize transforms for route {RouteId}", route.Id); }
             }
 
             routes.Add(new YarpRouteConfig

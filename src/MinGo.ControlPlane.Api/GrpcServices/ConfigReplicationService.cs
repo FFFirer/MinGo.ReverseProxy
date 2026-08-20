@@ -15,6 +15,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     private readonly DataPlaneConnectionManager _connectionManager;
     private readonly IGatewayInstanceService _instanceService;
     private readonly ILogger<ConfigReplicationService> _logger;
+    private readonly MonotonicVersionCounter _versionCounter = new();
 
     public ConfigReplicationService(
         IServiceScopeFactory scopeFactory,
@@ -101,11 +102,10 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
 
         var routes = await apiDbService.GetRoutesAsync();
         var clusters = await apiDbService.GetClustersAsync();
-        var certificates = await apiDbService.GetCertificatesAsync();
 
         var snapshot = new ConfigSnapshot
         {
-            Version = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Version = _versionCounter.Next(),
             UpdateType = UpdateType.FullSync,
             Checksum = Guid.NewGuid().ToString("N")[..16]
         };
@@ -195,7 +195,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
 
         var snapshot = new ConfigSnapshot
         {
-            Version = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Version = _versionCounter.Next(),
             UpdateType = UpdateType.FullSync,
             Checksum = Guid.NewGuid().ToString("N")[..16]
         };
@@ -242,5 +242,25 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         await _connectionManager.BroadcastConfigAsync(snapshot);
         _logger.LogInformation("Broadcast config update version {Version} to {Count} data planes",
             snapshot.Version, _connectionManager.ConnectedCount);
+    }
+}
+
+/// <summary>
+/// 单调递增版本号计数器，确保同一秒内多次广播不会产生重复版本号
+/// </summary>
+internal sealed class MonotonicVersionCounter
+{
+    private int _current;
+
+    public int Next()
+    {
+        var timestampBased = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        int original, next;
+        do
+        {
+            original = Volatile.Read(ref _current);
+            next = Math.Max(timestampBased, original + 1);
+        } while (Interlocked.CompareExchange(ref _current, next, original) != original);
+        return next;
     }
 }

@@ -46,11 +46,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAut
 
 builder.Services.Configure<Microsoft.AspNetCore.Identity.IdentityOptions>(options =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 4;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequiredLength = 8;
     options.User.RequireUniqueEmail = true;
 });
 

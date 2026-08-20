@@ -19,7 +19,7 @@ public static class DbInitializer
 
         var seedSection = configuration.GetSection("SeedData");
         var adminEmail = seedSection["AdminEmail"] ?? "admin@mingo.local";
-        var adminPassword = seedSection["AdminPassword"] ?? "admin123";
+        var adminPassword = seedSection["AdminPassword"] ?? "Admin@123";
 
         var adminUser = new IdentityUser
         {

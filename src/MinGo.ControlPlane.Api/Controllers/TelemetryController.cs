@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.Core.Services;
 
@@ -5,6 +6,7 @@ namespace MinGo.ControlPlane.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TelemetryController : ControllerBase
 {
     private readonly TelemetryStore _store;
@@ -41,8 +43,8 @@ public class TelemetryController : ControllerBase
             ? requestPoints.Count : 0;
         var errorRequests = _store.Metrics.TryGetValue("gateway.requests.errors", out var errorPoints)
             ? errorPoints.Count : 0;
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durationPointsList)
-            ? durationPointsList : new List<MetricPoint>();
+        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durationPointsQueue)
+            ? durationPointsQueue.ToList() : new List<MetricPoint>();
         var avgDuration = durationPoints.Count > 0 ? durationPoints.Average(p => p.Value) : 0;
 
         return Ok(new

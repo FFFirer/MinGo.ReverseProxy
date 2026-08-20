@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Models;
@@ -6,6 +7,7 @@ namespace MinGo.ControlPlane.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CertificatesController : ControllerBase
 {
     private readonly IApiManagementService _apiManagementService;
