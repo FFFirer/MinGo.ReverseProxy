@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.Core.Transforms;
 
@@ -5,6 +6,7 @@ namespace MinGo.ControlPlane.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TransformsController : ControllerBase
 {
     /// <summary>

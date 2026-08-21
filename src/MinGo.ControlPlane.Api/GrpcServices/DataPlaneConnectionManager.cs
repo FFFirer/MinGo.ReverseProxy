@@ -94,10 +94,11 @@ public class DataPlaneConnectionManager
     {
         if (_connections.TryGetValue(dataPlaneId, out var conn))
         {
-            if (DateTimeOffset.UtcNow - conn.LastHeartbeat > TimeSpan.FromSeconds(30))
-                return GatewayInstanceStatus.HeartbeatTimeout;
-            if (DateTimeOffset.UtcNow - conn.LastHeartbeat > TimeSpan.FromSeconds(120))
+            var elapsed = DateTimeOffset.UtcNow - conn.LastHeartbeat;
+            if (elapsed > TimeSpan.FromSeconds(120))
                 return GatewayInstanceStatus.Offline;
+            if (elapsed > TimeSpan.FromSeconds(30))
+                return GatewayInstanceStatus.HeartbeatTimeout;
             return GatewayInstanceStatus.Online;
         }
         return null;

@@ -1,12 +1,11 @@
 import { toggleTheme, isDark } from '../../store/theme';
 import { user, logout } from '../../store/auth';
+import { toggleSidebar } from '../../store/sidebar';
 import { useNavigate } from '@solidjs/router';
-import { createSignal } from 'solid-js';
-import { FaSolidBars, FaSolidSearch, FaSolidSun, FaSolidMoon, FaSolidBell, FaSolidUser } from 'solid-icons/fa';
+import { FaSolidBars, FaSolidSun, FaSolidMoon, FaSolidBell, FaSolidUser } from 'solid-icons/fa';
 
 export default function Header() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = createSignal('');
 
   const handleLogout = async () => {
     await logout();
@@ -16,7 +15,11 @@ export default function Header() {
   return (
     <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
       <div class="flex items-center space-x-3">
-        <button id="mobile-menu-button" class="md:hidden text-gray-500 dark:text-gray-400">
+        <button
+          class="md:hidden text-gray-500 dark:text-gray-400"
+          onClick={toggleSidebar}
+          aria-label="切换菜单"
+        >
           <FaSolidBars class="text-xl" />
         </button>
         <div class="flex items-center space-x-3">
@@ -25,16 +28,6 @@ export default function Header() {
         </div>
       </div>
       <div class="flex items-center space-x-3">
-        <div class="relative hidden md:block">
-          <input
-            type="text"
-            placeholder="搜索..."
-            class="input pl-10 pr-4 py-1 w-64"
-            value={searchQuery()}
-            onInput={(e) => setSearchQuery(e.currentTarget.value)}
-          />
-          <FaSolidSearch class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-        </div>
         <button
           onClick={toggleTheme}
           class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full"

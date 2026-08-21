@@ -16,17 +16,17 @@ namespace MinGo.Core.Services
         /// <summary>
         /// 跟踪数据队列
         /// </summary>
-        public ConcurrentQueue<Activity> Traces = new();
+        public ConcurrentQueue<Activity> Traces { get; } = new();
 
         /// <summary>
         /// 指标数据字典
         /// </summary>
-        public ConcurrentDictionary<string, List<MetricPoint>> Metrics = new();
+        public ConcurrentDictionary<string, ConcurrentQueue<MetricPoint>> Metrics { get; } = new();
 
         /// <summary>
         /// 日志数据环形缓冲区
         /// </summary>
-        public ConcurrentQueue<string> Logs = new();
+        public ConcurrentQueue<string> Logs { get; } = new();
 
         /// <summary>
         /// 添加跟踪数据
@@ -35,7 +35,7 @@ namespace MinGo.Core.Services
         public void AddTrace(Activity activity)
         {
             Traces.Enqueue(activity);
-            if (Traces.Count > MaxTraces)
+            while (Traces.Count > MaxTraces)
             {
                 Traces.TryDequeue(out _);
             }
@@ -48,16 +48,15 @@ namespace MinGo.Core.Services
         /// <param name="point">指标点</param>
         public void AddMetric(string name, MetricPoint point)
         {
-            if (!Metrics.TryGetValue(name, out var points))
-            {
-                points = new List<MetricPoint>();
-                Metrics[name] = points;
-            }
-            
-            points.Add(point);
+            var queue = Metrics.GetOrAdd(name, _ => new ConcurrentQueue<MetricPoint>());
+            queue.Enqueue(point);
+
             // 限制指标数据点数量（24小时）
             var cutoffTime = DateTime.UtcNow.AddHours(-24);
-            points.RemoveAll(p => p.Timestamp < cutoffTime);
+            while (queue.TryPeek(out var oldest) && oldest.Timestamp < cutoffTime)
+            {
+                queue.TryDequeue(out _);
+            }
         }
 
         /// <summary>
@@ -67,7 +66,7 @@ namespace MinGo.Core.Services
         public void AddLog(string log)
         {
             Logs.Enqueue(log);
-            if (Logs.Count > 10000)
+            while (Logs.Count > 10000)
             {
                 Logs.TryDequeue(out _);
             }

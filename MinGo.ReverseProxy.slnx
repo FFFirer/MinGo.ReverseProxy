@@ -9,4 +9,7 @@
     <!-- <Project Path="src/MinGo.ReverseProxy/MinGo.ReverseProxy.csproj" /> -->
     <!-- <Project Path="src/MinGo.Shared/MinGo.Shared.csproj" /> -->
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MinGo.DataPlane.Tests/MinGo.DataPlane.Tests.csproj" />
+  </Folder>
 </Solution>

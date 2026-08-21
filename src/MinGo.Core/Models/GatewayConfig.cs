@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MinGo.Core.Models;
 
 public class GatewayConfig
@@ -15,9 +17,18 @@ public class GatewayConfig
 public class RouteConfig
 {
     public string Id { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(200)]
     public string Name { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(200)]
     public string ClusterId { get; set; } = string.Empty;
+
+    [Required]
     public RouteMatch Match { get; set; } = new();
+
     public List<Dictionary<string, string>>? Transforms { get; set; }
     public bool Enabled { get; set; } = true;
 }
@@ -33,7 +44,10 @@ public class ClusterConfig
 {
     public string Id { get; set; } = string.Empty;
     public List<DestinationConfig> Destinations { get; set; } = new();
+
+    [StringLength(50)]
     public string LoadBalancingPolicy { get; set; } = "RoundRobin";
+
     public HealthCheckConfig HealthCheck { get; set; } = new();
 }
 

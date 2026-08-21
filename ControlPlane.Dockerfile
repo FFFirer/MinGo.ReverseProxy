@@ -17,16 +17,18 @@ WORKDIR /app
 COPY frontend/min-go-console/package.json frontend/min-go-console/pnpm-lock.yaml frontend/min-go-console/.npmrc /app/
 RUN pnpm install --frozen-lockfile
 
-# 构建前端
-COPY frontend/min-go-console/ /app/
+# 构建前端（仅复制必要源文件）
+COPY frontend/min-go-console/package.json frontend/min-go-console/pnpm-lock.yaml frontend/min-go-console/vite.config.ts frontend/min-go-console/tsconfig.json frontend/min-go-console/tsconfig.node.json frontend/min-go-console/index.html /app/
+COPY frontend/min-go-console/src /app/src
+COPY frontend/min-go-console/public /app/public
 RUN pnpm run build
 
 # Stage 2: 后端构建
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 WORKDIR /src
 
-# 安装 ef 工具
-RUN dotnet tool install -g dotnet-ef --version 10.0.4
+# 安装 ef 工具（版本与项目 EF Core 包一致）
+RUN dotnet tool install -g dotnet-ef --version 10.0.0
 ENV PATH="$PATH:/root/.dotnet/tools"
 
 # 缓存 NuGet 包

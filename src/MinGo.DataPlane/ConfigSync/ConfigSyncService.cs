@@ -112,31 +112,29 @@ public class ConfigSyncService : IDisposable
         }
     }
 
-    private Task ApplyConfigSnapshotAsync(ConfigSnapshot snapshot)
+    private async Task ApplyConfigSnapshotAsync(ConfigSnapshot snapshot)
     {
-        return _syncLock.WaitAsync().ContinueWith(async _ =>
+        await _syncLock.WaitAsync();
+        try
         {
-            try
-            {
-                _configProvider.ApplyConfig(snapshot);
+            _configProvider.ApplyConfig(snapshot);
 
-                if (snapshot.Certificates.Count > 0)
-                {
-                    _configProvider.UpdateCertificates(snapshot.Certificates);
-                    _certSelector.ReloadFromProvider();
-                }
+            if (snapshot.Certificates.Count > 0)
+            {
+                _configProvider.UpdateCertificates(snapshot.Certificates);
+                _certSelector.ReloadFromProvider();
+            }
 
-                _initialConfigReceived = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to apply config snapshot version {Version}", snapshot.Version);
-            }
-            finally
-            {
-                _syncLock.Release();
-            }
-        }, TaskContinuationOptions.ExecuteSynchronously).Unwrap();
+            _initialConfigReceived = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to apply config snapshot version {Version}", snapshot.Version);
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
     }
 
     public void Dispose()
