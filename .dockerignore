@@ -1,50 +1,73 @@
-# .dockerignore
-# Git
+# =========================
+# Version Control
+# =========================
 .git
 .gitignore
+.gitattributes
 
-# Build outputs
-**/bin/
-**/obj/
-**/out/
-**/publish/
-**/*.db
-
-# IDE
+# =========================
+# IDE / Editor
+# =========================
 .vs/
 .vscode/
 .idea/
 *.user
 *.suo
+*.sln.iml
+*.code-workspace
 
-# Logs
-*.log
-**/logs/
+# =========================
+# Build Outputs (already in Docker)
+# =========================
+**/bin/
+**/obj/
+**/out/
+**/publish/
+*.nupkg
+*.snupkg
 
-# Node modules
-**/node_modules/
-**/pnpm-store/
+# =========================
+# Frontend Build Artifacts
+# =========================
+frontend/min-go-console/dist/
+frontend/min-go-console/node_modules/
 
-# Test files
-# tests/
-# *Tests.csproj
-# *Test.csproj
-
+# =========================
 # Documentation
+# =========================
 docs/
 *.md
-README*
+LICENSE
 
-# Archived code
-archived/
-
-# IDE specific files
-*.slnx.user
-
-# CI/CD
+# =========================
+# CI/CD (not needed in build)
+# =========================
+.gitea/
 .github/
 .azure/
 
+# =========================
+# Test / E2E
+# =========================
+**/e2e/
+**/*.test.*
+**/*.spec.*
+**/TestResults/
+**/playwright-report/
+
+# =========================
+# Docker (avoid recursive)
+# =========================
+**/Dockerfile
+**/.dockerignore
+docker-compose*.yml
+
+# =========================
 # Misc
-*.DS_Store
+# =========================
+.DS_Store
 Thumbs.db
+*.log
+omo/
+.opencode/
+archived/

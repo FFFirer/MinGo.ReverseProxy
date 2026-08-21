@@ -1,50 +1,52 @@
-# .dockerignore
-# Git
+# =========================
+# Version Control
+# =========================
 .git
 .gitignore
+.gitattributes
 
-# Build outputs
-**/bin/
-**/obj/
-**/out/
-**/publish/
-**/*.db
-
-# IDE
+# =========================
+# IDE / Editor
+# =========================
 .vs/
 .vscode/
 .idea/
 *.user
 *.suo
+*.code-workspace
 
-# Logs
-*.log
-**/logs/
+# =========================
+# Build Outputs
+# =========================
+dist/
+node_modules/
+pnpm-store/
 
-# Node modules
-**/node_modules/
-**/pnpm-store/
+# =========================
+# Test / E2E
+# =========================
+e2e/
+playwright-report/
+test-results/
+*.test.*
+*.spec.*
 
-# Test files
-# tests/
-# *Tests.csproj
-# *Test.csproj
-
+# =========================
 # Documentation
-docs/
+# =========================
 *.md
 README*
+docs/
 
-# Archived code
-archived/
+# =========================
+# Docker (avoid recursive)
+# =========================
+Dockerfile
+.dockerignore
 
-# IDE specific files
-*.slnx.user
-
-# CI/CD
-.github/
-.azure/
-
+# =========================
 # Misc
-*.DS_Store
+# =========================
+.DS_Store
 Thumbs.db
+*.log
