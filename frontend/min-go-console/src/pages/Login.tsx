@@ -1,26 +1,30 @@
 import { createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { login, register } from '../store/auth';
+import { login } from '../store/auth';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [error, setError] = createSignal('');
-  const [isRegister, setIsRegister] = createSignal(false);
+  const [submitting, setSubmitting] = createSignal(false);
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
-    const result = isRegister()
-      ? await register(email(), password())
-      : await login(email(), password());
-
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
-      setError(result.message);
+    try {
+      const result = await login(email(), password());
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.message);
+      }
+    } catch {
+      setError('服务器响应异常，请稍后重试');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -29,7 +33,7 @@ export default function Login() {
       <div class="card max-w-md w-full">
         <div class="text-center mb-8">
           <h1 class="text-2xl font-bold">MinGo API网关</h1>
-          <p class="text-secondary mt-2">{isRegister() ? '创建新账户' : '登录到控制平面'}</p>
+          <p class="text-secondary mt-2">登录到控制平面</p>
         </div>
 
         {error() && (
@@ -61,18 +65,10 @@ export default function Login() {
               placeholder="请输入密码"
             />
           </div>
-          <button type="submit" class="btn btn-primary w-full">
-            {isRegister() ? '注册' : '登录'}
+          <button type="submit" class="btn btn-primary w-full" disabled={submitting()}>
+            {submitting() ? '登录中...' : '登录'}
           </button>
         </form>
-
-        <div class="mt-4 text-center text-sm text-secondary">
-          {isRegister() ? (
-            <>已有账户？<button onClick={() => setIsRegister(false)} class="text-primary hover:underline cursor-pointer">登录</button></>
-          ) : (
-            <>没有账户？<button onClick={() => setIsRegister(true)} class="text-primary hover:underline cursor-pointer">注册</button></>
-          )}
-        </div>
       </div>
     </div>
   );

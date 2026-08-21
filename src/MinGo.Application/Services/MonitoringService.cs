@@ -23,9 +23,9 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public Task<MetricsSummary> GetMetricsSummaryAsync()
     {
-        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total : new List<MetricPoint>();
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors : new List<MetricPoint>();
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations : new List<MetricPoint>();
+        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total.ToList() : new List<MetricPoint>();
+        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors.ToList() : new List<MetricPoint>();
+        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations.ToList() : new List<MetricPoint>();
 
         var totalRequests = totalPoints.Sum(p => (int)p.Value);
         var errorRequests = errorPoints.Sum(p => (int)p.Value);
@@ -112,9 +112,9 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public Task<IEnumerable<ServiceMetrics>> GetServiceMetricsAsync()
     {
-        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total : new List<MetricPoint>();
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors : new List<MetricPoint>();
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations : new List<MetricPoint>();
+        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total.ToList() : new List<MetricPoint>();
+        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors.ToList() : new List<MetricPoint>();
+        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations.ToList() : new List<MetricPoint>();
 
         var serviceGroups = totalPoints
             .GroupBy(p => p.Tags.TryGetValue("route", out var route) ? route?.ToString() ?? "unknown" : "unknown")

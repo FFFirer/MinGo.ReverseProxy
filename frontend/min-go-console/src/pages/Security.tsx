@@ -1,8 +1,13 @@
 import { createSignal } from 'solid-js';
+import { addToast } from '../store/toast';
 import { FaSolidKey, FaSolidPlus, FaSolidSave } from 'solid-icons/fa';
 
 export default function SecurityPage() {
   const [rateLimit, setRateLimit] = createSignal(1000);
+
+  const handleSave = () => {
+    addToast('warning', '安全配置保存功能尚未开放，敬请期待');
+  };
 
   return (
     <div>
@@ -26,7 +31,7 @@ export default function SecurityPage() {
             <div>
               <div class="flex items-center justify-between mb-2">
                 <h4 class="font-medium">IP白名单</h4>
-                <button class="text-primary hover:text-primary/80 text-sm"><FaSolidPlus class="mr-1" />添加</button>
+                <button class="text-primary hover:text-primary/80 text-sm" onClick={() => addToast('warning', 'IP白名单功能尚未开放，敬请期待')}><FaSolidPlus class="mr-1" />添加</button>
               </div>
               <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
                 <p class="text-sm">192.168.1.0/24</p>
@@ -61,7 +66,7 @@ export default function SecurityPage() {
             </div>
           </div>
           <div class="mt-4 flex justify-end">
-            <button class="btn btn-primary"><FaSolidSave class="mr-2" />保存配置</button>
+            <button class="btn btn-primary" onClick={handleSave}><FaSolidSave class="mr-2" />保存配置</button>
           </div>
         </div>
       </div>

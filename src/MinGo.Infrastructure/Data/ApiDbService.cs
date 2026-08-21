@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MinGo.Core.Entities;
@@ -14,16 +15,19 @@ public class ApiDbService : IApiDbService
 {
     private readonly AppDbContext _dbContext;
     private readonly ILogger<ApiDbService> _logger;
+    private readonly IDataProtector _dataProtector;
 
     /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="dbContext">数据库上下文</param>
     /// <param name="logger">日志记录器</param>
-    public ApiDbService(AppDbContext dbContext, ILogger<ApiDbService> logger)
+    /// <param name="dataProtectionProvider">数据保护提供程序</param>
+    public ApiDbService(AppDbContext dbContext, ILogger<ApiDbService> logger, IDataProtectionProvider dataProtectionProvider)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _dataProtector = dataProtectionProvider.CreateProtector("MinGo.CertificatePassword");
     }
 
     /// <summary>
@@ -627,6 +631,20 @@ public class ApiDbService : IApiDbService
     /// <returns>证书配置</returns>
     private CertificateConfig MapToCertificateModel(ApiCertificateEntity entity)
     {
+        string? decryptedPassword = null;
+        if (!string.IsNullOrEmpty(entity.Password))
+        {
+            try
+            {
+                decryptedPassword = _dataProtector.Unprotect(entity.Password);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to decrypt password for certificate {CertificateId}, treating as plain text", entity.Id);
+                decryptedPassword = entity.Password;
+            }
+        }
+
         return new CertificateConfig
         {
             Id = entity.Id,
@@ -639,7 +657,7 @@ public class ApiDbService : IApiDbService
             Thumbprint = entity.Thumbprint,
             IsValid = entity.IsValid,
             CertificateData = entity.CertificateData,
-            Password = entity.Password
+            Password = decryptedPassword
         };
     }
 
@@ -650,6 +668,12 @@ public class ApiDbService : IApiDbService
     /// <returns>证书实体</returns>
     private ApiCertificateEntity MapToCertificateEntity(CertificateConfig model)
     {
+        string? encryptedPassword = null;
+        if (!string.IsNullOrEmpty(model.Password))
+        {
+            encryptedPassword = _dataProtector.Protect(model.Password);
+        }
+
         return new ApiCertificateEntity
         {
             Id = model.Id,
@@ -662,7 +686,7 @@ public class ApiDbService : IApiDbService
             Thumbprint = model.Thumbprint,
             IsValid = model.IsValid,
             CertificateData = model.CertificateData,
-            Password = model.Password
+            Password = encryptedPassword
         };
     }
 }

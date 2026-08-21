@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.ControlPlane.Api.Services;
 using MinGo.Core.Interfaces;
@@ -8,6 +9,7 @@ namespace MinGo.ControlPlane.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class InstancesController : ControllerBase
 {
     private readonly IGatewayInstanceService _gatewayInstanceService;

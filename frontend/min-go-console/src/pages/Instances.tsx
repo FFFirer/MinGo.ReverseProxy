@@ -1,5 +1,6 @@
 import { createSignal, onMount, For, Show } from 'solid-js';
 import { api } from '../api/client';
+import { addToast } from '../store/toast';
 import type { GatewayInstance } from '../types';
 import InstanceConfigModal from '../components/shared/InstanceConfigModal';
 
@@ -69,9 +70,9 @@ export default function InstancesPage() {
     if (!confirm(`确定要删除实例 "${inst.name}" (${inst.instanceId}) 吗？`)) return;
     try {
       await api.delete(`/instances/${inst.instanceId}`);
-      setInstances(prev => prev.filter(i => i.instanceId !== inst.instanceId));
+      await fetchInstances();
     } catch (err) {
-      console.error('Failed to delete instance:', err);
+      addToast('error', `删除实例失败: ${(err as Error).message}`);
     }
   };
 

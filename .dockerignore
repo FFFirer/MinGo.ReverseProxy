@@ -27,6 +27,12 @@
 *.snupkg
 
 # =========================
+# Node modules
+# =========================
+**/node_modules/
+**/pnpm-store/
+
+# =========================
 # Frontend Build Artifacts
 # =========================
 frontend/min-go-console/dist/

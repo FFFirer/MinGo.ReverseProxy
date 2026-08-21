@@ -115,7 +115,8 @@ public class HeartbeatReporter : IHostedService, IDisposable
         // 添加遥测指标点
         foreach (var (name, points) in _telemetryStore.Metrics)
         {
-            foreach (var point in points.TakeLast(10))
+            var pointsList = points.ToList();
+            foreach (var point in pointsList.Skip(Math.Max(0, pointsList.Count - 10)))
             {
                 request.Metrics.Add(new Grpc.MetricPoint
                 {

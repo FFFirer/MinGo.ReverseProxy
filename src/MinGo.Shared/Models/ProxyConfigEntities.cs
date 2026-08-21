@@ -19,7 +19,7 @@ public class ApiRouteEntity
         {
             return JsonSerializer.Deserialize<RouteMatch>(MatchJson);
         }
-        catch
+        catch (JsonException)
         {
             return null;
         }
@@ -33,7 +33,7 @@ public class ApiRouteEntity
         {
             return JsonSerializer.Deserialize<List<Dictionary<string, string>>>(TransformsJson);
         }
-        catch
+        catch (JsonException)
         {
             return null;
         }
@@ -56,7 +56,7 @@ public class ApiClusterEntity
         {
             return JsonSerializer.Deserialize<HealthCheckConfig>(HealthCheckJson);
         }
-        catch
+        catch (JsonException)
         {
             return null;
         }
