@@ -25,6 +25,9 @@
 **/node_modules/
 **/pnpm-store/
 
+# Frontend local build output (built inside Docker, not needed from host)
+frontend/min-go-console/dist/
+
 # Test files
 # tests/
 # *Tests.csproj
