@@ -1,5 +1,11 @@
-import { createSignal, onMount, For } from 'solid-js';
+import { createSignal, For } from 'solid-js';
 import { api } from '../api/client';
+
+const alertStyles: Record<string, string> = {
+  danger: 'border-l-4 border-danger bg-danger/5 dark:bg-danger/10 rounded-r-lg',
+  warning: 'border-l-4 border-warning bg-warning/5 dark:bg-warning/10 rounded-r-lg',
+  success: 'border-l-4 border-success bg-success/5 dark:bg-success/10 rounded-r-lg',
+};
 
 export default function MonitoringPage() {
   const [timeRange, setTimeRange] = createSignal('1h');
@@ -39,7 +45,7 @@ export default function MonitoringPage() {
         <h3 class="font-semibold mb-4">告警记录</h3>
         <div class="space-y-4">
           <For each={alerts()}>{(alert) => (
-            <div class={`p-4 border-l-4 border-${alert.level} bg-${alert.level}/5 dark:bg-${alert.level}/10 rounded-r-lg`}>
+            <div class={`p-4 ${alertStyles[alert.level] || alertStyles.warning}`}>
               <div class="flex items-center justify-between">
                 <h4 class="font-medium">{alert.title}</h4>
                 <span class="text-sm text-secondary">{alert.time}</span>

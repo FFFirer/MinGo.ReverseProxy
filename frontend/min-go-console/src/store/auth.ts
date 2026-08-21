@@ -24,27 +24,12 @@ export async function login(email: string, password: string): Promise<{ success:
     credentials: 'include',
     body: JSON.stringify({ email, password }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (res.ok) {
     await fetchUser();
-    return { success: true, message: data.message };
+    return { success: true, message: data.message || '登录成功' };
   }
-  return { success: false, message: data.message };
-}
-
-export async function register(email: string, password: string): Promise<{ success: boolean; message: string }> {
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
-  if (res.ok) {
-    await fetchUser();
-    return { success: true, message: data.message };
-  }
-  return { success: false, message: data.message };
+  return { success: false, message: data.message || '登录失败，请检查邮箱和密码' };
 }
 
 export async function logout() {

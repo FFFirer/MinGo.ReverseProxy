@@ -1,5 +1,6 @@
 import { createSignal, onMount, For } from 'solid-js';
 import { api } from '../api/client';
+import { addToast } from '../store/toast';
 import type { MetricsSummary, RequestMetrics } from '../types';
 import { FaSolidArrowUp, FaSolidRefresh, FaSolidExclamationCircle, FaSolidClock, FaSolidServer } from 'solid-icons/fa';
 
@@ -11,14 +12,18 @@ export default function Dashboard() {
     try {
       const data = await api.get<MetricsSummary>('/monitoring/metrics');
       setMetrics(data);
-    } catch { /* ignore */ }
+    } catch {
+      addToast('error', '加载监控指标失败');
+    }
 
     try {
       const end = new Date().toISOString();
       const start = new Date(Date.now() - 3600000).toISOString();
       const data = await api.get<RequestMetrics[]>(`/monitoring/requests?start=${start}&end=${end}`);
       setRequestMetrics(data || []);
-    } catch { /* ignore */ }
+    } catch {
+      addToast('error', '加载请求趋势数据失败');
+    }
   });
 
   return (
