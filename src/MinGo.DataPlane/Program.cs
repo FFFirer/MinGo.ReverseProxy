@@ -64,6 +64,7 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
     }
 });
 
+app.UseRouting();
 app.UseGatewayTelemetry();
 app.UseSerilogRequestLogging();
 app.MapReverseProxy();

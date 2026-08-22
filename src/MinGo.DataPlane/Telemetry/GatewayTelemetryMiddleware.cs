@@ -23,6 +23,13 @@ public class GatewayTelemetryMiddleware
 
     public async Task InvokeAsync(HttpContext ctx)
     {
+        // 跳过健康检查路径，避免探测流量污染指标
+        if (ctx.Request.Path.StartsWithSegments("/healthz"))
+        {
+            await _next(ctx);
+            return;
+        }
+
         var endpoint = ctx.GetEndpoint();
         var route = endpoint?.DisplayName ?? $"{ctx.Request.Method} {ctx.Request.Path}";
         using var activity = Source.StartActivity($"gateway.request: {route}", ActivityKind.Server);
