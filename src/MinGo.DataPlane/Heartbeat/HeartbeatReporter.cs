@@ -11,15 +11,13 @@ namespace MinGo.DataPlane.Heartbeat;
 /// <summary>
 /// 心跳上报服务 - 通过 gRPC 双向流定期上报系统指标
 /// </summary>
-public class HeartbeatReporter : IHostedService, IDisposable
+public class HeartbeatReporter : BackgroundService
 {
     private readonly HeartbeatCollect.HeartbeatCollectClient _client;
     private readonly TelemetryStore _telemetryStore;
     private readonly DataPlaneConfigProvider _configProvider;
     private readonly ConfigSyncService _configSync;
     private readonly ILogger<HeartbeatReporter> _logger;
-    private CancellationTokenSource? _cts;
-    private bool _disposed;
 
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
 
@@ -37,46 +35,32 @@ public class HeartbeatReporter : IHostedService, IDisposable
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _ = RunHeartbeatLoopAsync(_cts.Token);
-        await Task.CompletedTask;
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _cts?.Cancel();
-        return Task.CompletedTask;
-    }
-
-    private async Task RunHeartbeatLoopAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var retryDelay = TimeSpan.FromSeconds(1);
 
-        while (!ct.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var call = _client.ReportHeartbeat(cancellationToken: ct);
+                using var call = _client.ReportHeartbeat(cancellationToken: stoppingToken);
                 _logger.LogInformation("Heartbeat connection established");
 
                 retryDelay = TimeSpan.FromSeconds(1);
 
-                while (!ct.IsCancellationRequested)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    await Task.Delay(HeartbeatInterval, ct);
+                    await Task.Delay(HeartbeatInterval, stoppingToken);
 
                     var request = BuildHeartbeatRequest();
-                    await call.RequestStream.WriteAsync(request, ct);
+                    await call.RequestStream.WriteAsync(request, stoppingToken);
 
-                    // 读取响应（含可能的控制指令）
-                    if (await call.ResponseStream.MoveNext(ct))
+                    if (await call.ResponseStream.MoveNext(stoppingToken))
                     {
                         var response = call.ResponseStream.Current;
                         if (response.Commands.Count > 0)
                         {
-                            await HandleCommandsAsync(response.Commands, ct);
+                            await HandleCommandsAsync(response.Commands, stoppingToken);
                         }
                     }
                 }
@@ -85,10 +69,10 @@ public class HeartbeatReporter : IHostedService, IDisposable
             {
                 break;
             }
-            catch (Exception ex) when (!ct.IsCancellationRequested)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Heartbeat connection lost, retrying in {Delay}...", retryDelay);
-                await Task.Delay(retryDelay, ct);
+                await Task.Delay(retryDelay, stoppingToken);
                 retryDelay = TimeSpan.FromSeconds(Math.Min(retryDelay.TotalSeconds * 2, 30));
             }
         }
@@ -149,19 +133,9 @@ public class HeartbeatReporter : IHostedService, IDisposable
 
                 case CommandType.CmdShutdown:
                     _logger.LogWarning("Shutdown requested by control plane");
-                    _cts?.Cancel();
                     break;
             }
         }
     }
 
-    public void Dispose()
-    {
-        if (!_disposed)
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _disposed = true;
-        }
-    }
 }

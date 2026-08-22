@@ -1,4 +1,5 @@
 using Grpc.Core;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MinGo.DataPlane.Grpc;
 using MinGo.DataPlane.Kestrel;
@@ -8,17 +9,14 @@ namespace MinGo.DataPlane.ConfigSync;
 /// <summary>
 /// 配置同步服务 - 通过 gRPC 双向流从控制面同步配置
 /// </summary>
-public class ConfigSyncService : IDisposable
+public class ConfigSyncService : BackgroundService
 {
     private readonly ConfigReplication.ConfigReplicationClient _client;
     private readonly DataPlaneConfigProvider _configProvider;
     private readonly DataPlaneCertificateSelector _certSelector;
     private readonly ILogger<ConfigSyncService> _logger;
     private readonly string _dataPlaneId;
-    private AsyncDuplexStreamingCall<ConfigSubscription, ConfigSnapshot>? _call;
-    private CancellationTokenSource? _cts;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
-    private bool _disposed;
     private bool _initialConfigReceived;
 
     private static readonly TimeSpan[] RetryDelays = [
@@ -46,16 +44,6 @@ public class ConfigSyncService : IDisposable
     public bool InitialConfigReceived => _initialConfigReceived;
 
     /// <summary>
-    /// 启动配置同步（建立 gRPC 双向流）
-    /// </summary>
-    public async Task StartAsync(CancellationToken ct)
-    {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _ = RunSyncLoopAsync(_cts.Token);
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
     /// 等待首次配置到达
     /// </summary>
     public async Task<bool> WaitForInitialConfigAsync(TimeSpan timeout)
@@ -68,20 +56,19 @@ public class ConfigSyncService : IDisposable
         return _initialConfigReceived;
     }
 
-    private async Task RunSyncLoopAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var retryIndex = 0;
 
-        while (!ct.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 _logger.LogInformation("Connecting to control plane gRPC ConfigReplication...");
 
-                _call = _client.ReplicateConfig(cancellationToken: ct);
+                using var call = _client.ReplicateConfig(cancellationToken: stoppingToken);
 
-                // 发送订阅请求
-                await _call.RequestStream.WriteAsync(new ConfigSubscription
+                await call.RequestStream.WriteAsync(new ConfigSubscription
                 {
                     DataPlaneId = _dataPlaneId,
                     CurrentConfigVersion = _configProvider.CurrentVersion,
@@ -91,8 +78,7 @@ public class ConfigSyncService : IDisposable
                 _logger.LogInformation("Connected to control plane, waiting for config...");
                 retryIndex = 0;
 
-                // 持续接收配置更新
-                await foreach (var snapshot in _call.ResponseStream.ReadAllAsync(ct))
+                await foreach (var snapshot in call.ResponseStream.ReadAllAsync(stoppingToken))
                 {
                     await ApplyConfigSnapshotAsync(snapshot);
                 }
@@ -101,12 +87,12 @@ public class ConfigSyncService : IDisposable
             {
                 break;
             }
-            catch (Exception ex) when (!ct.IsCancellationRequested)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Config sync connection lost, retrying in {Delay}...",
                     RetryDelays[Math.Min(retryIndex, RetryDelays.Length - 1)]);
 
-                await Task.Delay(RetryDelays[Math.Min(retryIndex, RetryDelays.Length - 1)], ct);
+                await Task.Delay(RetryDelays[Math.Min(retryIndex, RetryDelays.Length - 1)], stoppingToken);
                 retryIndex = Math.Min(retryIndex + 1, RetryDelays.Length - 1);
             }
         }
@@ -137,15 +123,9 @@ public class ConfigSyncService : IDisposable
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        if (!_disposed)
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _call?.Dispose();
-            _syncLock.Dispose();
-            _disposed = true;
-        }
+        base.Dispose();
+        _syncLock.Dispose();
     }
 }

@@ -8,14 +8,12 @@ namespace MinGo.DataPlane.ConfigSync;
 /// <summary>
 /// 配置查询处理器 - 通过 EventSubscription 双向流响应控制面的 CONFIG_QUERY
 /// </summary>
-public class ConfigQueryHandler : IDisposable
+public class ConfigQueryHandler : BackgroundService
 {
     private readonly EventSubscription.EventSubscriptionClient _client;
     private readonly DataPlaneConfigProvider _configProvider;
     private readonly ConfigSyncService _configSync;
     private readonly ILogger<ConfigQueryHandler> _logger;
-    private CancellationTokenSource? _cts;
-    private bool _disposed;
 
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(5);
 
@@ -31,22 +29,14 @@ public class ConfigQueryHandler : IDisposable
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _ = RunEventLoopAsync(_cts.Token);
-        return Task.CompletedTask;
-    }
-
-    private async Task RunEventLoopAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var call = _client.SubscribeEvents(cancellationToken: ct);
+                using var call = _client.SubscribeEvents(cancellationToken: stoppingToken);
 
-                // 发送订阅注册事件
                 await call.RequestStream.WriteAsync(new EventMessage
                 {
                     EventId = Guid.NewGuid().ToString("N")[..12],
@@ -58,20 +48,19 @@ public class ConfigQueryHandler : IDisposable
 
                 _logger.LogInformation("Event subscription established for data plane {DataPlaneId}", _configSync.DataPlaneId);
 
-                // 持续接收事件
-                await foreach (var eventMsg in call.ResponseStream.ReadAllAsync(ct))
+                await foreach (var eventMsg in call.ResponseStream.ReadAllAsync(stoppingToken))
                 {
-                    await HandleEventAsync(eventMsg, call, ct);
+                    await HandleEventAsync(eventMsg, call, stoppingToken);
                 }
             }
             catch (OperationCanceledException)
             {
                 break;
             }
-            catch (Exception ex) when (!ct.IsCancellationRequested)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Event subscription connection lost, retrying in {Delay}s...", ReconnectDelay.Seconds);
-                await Task.Delay(ReconnectDelay, ct);
+                await Task.Delay(ReconnectDelay, stoppingToken);
             }
         }
     }
@@ -119,16 +108,6 @@ public class ConfigQueryHandler : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle CONFIG_QUERY {EventId}", queryMsg.EventId);
-        }
-    }
-
-    public void Dispose()
-    {
-        if (!_disposed)
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _disposed = true;
         }
     }
 }
