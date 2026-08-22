@@ -27,6 +27,8 @@ builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.EventSubscription.EventSubsc
 builder.Services.AddSingleton<TelemetryStore>();
 
 // 后台服务：配置同步、事件订阅、心跳上报
+// ConfigSyncService 需要同时注册为 Singleton，因为 ConfigQueryHandler 和 HeartbeatReporter 依赖它
+builder.Services.AddSingleton<ConfigSyncService>();
 builder.Services.AddHostedService<ConfigSyncService>();
 builder.Services.AddHostedService<ConfigQueryHandler>();
 builder.Services.AddHostedService<HeartbeatReporter>();
