@@ -1,4 +1,4 @@
-import { createSignal, For } from 'solid-js';
+import { createSignal, For, onMount } from 'solid-js';
 import { api } from '../api/client';
 import type { AccessLog } from '../types';
 import { FaSolidSearch, FaSolidRefresh } from 'solid-icons/fa';
@@ -7,12 +7,18 @@ export default function LogsPage() {
   const [logs, setLogs] = createSignal<AccessLog[]>([]);
   const [search, setSearch] = createSignal('');
 
-  const handleSearch = async () => {
+  const fetchLogs = async (message = '') => {
     try {
-      const data = await api.get<AccessLog[]>(`/logs/access?pageSize=50&message=${search()}`);
+      const params = new URLSearchParams({ pageSize: '100' });
+      if (message) params.set('message', message);
+      const data = await api.get<AccessLog[]>(`/logs/access?${params}`);
       setLogs(data || []);
     } catch { /* ignore */ }
   };
+
+  onMount(() => fetchLogs());
+
+  const handleSearch = () => fetchLogs(search());
 
   const logClass = (status: number) => {
     if (status >= 500) return 'text-danger';
@@ -50,7 +56,8 @@ export default function LogsPage() {
             )}</For>
           ) : (
             <div class="text-center text-secondary py-8">
-              <p>点击"查询"查看日志</p>
+              <p>暂无访问日志</p>
+              <p class="text-xs mt-1">日志将在网关处理请求后显示</p>
             </div>
           )}
         </div>

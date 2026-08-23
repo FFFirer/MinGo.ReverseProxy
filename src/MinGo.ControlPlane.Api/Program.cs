@@ -10,6 +10,10 @@ using MinGo.Core.Services;
 using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
 using MinGo.ControlPlane.Api.Services;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 
 Console.WriteLine("Starting MinGo Control Plane...");
@@ -103,6 +107,24 @@ builder.Services.AddSingleton<EventSubscriptionService>();
 
 // 配置变更 gRPC 广播
 builder.Services.AddHostedService<MinGo.ControlPlane.Api.Services.ConfigUpdateGrpcBroadcaster>();
+
+// OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
+var otelSection = builder.Configuration.GetSection("OpenTelemetry");
+if (otelSection.GetValue<bool>("Enabled", true))
+{
+    var otelEndpoint = otelSection["OtlpEndpoint"] ?? "http://localhost:4317";
+    var serviceName = otelSection["ServiceName"] ?? "min-go-control-plane";
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService(serviceName))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+}
 
 var app = builder.Build();
 

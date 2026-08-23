@@ -1,7 +1,10 @@
 using Grpc.Core;
 using MinGo.Core.Entities;
 using MinGo.Core.Interfaces;
+using MinGo.Core.Services;
 using MinGo.DataPlane.Grpc;
+using CoreMetricPoint = MinGo.Core.Services.MetricPoint;
+using CoreAccessLogEntry = MinGo.Core.Services.AccessLogEntry;
 
 namespace MinGo.ControlPlane.Api.GrpcServices;
 
@@ -12,15 +15,18 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
 {
     private readonly DataPlaneConnectionManager _connectionManager;
     private readonly IGatewayInstanceService _instanceService;
+    private readonly TelemetryStore _telemetryStore;
     private readonly ILogger<HeartbeatCollectService> _logger;
 
     public HeartbeatCollectService(
         DataPlaneConnectionManager connectionManager,
         IGatewayInstanceService instanceService,
+        TelemetryStore telemetryStore,
         ILogger<HeartbeatCollectService> logger)
     {
         _connectionManager = connectionManager;
         _instanceService = instanceService;
+        _telemetryStore = telemetryStore;
         _logger = logger;
     }
 
@@ -51,15 +57,52 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
                     IsHealthy = request.IsHealthy
                 });
 
+                // 写入遥测指标到 TelemetryStore
+                foreach (var grpcPoint in request.Metrics)
+                {
+                    var tags = new Dictionary<string, object>();
+                    foreach (var (key, val) in grpcPoint.Tags)
+                    {
+                        tags[key] = val;
+                    }
+                    // 标记数据来源
+                    tags["instance_id"] = request.DataPlaneId;
+
+                    _telemetryStore.AddMetric(grpcPoint.Name, new CoreMetricPoint
+                    {
+                        Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(grpcPoint.TimestampUnixMs).UtcDateTime,
+                        Value = grpcPoint.Value,
+                        Tags = tags
+                    });
+                }
+
+                // 写入访问日志到 TelemetryStore
+                foreach (var grpcLog in request.AccessLogs)
+                {
+                    _telemetryStore.AddAccessLog(new CoreAccessLogEntry
+                    {
+                        Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(grpcLog.TimestampUnixMs).UtcDateTime,
+                        Method = grpcLog.Method,
+                        Path = grpcLog.Path,
+                        StatusCode = grpcLog.StatusCode,
+                        DurationMs = grpcLog.DurationMs,
+                        ClientIp = grpcLog.ClientIp,
+                        Route = grpcLog.Route,
+                        InstanceId = request.DataPlaneId
+                    });
+                }
+
                 // 记录指标日志
                 _logger.LogDebug(
-                    "Heartbeat from {DataPlaneId}: CPU={Cpu} MEM={Mem} Reqs={Total}({Err} err) Healthy={Healthy}",
+                    "Heartbeat from {DataPlaneId}: CPU={Cpu} MEM={Mem} Reqs={Total}({Err} err) Healthy={Healthy} Metrics={MetricCount} Logs={LogCount}",
                     request.DataPlaneId,
                     request.CpuUsage.ToString("F1"),
                     request.MemoryUsage.ToString("F1"),
                     request.TotalRequests,
                     request.ErrorRequests,
-                    request.IsHealthy);
+                    request.IsHealthy,
+                    request.Metrics.Count,
+                    request.AccessLogs.Count);
 
                 // 发送确认响应
                 var response = new HeartbeatResponse

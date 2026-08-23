@@ -31,6 +31,8 @@ services:
       - Kestrel__Endpoints__gRPC__Url=http://+:5001
       - Kestrel__Endpoints__gRPC__Protocols=Http2
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+      - OpenTelemetry__Enabled=true
+      - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
       interval: 15s
@@ -40,6 +42,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      aspire-dashboard:
+        condition: service_started
     volumes:
       - ./data:/app/data
     restart: unless-stopped
@@ -57,9 +61,23 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080;https://+:8443
       - ControlPlane__GrpcUrl=http://control-plane:5001
+      - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
     depends_on:
       control-plane:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
+    restart: unless-stopped
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    container_name: min-go-aspire-dashboard
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+    ports:
+      - "18888:18888"   # Dashboard UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
     restart: unless-stopped
 
   # frontend 服务已合并到 control-plane 中

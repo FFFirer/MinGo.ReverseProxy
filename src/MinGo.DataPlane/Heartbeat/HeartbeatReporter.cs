@@ -96,18 +96,39 @@ public class HeartbeatReporter : BackgroundService
             TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         };
 
+        // 添加访问日志
+        var accessLogs = _telemetryStore.DrainAccessLogs(200);
+        foreach (var log in accessLogs)
+        {
+            request.AccessLogs.Add(new Grpc.AccessLogEntry
+            {
+                TimestampUnixMs = new DateTimeOffset(log.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
+                Method = log.Method,
+                Path = log.Path,
+                StatusCode = log.StatusCode,
+                DurationMs = log.DurationMs,
+                ClientIp = log.ClientIp,
+                Route = log.Route
+            });
+        }
+
         // 添加遥测指标点
         foreach (var (name, points) in _telemetryStore.Metrics)
         {
             var pointsList = points.ToList();
             foreach (var point in pointsList.Skip(Math.Max(0, pointsList.Count - 10)))
             {
-                request.Metrics.Add(new Grpc.MetricPoint
+                var grpcPoint = new Grpc.MetricPoint
                 {
                     Name = name,
                     Value = point.Value,
                     TimestampUnixMs = new DateTimeOffset(point.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds()
-                });
+                };
+                foreach (var (key, val) in point.Tags)
+                {
+                    grpcPoint.Tags[key] = val?.ToString() ?? "";
+                }
+                request.Metrics.Add(grpcPoint);
             }
         }
 

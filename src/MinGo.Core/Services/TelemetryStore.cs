@@ -29,6 +29,11 @@ namespace MinGo.Core.Services
         public ConcurrentQueue<string> Logs { get; } = new();
 
         /// <summary>
+        /// 结构化访问日志环形缓冲区
+        /// </summary>
+        public ConcurrentQueue<AccessLogEntry> AccessLogs { get; } = new();
+
+        /// <summary>
         /// 添加跟踪数据
         /// </summary>
         /// <param name="activity">活动对象</param>
@@ -71,6 +76,46 @@ namespace MinGo.Core.Services
                 Logs.TryDequeue(out _);
             }
         }
+
+        /// <summary>
+        /// 添加访问日志
+        /// </summary>
+        public void AddAccessLog(AccessLogEntry entry)
+        {
+            AccessLogs.Enqueue(entry);
+            while (AccessLogs.Count > 5000)
+            {
+                AccessLogs.TryDequeue(out _);
+            }
+        }
+
+        /// <summary>
+        /// 批量取出并清空访问日志（用于心跳上报）
+        /// </summary>
+        public List<AccessLogEntry> DrainAccessLogs(int maxCount = 200)
+        {
+            var result = new List<AccessLogEntry>();
+            while (result.Count < maxCount && AccessLogs.TryDequeue(out var entry))
+            {
+                result.Add(entry);
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// 访问日志条目
+    /// </summary>
+    public class AccessLogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Method { get; set; } = "";
+        public string Path { get; set; } = "";
+        public int StatusCode { get; set; }
+        public long DurationMs { get; set; }
+        public string ClientIp { get; set; } = "";
+        public string Route { get; set; } = "";
+        public string? InstanceId { get; set; }
     }
 
     /// <summary>

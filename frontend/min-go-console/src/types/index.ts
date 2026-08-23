@@ -133,6 +133,25 @@ export interface RequestMetrics {
   averageResponseTime: number;
 }
 
+export interface ServiceMetrics {
+  serviceId: string;
+  serviceName: string;
+  totalRequests: number;
+  errorRequests: number;
+  errorRate: number;
+  averageResponseTime: number;
+  lastUpdated: string;
+}
+
+export interface ErrorMetrics {
+  timestamp: string;
+  errorCode: string;
+  errorMessage: string;
+  count: number;
+  routeId?: string;
+  clusterId?: string;
+}
+
 export interface AccessLog {
   id: string;
   timestamp: string;

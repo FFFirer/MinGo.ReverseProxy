@@ -71,6 +71,17 @@ public class GatewayTelemetryMiddleware
             activity?.SetTag("route", route);
             activity?.SetTag("status", statusCode);
             activity?.SetTag("duration", duration);
+
+            _store.AddAccessLog(new AccessLogEntry
+            {
+                Timestamp = DateTime.UtcNow,
+                Method = ctx.Request.Method,
+                Path = ctx.Request.Path.ToString(),
+                StatusCode = statusCode,
+                DurationMs = (long)duration,
+                ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+                Route = route
+            });
         }
         catch (Exception ex)
         {

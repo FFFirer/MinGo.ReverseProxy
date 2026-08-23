@@ -6,6 +6,10 @@ using MinGo.DataPlane.Heartbeat;
 using MinGo.DataPlane.Telemetry;
 using MinGo.DataPlane.Kestrel;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 
 Console.WriteLine("Starting MinGo Data Plane...");
@@ -41,6 +45,26 @@ builder.Services.AddReverseProxy()
 
 // Kestrel 证书选择
 builder.Services.AddCertificateServices();
+
+// OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
+var otelSection = builder.Configuration.GetSection("OpenTelemetry");
+if (otelSection.GetValue<bool>("Enabled", true))
+{
+    var otelEndpoint = otelSection["OtlpEndpoint"] ?? "http://localhost:4317";
+    var serviceName = otelSection["ServiceName"] ?? "min-go-data-plane";
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService(serviceName))
+        .WithTracing(tracing => tracing
+            .AddSource("Gateway")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
+        .WithMetrics(metrics => metrics
+            .AddMeter("Gateway")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+}
 
 // 健康检查
 builder.Services.AddHealthChecks();
