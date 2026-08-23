@@ -63,6 +63,17 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             return;
         }
 
+        var nextVersion = BuildProxyConfig(snapshot);
+        UpdateInternal(nextVersion);
+        _currentVersion = snapshot.Version;
+        _lastApplySucceeded = true;
+        _logger.LogInformation("Config updated to version {Version} ({UpdateType}, {RouteCount} routes, {ClusterCount} clusters)",
+            snapshot.Version, snapshot.UpdateType, nextVersion.Routes.Count, nextVersion.Clusters.Count);
+    }
+
+    private DataPlaneProxyConfig BuildProxyConfig(ConfigSnapshot snapshot)
+    {
+
         var routes = new List<YarpRouteConfig>();
         var clusters = new List<YarpClusterConfig>();
 
@@ -89,7 +100,7 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
                 RouteId = route.Id,
                 ClusterId = route.ClusterId,
                 Match = match,
-                Transforms = transforms
+                // Transforms = transforms
             });
         }
 
@@ -107,22 +118,18 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             clusters.Add(new YarpClusterConfig
             {
                 ClusterId = cluster.Id,
-                LoadBalancingPolicy = string.IsNullOrEmpty(cluster.LoadBalancingPolicy) ? "RoundRobin" : cluster.LoadBalancingPolicy,
+                // LoadBalancingPolicy = string.IsNullOrEmpty(cluster.LoadBalancingPolicy) ? "RoundRobin" : cluster.LoadBalancingPolicy,
                 Destinations = destinations
             });
         }
 
-        lock (_lock)
-        {
-            var oldConfig = _config;
-            _config = new DataPlaneProxyConfig(routes, clusters, DateTime.UtcNow);
-            oldConfig.SignalChange();
-            _currentVersion = snapshot.Version;
-            _lastApplySucceeded = true;
-        }
+        return new DataPlaneProxyConfig(routes, clusters, DateTime.UtcNow);
+    }
 
-        _logger.LogInformation("Config updated to version {Version} ({UpdateType}, {RouteCount} routes, {ClusterCount} clusters)",
-            snapshot.Version, snapshot.UpdateType, routes.Count, clusters.Count);
+    private void UpdateInternal(DataPlaneProxyConfig proxyConfig)
+    {
+        var oldConfig = Interlocked.Exchange(ref _config, proxyConfig);
+        oldConfig.SignalChange();
     }
 
     /// <summary>
@@ -194,11 +201,12 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
     /// <summary>
     /// 获取当前配置中的证书数据
     /// </summary>
-    public IReadOnlyList<CertificateData> CurrentCertificates { get; private set; } = Array.Empty<CertificateData>();
+    private volatile IReadOnlyList<CertificateData> _certificates = Array.Empty<CertificateData>();
+    public IReadOnlyList<CertificateData> CurrentCertificates => _certificates;
 
     public void UpdateCertificates(IReadOnlyList<CertificateData> certificates)
     {
-        CurrentCertificates = certificates;
+        _certificates = certificates;
     }
 
     /// <summary>
@@ -280,8 +288,7 @@ internal class DestinationSnapshotDto
 
 internal class DataPlaneProxyConfig : IProxyConfig
 {
-    private CancellationTokenSource _cts = new();
-    private bool _disposed;
+    private readonly CancellationTokenSource _cts = new();
 
     public DataPlaneProxyConfig(
         IReadOnlyList<YarpRouteConfig> routes,
@@ -297,24 +304,17 @@ internal class DataPlaneProxyConfig : IProxyConfig
     public IReadOnlyList<YarpRouteConfig> Routes { get; }
     public IReadOnlyList<YarpClusterConfig> Clusters { get; }
     public DateTime ChangeTime { get; }
-    public IChangeToken ChangeToken { get; private set; }
+    public IChangeToken ChangeToken { get; }
 
     public void SignalChange()
     {
-        var previousCts = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
-        ChangeToken = new CancellationChangeToken(_cts.Token);
-        previousCts?.Cancel();
-        previousCts?.Dispose();
+        _cts.Cancel();
     }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _disposed = true;
-        }
+        _cts.Cancel();
+        _cts.Dispose();
     }
 }
 
