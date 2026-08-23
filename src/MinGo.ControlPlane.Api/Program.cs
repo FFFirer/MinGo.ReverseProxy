@@ -21,6 +21,9 @@ builder.Configuration.AddUserSecrets<Program>();
 // Serilog — 共享配置
 builder.Host.UseSerilog(SerilogSetup.ConfigureSharedSerilog());
 
+// NSwag
+builder.Services.AddOpenApiDocument().AddEndpointsApiExplorer();
+
 // 数据库（统一 AppDbContext）
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -105,6 +108,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseOpenApi();
+    app.UseSwaggerUi();
     app.UseCors("Frontend");
 }
 else
