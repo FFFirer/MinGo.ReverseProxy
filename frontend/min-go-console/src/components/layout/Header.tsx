@@ -1,8 +1,8 @@
-import { toggleTheme, isDark } from '../../store/theme';
+import { toggleTheme, isDark, mode } from '../../store/theme';
 import { user, logout } from '../../store/auth';
 import { toggleSidebar } from '../../store/sidebar';
 import { useNavigate } from '@solidjs/router';
-import { FaSolidBars, FaSolidSun, FaSolidMoon, FaSolidBell, FaSolidUser } from 'solid-icons/fa';
+import { FaSolidBars, FaSolidSun, FaSolidMoon, FaSolidDesktop, FaSolidBell, FaSolidUser } from 'solid-icons/fa';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -11,6 +11,16 @@ export default function Header() {
     await logout();
     navigate('/login');
   };
+
+  const themeIcon = () =>
+    mode() === 'system' ? <FaSolidDesktop class="text-xl" />
+    : isDark()           ? <FaSolidMoon class="text-xl" />
+    :                      <FaSolidSun class="text-xl" />;
+
+  const themeLabel = () =>
+    mode() === 'system' ? '跟随系统'
+    : isDark()           ? '深色模式'
+    :                      '浅色模式';
 
   return (
     <header class="bg-white dark:bg-dark-100 border-b border-gray-200 dark:border-dark-200 py-3 px-4 md:px-6 flex items-center justify-between z-50">
@@ -30,9 +40,10 @@ export default function Header() {
       <div class="flex items-center space-x-3">
         <button
           onClick={toggleTheme}
+          title={themeLabel()}
           class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 transition-colors duration-300 hover:text-primary dark:hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-full"
         >
-          {isDark() ? <FaSolidSun class="text-xl" /> : <FaSolidMoon class="text-xl" />}
+          {themeIcon()}
         </button>
         <div class="hidden md:flex items-center space-x-3">
           <button class="flex items-center justify-center w-10 h-10 text-gray-500 dark:text-gray-400 hover:text-primary rounded-full">
