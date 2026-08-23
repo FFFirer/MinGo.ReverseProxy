@@ -151,7 +151,20 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                 .Where(c => c.IsValid && c.CertificateData != null)
                 .ToListAsync();
 
-            foreach (var certEntity in certificates)
+            // 按域名分组，同一域名多张证书时选择有效期内最晚过期的
+            var grouped = certificates
+                .GroupBy(c => c.DomainName.ToLowerInvariant())
+                .Select(g =>
+                {
+                    var now = DateTimeOffset.Now;
+                    var validOnes = g.Where(c => c.ExpiresAt == null || c.ExpiresAt > now).ToList();
+                    return validOnes.Count > 0
+                        ? validOnes.OrderByDescending(c => c.ExpiresAt ?? DateTimeOffset.MaxValue).First()
+                        : g.OrderByDescending(c => c.ExpiresAt ?? DateTimeOffset.MinValue).First();
+                })
+                .ToList();
+
+            foreach (var certEntity in grouped)
             {
                 try
                 {
@@ -176,11 +189,9 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                         cert = X509CertificateLoader.LoadCertificate(certData);
                     }
 
-                    // 使用域名作为缓存键
                     var cacheKey = certEntity.DomainName.ToLowerInvariant();
                     _certificateCache.TryAdd(cacheKey, cert);
 
-                    // 缓存证书信息
                     var info = new CertificateInfo
                     {
                         DomainName = certEntity.DomainName,
@@ -191,17 +202,16 @@ public class CertificateManager : ICertificateManager, IServerCertificateSelecto
                     };
                     _certificateInfoCache.TryAdd(cacheKey, info);
 
-                    _logger.LogDebug("Loaded certificate for domain {Domain}, thumbprint: {Thumbprint}", 
+                    _logger.LogDebug("Loaded certificate for domain {Domain}, thumbprint: {Thumbprint}",
                         certEntity.DomainName, cert.Thumbprint);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to load certificate {Id} for domain {Domain}", 
+                    _logger.LogError(ex, "Failed to load certificate {Id} for domain {Domain}",
                         certEntity.Id, certEntity.DomainName);
                 }
             }
 
-            // 设置兜底证书（如果有多个证书，选择第一个）
             SetFallbackCertificate();
         }
         catch (Exception ex)

@@ -41,6 +41,68 @@ public class CertificatesController : ControllerBase
         return CreatedAtAction(nameof(GetCertificate), new { id = created.Id }, created);
     }
 
+    public record CertificateParseResult(
+        string DomainName,
+        string Subject,
+        string Issuer,
+        string Thumbprint,
+        string CertificateType,
+        DateTimeOffset NotBefore,
+        DateTimeOffset NotAfter,
+        bool IsValid,
+        string[] SanNames,
+        string? ExistingCertificateId = null,
+        string? ExistingDomainName = null);
+
+    [HttpPost("parse")]
+    public async Task<ActionResult<CertificateParseResult>> ParseCertificate(
+        IFormFile certificateFile,
+        [FromForm] string? password = null)
+    {
+        if (certificateFile == null || certificateFile.Length == 0)
+            return BadRequest("请选择证书文件");
+
+        using var memoryStream = new MemoryStream();
+        await certificateFile.CopyToAsync(memoryStream);
+        var certificateData = memoryStream.ToArray();
+
+        try
+        {
+            var cert = LoadCertificate(certificateData, password);
+            var sanNames = ExtractSanNames(cert);
+            var domainName = ExtractDomainName(cert);
+
+            string? existingId = null;
+            string? existingDomain = null;
+            var allCerts = await _apiManagementService.GetCertificatesAsync();
+            var existing = allCerts.FirstOrDefault(c =>
+                string.Equals(c.Thumbprint, cert.Thumbprint, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                existingId = existing.Id;
+                existingDomain = existing.DomainName;
+            }
+
+            return Ok(new CertificateParseResult(
+                domainName,
+                cert.Subject,
+                cert.Issuer,
+                cert.Thumbprint,
+                cert.HasPrivateKey ? "Pfx" : "Cer",
+                cert.NotBefore,
+                cert.NotAfter,
+                DateTime.Now >= cert.NotBefore && DateTime.Now <= cert.NotAfter,
+                sanNames,
+                existingId,
+                existingDomain));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "解析证书失败");
+            return BadRequest($"证书解析失败: {ex.Message}");
+        }
+    }
+
     [HttpPost("upload")]
     public async Task<ActionResult<CertificateConfig>> UploadCertificate(
         IFormFile certificateFile,
@@ -63,6 +125,18 @@ public class CertificatesController : ControllerBase
         {
             _logger.LogError(ex, "解析证书失败");
             return BadRequest($"证书解析失败: {ex.Message}");
+        }
+
+        // 按指纹去重：相同指纹的证书直接替换
+        var allCerts = await _apiManagementService.GetCertificatesAsync();
+        var existing = allCerts.FirstOrDefault(c =>
+            string.Equals(c.Thumbprint, certificateConfig.Thumbprint, StringComparison.OrdinalIgnoreCase));
+
+        if (existing != null)
+        {
+            certificateConfig.Id = existing.Id;
+            var updated = await _apiManagementService.UpdateCertificateAsync(existing.Id, certificateConfig);
+            return Ok(updated);
         }
 
         var created = await _apiManagementService.CreateCertificateAsync(certificateConfig);
@@ -121,5 +195,45 @@ public class CertificatesController : ControllerBase
         {
             return System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificateData);
         }
+    }
+
+    private static string ExtractDomainName(System.Security.Cryptography.X509Certificates.X509Certificate2 cert)
+    {
+        var cnMatch = System.Text.RegularExpressions.Regex.Match(cert.Subject, @"CN=([^,]+)");
+        return cnMatch.Success ? cnMatch.Groups[1].Value.Trim() : string.Empty;
+    }
+
+    private static string[] ExtractSanNames(System.Security.Cryptography.X509Certificates.X509Certificate2 cert)
+    {
+        var names = new List<string>();
+        foreach (var ext in cert.Extensions)
+        {
+            if (ext.Oid?.Value == "2.5.29.17")
+            {
+                var formatted = ext.Format(false);
+                if (!string.IsNullOrWhiteSpace(formatted))
+                {
+                    // Windows: "DNS Name=x, DNS Name=y"  Linux: "DNS:x, DNS:y"
+                    var entries = formatted.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var entry in entries)
+                    {
+                        string value;
+                        var eqIdx = entry.IndexOf('=');
+                        var colonIdx = entry.IndexOf(':');
+                        if (eqIdx > 0 && (colonIdx < 0 || eqIdx < colonIdx))
+                            value = entry.Substring(eqIdx + 1).Trim();
+                        else if (colonIdx > 0)
+                            value = entry.Substring(colonIdx + 1).Trim();
+                        else
+                            value = entry.Trim();
+
+                        if (!string.IsNullOrEmpty(value))
+                            names.Add(value);
+                    }
+                }
+                break;
+            }
+        }
+        return names.ToArray();
     }
 }

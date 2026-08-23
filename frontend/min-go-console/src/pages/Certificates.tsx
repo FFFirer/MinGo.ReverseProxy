@@ -1,7 +1,7 @@
-import { createSignal, onMount, For } from 'solid-js';
+import { createSignal, onMount, For, Show } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
-import type { CertificateConfig } from '../types';
+import type { CertificateConfig, CertificateParseResult } from '../types';
 import { FaSolidPlus, FaSolidUpload } from 'solid-icons/fa';
 
 export default function CertificatesPage() {
@@ -137,20 +137,51 @@ export default function CertificatesPage() {
 }
 
 function UploadCertModal(props: { onClose: () => void; onDone: () => void }) {
-  const [domainName, setDomainName] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [file, setFile] = createSignal<File | null>(null);
+  const [parsing, setParsing] = createSignal(false);
   const [uploading, setUploading] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
+  const [parsed, setParsed] = createSignal<CertificateParseResult | null>(null);
+  const [domainName, setDomainName] = createSignal('');
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
+  const handleParse = async () => {
     const errs: Record<string, string> = {};
-    if (!domainName().trim()) errs.domainName = '域名不能为空';
     if (!file()) errs.file = '请选择证书文件';
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
+    setParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append('certificateFile', file()!);
+      if (password()) formData.append('password', password());
+
+      const res = await fetch('/api/certificates/parse', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || '解析失败');
+      }
+      const result: CertificateParseResult = await res.json();
+      setParsed(result);
+      setDomainName(result.domainName);
+    } catch (err) {
+      addToast('error', `解析失败: ${(err as Error).message}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!domainName().trim()) {
+      setErrors({ domainName: '域名不能为空' });
+      return;
+    }
+    setErrors({});
     setUploading(true);
     try {
       const formData = new FormData();
@@ -167,7 +198,7 @@ function UploadCertModal(props: { onClose: () => void; onDone: () => void }) {
         const text = await res.text();
         throw new Error(text || '上传失败');
       }
-      addToast('success', '证书上传成功');
+      addToast('success', parsed()?.existingCertificateId ? '证书已更新' : '证书上传成功');
       props.onDone();
     } catch (err) {
       addToast('error', `上传失败: ${(err as Error).message}`);
@@ -180,29 +211,86 @@ function UploadCertModal(props: { onClose: () => void; onDone: () => void }) {
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={props.onClose}>
       <div class="card w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
         <h3 class="font-semibold mb-4">上传证书</h3>
-        <form onSubmit={handleSubmit} class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">域名</label>
-            <input class="input" value={domainName()} onInput={(e) => setDomainName(e.currentTarget.value)} placeholder="example.com" />
-            {errors().domainName && <p class="text-danger text-xs mt-1">{errors().domainName}</p>}
+
+        <Show when={!parsed()} fallback={
+          <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-dark-200 rounded-lg p-4 space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-secondary">类型</span>
+                <span class="font-medium">{parsed()!.certificateType}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-secondary">主题</span>
+                <span class="font-medium truncate ml-4" title={parsed()!.subject}>{parsed()!.subject || '-'}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-secondary">颁发者</span>
+                <span class="font-medium truncate ml-4" title={parsed()!.issuer}>{parsed()!.issuer || '-'}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-secondary">有效期</span>
+                <span class="font-medium">{new Date(parsed()!.notBefore).toLocaleDateString()} ~ {new Date(parsed()!.notAfter).toLocaleDateString()}</span>
+              </div>
+              <Show when={parsed()!.sanNames.length > 0}>
+                <div class="flex justify-between items-start">
+                  <span class="text-secondary">备用域名</span>
+                  <div class="text-right ml-4">
+                    <For each={parsed()!.sanNames}>{(name) =>
+                      <span class="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1">{name}</span>
+                    }</For>
+                  </div>
+                </div>
+              </Show>
+              <div class="flex justify-between">
+                <span class="text-secondary">指纹</span>
+                <span class="font-mono text-xs truncate ml-4" title={parsed()!.thumbprint}>{parsed()!.thumbprint}</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">域名</label>
+              <input class="input" value={domainName()} onInput={(e) => setDomainName(e.currentTarget.value)} placeholder="example.com" />
+              {errors().domainName && <p class="text-danger text-xs mt-1">{errors().domainName}</p>}
+              <Show when={parsed()!.sanNames.length > 1}>
+                <p class="text-secondary text-xs mt-1">检测到多个域名，请确认或手动修改</p>
+              </Show>
+            </div>
+
+            <Show when={parsed()!.existingCertificateId}>
+              <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 text-sm">
+                <p class="text-blue-700 dark:text-blue-300">
+                  系统中已有相同证书（域名: {parsed()!.existingDomainName}），将自动更新
+                </p>
+              </div>
+            </Show>
+
+            <div class="flex justify-end space-x-2">
+              <button type="button" class="btn btn-secondary" onClick={() => { setParsed(null); setDomainName(''); }}>重新选择</button>
+              <button type="button" class="btn btn-primary" disabled={uploading()} onClick={handleUpload}>
+                {uploading() ? '上传中...' : '确认上传'}
+              </button>
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">证书文件</label>
-            <input type="file" accept=".pfx,.cer,.crt,.pem" class="input"
-              onChange={(e) => setFile(e.currentTarget.files?.[0] || null)} />
-            {errors().file && <p class="text-danger text-xs mt-1">{errors().file}</p>}
+        }>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">证书文件</label>
+              <input type="file" accept=".pfx,.cer,.crt,.pem" class="input"
+                onChange={(e) => { setFile(e.currentTarget.files?.[0] || null); setParsed(null); setDomainName(''); }} />
+              {errors().file && <p class="text-danger text-xs mt-1">{errors().file}</p>}
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">密码 <span class="text-secondary text-xs">(可选，PFX文件)</span></label>
+              <input type="password" class="input" value={password()} onInput={(e) => setPassword(e.currentTarget.value)} placeholder="输入证书密码" />
+            </div>
+            <div class="flex justify-end space-x-2">
+              <button type="button" class="btn btn-secondary" onClick={props.onClose}>取消</button>
+              <button type="button" class="btn btn-primary" disabled={parsing() || !file()} onClick={handleParse}>
+                {parsing() ? '解析中...' : '解析证书'}
+              </button>
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">密码 <span class="text-secondary text-xs">(可选，PFX文件)</span></label>
-            <input type="password" class="input" value={password()} onInput={(e) => setPassword(e.currentTarget.value)} />
-          </div>
-          <div class="flex justify-end space-x-2">
-            <button type="button" class="btn btn-secondary" onClick={props.onClose}>取消</button>
-            <button type="submit" class="btn btn-primary" disabled={uploading()}>
-              {uploading() ? '上传中...' : '上传'}
-            </button>
-          </div>
-        </form>
+        </Show>
       </div>
     </div>
   );

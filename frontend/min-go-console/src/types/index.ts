@@ -80,6 +80,20 @@ export interface CertificateConfig {
   isValid: boolean;
 }
 
+export interface CertificateParseResult {
+  domainName: string;
+  subject: string;
+  issuer: string;
+  thumbprint: string;
+  certificateType: string;
+  notBefore: string;
+  notAfter: string;
+  isValid: boolean;
+  sanNames: string[];
+  existingCertificateId?: string;
+  existingDomainName?: string;
+}
+
 export interface GatewayInstance {
   instanceId: string;
   name: string;
