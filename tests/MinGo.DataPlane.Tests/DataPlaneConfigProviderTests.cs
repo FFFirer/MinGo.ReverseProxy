@@ -11,8 +11,11 @@ public class DataPlaneConfigProviderTests
 
     public DataPlaneConfigProviderTests()
     {
+        var inMemoryProvider = new Yarp.ReverseProxy.Configuration.InMemoryConfigProvider(
+            Array.Empty<Yarp.ReverseProxy.Configuration.RouteConfig>(),
+            Array.Empty<Yarp.ReverseProxy.Configuration.ClusterConfig>());
         var logger = new Mock<ILogger<DataPlaneConfigProvider>>();
-        _provider = new DataPlaneConfigProvider(logger.Object);
+        _provider = new DataPlaneConfigProvider(inMemoryProvider, logger.Object);
     }
 
     private static ConfigSnapshot CreateValidSnapshot(int version = 1) => new()

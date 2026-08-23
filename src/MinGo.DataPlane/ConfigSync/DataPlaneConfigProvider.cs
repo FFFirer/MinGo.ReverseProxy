@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
 using MinGo.DataPlane.Grpc;
 using Yarp.ReverseProxy.Configuration;
 using YarpRouteConfig = Yarp.ReverseProxy.Configuration.RouteConfig;
@@ -11,36 +11,35 @@ using YarpDestinationConfig = Yarp.ReverseProxy.Configuration.DestinationConfig;
 namespace MinGo.DataPlane.ConfigSync;
 
 /// <summary>
-/// 数据面配置提供程序 - 从 gRPC ConfigSnapshot 构建 YARP 配置
-/// 不直接访问数据库
+/// 数据面配置适配器 - 负责 gRPC ConfigSnapshot 到 YARP Routes/Clusters 的转换与校验
+/// 配置基础设施（ChangeToken、原子交换）委托给 InMemoryConfigProvider
 /// </summary>
-public class DataPlaneConfigProvider : IProxyConfigProvider
+public class DataPlaneConfigProvider
 {
     private static readonly HashSet<string> AllowedLoadBalancingPolicies = new(StringComparer.OrdinalIgnoreCase)
     {
         "RoundRobin", "LeastRequests", "PowerOfTwoChoices", "FirstAlphabetical", "Random"
     };
 
-    private volatile DataPlaneProxyConfig _config;
+    private readonly Lazy<InMemoryConfigProvider> _provider;
     private readonly ILogger<DataPlaneConfigProvider> _logger;
-    private readonly object _lock = new();
     private int _currentVersion;
     private volatile bool _lastApplySucceeded;
 
-    public DataPlaneConfigProvider(ILogger<DataPlaneConfigProvider> logger)
+    public DataPlaneConfigProvider(
+        IServiceProvider services,
+        ILogger<DataPlaneConfigProvider> logger)
     {
+        _provider = new Lazy<InMemoryConfigProvider>(() =>
+            services.GetRequiredKeyedService<InMemoryConfigProvider>("DataPlane"));
         _logger = logger;
-        _config = new DataPlaneProxyConfig(
-            Array.Empty<YarpRouteConfig>(),
-            Array.Empty<YarpClusterConfig>(),
-            DateTime.UtcNow);
     }
 
     public int CurrentVersion => _currentVersion;
 
     public bool LastApplySucceeded => _lastApplySucceeded;
 
-    public IProxyConfig GetConfig() => _config;
+    public IProxyConfig GetConfig() => _provider.Value.GetConfig();
 
     /// <summary>
     /// 应用来自控制面的配置快照
@@ -63,17 +62,16 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             return;
         }
 
-        var nextVersion = BuildProxyConfig(snapshot);
-        UpdateInternal(nextVersion);
+        var (routes, clusters) = TranslateConfig(snapshot);
+        _provider.Value.Update(routes, clusters);
         _currentVersion = snapshot.Version;
         _lastApplySucceeded = true;
         _logger.LogInformation("Config updated to version {Version} ({UpdateType}, {RouteCount} routes, {ClusterCount} clusters)",
-            snapshot.Version, snapshot.UpdateType, nextVersion.Routes.Count, nextVersion.Clusters.Count);
+            snapshot.Version, snapshot.UpdateType, routes.Count, clusters.Count);
     }
 
-    private DataPlaneProxyConfig BuildProxyConfig(ConfigSnapshot snapshot)
+    private (List<YarpRouteConfig> Routes, List<YarpClusterConfig> Clusters) TranslateConfig(ConfigSnapshot snapshot)
     {
-
         var routes = new List<YarpRouteConfig>();
         var clusters = new List<YarpClusterConfig>();
 
@@ -123,13 +121,7 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
             });
         }
 
-        return new DataPlaneProxyConfig(routes, clusters, DateTime.UtcNow);
-    }
-
-    private void UpdateInternal(DataPlaneProxyConfig proxyConfig)
-    {
-        var oldConfig = Interlocked.Exchange(ref _config, proxyConfig);
-        oldConfig.SignalChange();
+        return (routes, clusters);
     }
 
     /// <summary>
@@ -214,11 +206,10 @@ public class DataPlaneConfigProvider : IProxyConfigProvider
     /// </summary>
     public string GetConfigSnapshotJson()
     {
-        var config = _config;
+        var config = _provider.Value.GetConfig();
         var snapshot = new ConfigSnapshotDto
         {
             Version = _currentVersion,
-            ChangeTime = config.ChangeTime,
             Routes = config.Routes.Select(r => new RouteSnapshotDto
             {
                 RouteId = r.RouteId,
@@ -286,44 +277,17 @@ internal class DestinationSnapshotDto
     public bool Healthy { get; set; } = true;
 }
 
-internal class DataPlaneProxyConfig : IProxyConfig
-{
-    private readonly CancellationTokenSource _cts = new();
-
-    public DataPlaneProxyConfig(
-        IReadOnlyList<YarpRouteConfig> routes,
-        IReadOnlyList<YarpClusterConfig> clusters,
-        DateTime changeTime)
-    {
-        Routes = routes;
-        Clusters = clusters;
-        ChangeTime = changeTime;
-        ChangeToken = new CancellationChangeToken(_cts.Token);
-    }
-
-    public IReadOnlyList<YarpRouteConfig> Routes { get; }
-    public IReadOnlyList<YarpClusterConfig> Clusters { get; }
-    public DateTime ChangeTime { get; }
-    public IChangeToken ChangeToken { get; }
-
-    public void SignalChange()
-    {
-        _cts.Cancel();
-    }
-
-    public void Dispose()
-    {
-        _cts.Cancel();
-        _cts.Dispose();
-    }
-}
-
 public static class DataPlaneConfigProviderExtensions
 {
     public static IReverseProxyBuilder LoadFromDataPlaneProvider(this IReverseProxyBuilder builder)
     {
+        builder.Services.AddKeyedSingleton<InMemoryConfigProvider>("DataPlane", (_, _) =>
+            new InMemoryConfigProvider(
+                Array.Empty<YarpRouteConfig>(),
+                Array.Empty<YarpClusterConfig>()));
+        builder.Services.AddSingleton<IProxyConfigProvider>(sp =>
+            sp.GetRequiredKeyedService<InMemoryConfigProvider>("DataPlane"));
         builder.Services.AddSingleton<DataPlaneConfigProvider>();
-        builder.Services.AddSingleton<IProxyConfigProvider>(sp => sp.GetRequiredService<DataPlaneConfigProvider>());
         return builder;
     }
 }
