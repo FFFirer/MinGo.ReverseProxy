@@ -1,5 +1,6 @@
 using MinGo.Core.Logging;
 using MinGo.Core.Services;
+using MinGo.DataPlane;
 using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Heartbeat;
 using MinGo.DataPlane.Telemetry;
@@ -27,8 +28,8 @@ builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.EventSubscription.EventSubsc
 builder.Services.AddSingleton<TelemetryStore>();
 
 // 后台服务：配置同步、事件订阅、心跳上报
-// ConfigSyncService 需要同时注册为 Singleton，因为 ConfigQueryHandler 和 HeartbeatReporter 依赖它
-builder.Services.AddSingleton<ConfigSyncService>();
+// GatewayIdentity 为所有服务提供统一的 DataPlaneId，程序启动时即就绪
+builder.Services.AddSingleton<GatewayIdentity>();
 builder.Services.AddHostedService<ConfigSyncService>();
 builder.Services.AddHostedService<ConfigQueryHandler>();
 builder.Services.AddHostedService<HeartbeatReporter>();

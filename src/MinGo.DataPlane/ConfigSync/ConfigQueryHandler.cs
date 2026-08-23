@@ -12,7 +12,7 @@ public class ConfigQueryHandler : BackgroundService
 {
     private readonly EventSubscription.EventSubscriptionClient _client;
     private readonly DataPlaneConfigProvider _configProvider;
-    private readonly ConfigSyncService _configSync;
+    private readonly GatewayIdentity _identity;
     private readonly ILogger<ConfigQueryHandler> _logger;
 
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(5);
@@ -20,12 +20,12 @@ public class ConfigQueryHandler : BackgroundService
     public ConfigQueryHandler(
         EventSubscription.EventSubscriptionClient client,
         DataPlaneConfigProvider configProvider,
-        ConfigSyncService configSync,
+        GatewayIdentity identity,
         ILogger<ConfigQueryHandler> logger)
     {
         _client = client;
         _configProvider = configProvider;
-        _configSync = configSync;
+        _identity = identity;
         _logger = logger;
     }
 
@@ -41,12 +41,12 @@ public class ConfigQueryHandler : BackgroundService
                 {
                     EventId = Guid.NewGuid().ToString("N")[..12],
                     Type = EventType.InstanceStatusChange,
-                    Source = _configSync.DataPlaneId,
+                    Source = _identity.Id,
                     DataJson = """{"status":"connected"}""",
                     TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                 });
 
-                _logger.LogInformation("Event subscription established for data plane {DataPlaneId}", _configSync.DataPlaneId);
+                _logger.LogInformation("Event subscription established for data plane {DataPlaneId}", _identity.Id);
 
                 await foreach (var eventMsg in call.ResponseStream.ReadAllAsync(stoppingToken))
                 {
@@ -97,7 +97,7 @@ public class ConfigQueryHandler : BackgroundService
             {
                 EventId = queryMsg.EventId,
                 Type = EventType.ConfigReport,
-                Source = _configSync.DataPlaneId,
+                Source = _identity.Id,
                 DataJson = configJson,
                 TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };

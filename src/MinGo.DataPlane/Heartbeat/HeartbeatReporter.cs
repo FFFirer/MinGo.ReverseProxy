@@ -16,7 +16,7 @@ public class HeartbeatReporter : BackgroundService
     private readonly HeartbeatCollect.HeartbeatCollectClient _client;
     private readonly TelemetryStore _telemetryStore;
     private readonly DataPlaneConfigProvider _configProvider;
-    private readonly ConfigSyncService _configSync;
+    private readonly GatewayIdentity _identity;
     private readonly ILogger<HeartbeatReporter> _logger;
 
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
@@ -25,13 +25,13 @@ public class HeartbeatReporter : BackgroundService
         HeartbeatCollect.HeartbeatCollectClient client,
         TelemetryStore telemetryStore,
         DataPlaneConfigProvider configProvider,
-        ConfigSyncService configSync,
+        GatewayIdentity identity,
         ILogger<HeartbeatReporter> logger)
     {
         _client = client;
         _telemetryStore = telemetryStore;
         _configProvider = configProvider;
-        _configSync = configSync;
+        _identity = identity;
         _logger = logger;
     }
 
@@ -87,7 +87,7 @@ public class HeartbeatReporter : BackgroundService
 
         var request = new HeartbeatRequest
         {
-            DataPlaneId = _configSync.DataPlaneId,
+            DataPlaneId = _identity.Id,
             CpuUsage = 0,
             MemoryUsage = 0,
             TotalRequests = totalRequests,

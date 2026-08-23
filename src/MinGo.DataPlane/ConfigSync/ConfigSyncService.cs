@@ -14,8 +14,8 @@ public class ConfigSyncService : BackgroundService
     private readonly ConfigReplication.ConfigReplicationClient _client;
     private readonly DataPlaneConfigProvider _configProvider;
     private readonly DataPlaneCertificateSelector _certSelector;
+    private readonly GatewayIdentity _identity;
     private readonly ILogger<ConfigSyncService> _logger;
-    private readonly string _dataPlaneId;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private bool _initialConfigReceived;
 
@@ -30,16 +30,17 @@ public class ConfigSyncService : BackgroundService
         ConfigReplication.ConfigReplicationClient client,
         DataPlaneConfigProvider configProvider,
         DataPlaneCertificateSelector certSelector,
+        GatewayIdentity identity,
         ILogger<ConfigSyncService> logger)
     {
         _client = client;
         _configProvider = configProvider;
         _certSelector = certSelector;
+        _identity = identity;
         _logger = logger;
-        _dataPlaneId = Guid.NewGuid().ToString("N")[..8];
     }
 
-    public string DataPlaneId => _dataPlaneId;
+    public string DataPlaneId => _identity.Id;
 
     public bool InitialConfigReceived => _initialConfigReceived;
 
@@ -70,7 +71,7 @@ public class ConfigSyncService : BackgroundService
 
                 await call.RequestStream.WriteAsync(new ConfigSubscription
                 {
-                    DataPlaneId = _dataPlaneId,
+                    DataPlaneId = _identity.Id,
                     CurrentConfigVersion = _configProvider.CurrentVersion,
                     SubscribeCertificates = true
                 });
