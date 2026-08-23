@@ -39,6 +39,7 @@ builder.Services.AddHostedService<ConfigQueryHandler>();
 builder.Services.AddHostedService<HeartbeatReporter>();
 
 // YARP 反向代理 - 从 DataPlaneConfigProvider 加载配置
+// YARP 默认会添加 X-Forwarded-For/Proto/Host 头，无需额外配置
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .LoadFromDataPlaneProvider();
