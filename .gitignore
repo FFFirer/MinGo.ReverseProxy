@@ -110,4 +110,6 @@ coverage/
 # =========================
 omo/
 .opencode/
-/.omo/
+
+.mimocode/
+.omo/
