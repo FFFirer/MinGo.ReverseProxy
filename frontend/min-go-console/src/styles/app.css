@@ -2,6 +2,37 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* color-scheme: tell browser native controls (scrollbar, form elements) which theme to use */
+.dark { color-scheme: dark; }
+
+/* Base theme variables — resolved before any JS framework mounts */
+:root,
+:root[data-theme="light"] {
+  --bg: var(--color-gray-50);
+  --text: var(--color-gray-800);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--color-dark-200);
+    --text: var(--color-gray-200);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: var(--color-dark-200);
+  --text: var(--color-gray-200);
+}
+
+html, body {
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition-property: color, background-color;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+}
+
 @theme {
   --color-primary: #3b82f6;
   --color-secondary: #64748b;

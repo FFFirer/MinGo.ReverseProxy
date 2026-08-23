@@ -20,7 +20,10 @@ const [mode, setMode] = createSignal<ThemeMode>(readStoredMode());
 const [isDark, setIsDark] = createSignal(resolveDark(mode()));
 
 function applyTheme(dark: boolean) {
-  document.documentElement.classList.toggle('dark', dark);
+  const el = document.documentElement;
+  el.classList.toggle('dark', dark);
+  el.setAttribute('data-theme', dark ? 'dark' : 'light');
+  el.style.colorScheme = dark ? 'dark' : 'light';
   setIsDark(dark);
 }
 
