@@ -36,7 +36,7 @@ builder.Services.AddHostedService<HeartbeatReporter>();
 
 // YARP 反向代理 - 从 DataPlaneConfigProvider 加载配置
 builder.Services.AddReverseProxy()
-    .LoadFromConfig(builder.Configuration)
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .LoadFromDataPlaneProvider();
 
 // Kestrel 证书选择
@@ -67,8 +67,8 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
     }
 });
 
-// app.UseRouting();
-// app.UseGatewayTelemetry();
+app.UseRouting();
+app.UseGatewayTelemetry();
 app.UseSerilogRequestLogging();
 app.MapReverseProxy();
 
