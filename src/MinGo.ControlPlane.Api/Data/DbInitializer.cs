@@ -5,11 +5,11 @@ namespace MinGo.ControlPlane.Api.Data;
 
 /// <summary>
 /// 种子数据初始化器
-/// 仅在开发环境下首次运行时创建默认管理员账户
+/// 首次运行时创建默认管理员账户
 /// </summary>
 public static class DbInitializer
 {
-    public static async Task SeedDevelopmentDataAsync(IServiceProvider serviceProvider, IConfiguration configuration)
+    public static async Task SeedDataAsync(IServiceProvider serviceProvider, IConfiguration configuration)
     {
         var userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
 

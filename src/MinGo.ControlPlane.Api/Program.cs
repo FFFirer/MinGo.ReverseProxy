@@ -148,16 +148,13 @@ else
     app.UseStaticFiles();
 }
 
-if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var sp = scope.ServiceProvider;
-        sp.GetRequiredService<AppDbContext>().Database.Migrate();
+    var sp = scope.ServiceProvider;
+    sp.GetRequiredService<AppDbContext>().Database.Migrate();
 
-        // 种子数据：首次运行时创建默认管理员
-        await DbInitializer.SeedDevelopmentDataAsync(sp, app.Configuration);
-    }
+    // 种子数据：首次运行时创建默认管理员（所有环境）
+    await DbInitializer.SeedDataAsync(sp, app.Configuration);
 }
 
 // 连接配置查询服务与事件订阅服务（所有环境均需装配）
