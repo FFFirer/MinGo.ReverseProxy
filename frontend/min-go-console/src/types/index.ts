@@ -68,6 +68,86 @@ export interface HealthCheckPassiveConfig {
   reactivationPeriod: string;
 }
 
+// ── Portainer 只读发现 ──
+
+export interface PortainerSelfIdentity {
+  detected: boolean;
+  source: 'config' | 'hostname' | 'image' | 'none' | string;
+  stacks: string[];
+  containerCount: number;
+}
+
+export interface PortainerStatus {
+  enabled: boolean;
+  baseUrl?: string | null;
+  reachable: boolean;
+  version?: string | null;
+  endpointCount?: number | null;
+  apiKeyConfigured: boolean;
+  selfDetection: PortainerSelfIdentity;
+  error?: string | null;
+}
+
+export interface PortainerDiscovery {
+  connected: boolean;
+  version?: string | null;
+  self: PortainerSelfIdentity;
+  endpoints: PortainerEndpoint[];
+  excluded: PortainerExcludedContainer[];
+}
+
+export interface PortainerEndpoint {
+  id: number;
+  name: string;
+  engine: string;
+  status: string;
+  error?: string | null;
+  networks: PortainerNetwork[];
+}
+
+export interface PortainerNetwork {
+  name: string;
+  driver?: string | null;
+  isDefaultBridge: boolean;
+  dataPlaneAttached: boolean;
+  supportsContainerName: boolean;
+  groups: PortainerGroup[];
+}
+
+export interface PortainerGroup {
+  name: string;
+  source: 'compose' | 'standalone' | string;
+  containers: PortainerContainer[];
+}
+
+export interface PortainerContainer {
+  id: string;
+  name: string;
+  image: string;
+  service?: string | null;
+  ports: PortainerPort[];
+}
+
+export interface PortainerPort {
+  private: number;
+  public?: number | null;
+  bindIp?: string | null;
+  protocol: string;
+  addresses: PortainerAddressCandidates;
+}
+
+export interface PortainerAddressCandidates {
+  containerName?: string | null;
+  host?: string | null;
+}
+
+export interface PortainerExcludedContainer {
+  name: string;
+  reason: string;
+  stack?: string | null;
+  endpoint?: string | null;
+}
+
 export interface CertificateConfig {
   id: string;
   domainName: string;

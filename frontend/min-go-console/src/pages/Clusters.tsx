@@ -1,12 +1,22 @@
-import { createSignal, onMount, For, Index, type Component } from "solid-js";
+import { createSignal, onMount, For, Index, Show, type Component } from "solid-js";
 import { api } from "../api/client";
 import { addToast } from "../store/toast";
 import type {
   ClusterConfig,
   DestinationConfig,
   HealthCheckConfig,
+  PortainerStatus,
 } from "../types";
-import { FaSolidPlus, FaSolidEdit, FaSolidTrash, FaSolidTimes, FaSolidChevronRight, FaSolidChevronDown } from "solid-icons/fa";
+import {
+  FaSolidPlus,
+  FaSolidEdit,
+  FaSolidTrash,
+  FaSolidTimes,
+  FaSolidChevronRight,
+  FaSolidChevronDown,
+  FaSolidDownload,
+} from "solid-icons/fa";
+import PortainerImportModal from "../components/shared/PortainerImportModal";
 
 export default function ClustersPage() {
   const [clusters, setClusters] = createSignal<ClusterConfig[]>([]);
@@ -14,16 +24,55 @@ export default function ClustersPage() {
   const [editingCluster, setEditingCluster] =
     createSignal<ClusterConfig | null>(null);
   const [showModal, setShowModal] = createSignal(false);
+  const [portainerStatus, setPortainerStatus] = createSignal<PortainerStatus | null>(null);
+  const [portainerStatusLoading, setPortainerStatusLoading] = createSignal(true);
+  const [showPortainerImport, setShowPortainerImport] = createSignal(false);
+  const [importTargetClusterId, setImportTargetClusterId] = createSignal<string | undefined>();
+
+  const refreshClusters = async () => {
+    setClusters(await api.get<ClusterConfig[]>("/apimanagement/clusters"));
+  };
+
+  const loadPortainerStatus = async () => {
+    setPortainerStatusLoading(true);
+    try {
+      setPortainerStatus(await api.getPortainerStatus());
+    } catch {
+      // 状态获取失败不阻塞集群管理，打开向导时会再次尝试
+      setPortainerStatus(null);
+    } finally {
+      setPortainerStatusLoading(false);
+    }
+  };
 
   onMount(async () => {
     try {
-      setClusters(await api.get<ClusterConfig[]>("/apimanagement/clusters"));
+      await refreshClusters();
     } catch (err) {
       addToast("error", "加载集群列表失败");
     } finally {
       setLoading(false);
     }
   });
+
+  onMount(loadPortainerStatus);
+
+  const portainerDisabledReason = (): string | null => {
+    if (portainerStatusLoading()) return "正在检查 Portainer 配置...";
+    const status = portainerStatus();
+    if (!status) return null;
+    if (!status.enabled) {
+      return status.error || "Portainer 集成未启用（Portainer:Enabled=false）";
+    }
+    if (!status.apiKeyConfigured) return "未配置 Portainer:ApiKey";
+    if (!status.reachable) return status.error || "Portainer 不可达";
+    return null;
+  };
+
+  const openPortainerImport = (targetClusterId?: string) => {
+    setImportTargetClusterId(targetClusterId);
+    setShowPortainerImport(true);
+  };
 
   const handleSave = async (cluster: ClusterConfig) => {
     try {
@@ -64,15 +113,25 @@ export default function ClustersPage() {
           <h2 class="text-2xl font-bold mb-2">集群管理</h2>
           <p class="text-secondary">配置和管理后端服务集群</p>
         </div>
-        <button
-          class="btn btn-primary"
-          onClick={() => {
-            setEditingCluster(null);
-            setShowModal(true);
-          }}
-        >
-          <FaSolidPlus class="mr-2" />添加集群
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            class="btn btn-secondary"
+            disabled={portainerDisabledReason() !== null}
+            title={portainerDisabledReason() ?? "从 Portainer 发现容器并生成目标地址"}
+            onClick={() => openPortainerImport()}
+          >
+            <FaSolidDownload class="mr-2" />从 Portainer 导入
+          </button>
+          <button
+            class="btn btn-primary"
+            onClick={() => {
+              setEditingCluster(null);
+              setShowModal(true);
+            }}
+          >
+            <FaSolidPlus class="mr-2" />添加集群
+          </button>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -111,6 +170,15 @@ export default function ClustersPage() {
                   )}
                 </div>
                 <div class="flex space-x-2">
+                  <Show when={portainerDisabledReason() === null}>
+                    <button
+                      class="btn-text btn-text-primary"
+                      title="从 Portainer 导入并追加到此集群"
+                      onClick={() => openPortainerImport(cluster.id)}
+                    >
+                      <FaSolidDownload class="mr-1" />追加目标
+                    </button>
+                  </Show>
                   <button
                     class="btn-text btn-text-primary"
                     onClick={() => {
@@ -150,6 +218,20 @@ export default function ClustersPage() {
           onClose={() => setShowModal(false)}
         />
       )}
+
+      <Show when={showPortainerImport()}>
+        <PortainerImportModal
+          clusters={clusters()}
+          defaultTargetClusterId={importTargetClusterId()}
+          onClose={() => setShowPortainerImport(false)}
+          onImported={() => {
+            setShowPortainerImport(false);
+            void refreshClusters().catch(() =>
+              addToast("error", "刷新集群列表失败"),
+            );
+          }}
+        />
+      </Show>
     </div>
   );
 }

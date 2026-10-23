@@ -35,6 +35,11 @@ services:
       - OpenTelemetry__Enabled=true
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
       - Serilog__MinimumLevel__Default=Debug
+      # Portainer 只读导入（.env 提供，留空则功能禁用）
+      - Portainer__Enabled=${PORTAINER_ENABLED:-false}
+      - Portainer__BaseUrl=${PORTAINER_BASE_URL:-}
+      - Portainer__ApiKey=${PORTAINER_API_KEY:-}
+      - Portainer__HostAddress=${PORTAINER_HOST_ADDRESS:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
       interval: 15s

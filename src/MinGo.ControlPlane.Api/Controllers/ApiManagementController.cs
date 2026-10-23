@@ -72,6 +72,16 @@ public class ApiManagementController : ControllerBase
     [HttpPost("clusters")]
     public async Task<ActionResult<ClusterConfig>> CreateCluster([FromBody] ClusterConfig cluster)
     {
+        if (string.IsNullOrWhiteSpace(cluster.Id))
+        {
+            return BadRequest(new { message = "集群名称不能为空" });
+        }
+
+        if (await _apiManagementService.GetClusterAsync(cluster.Id) is not null)
+        {
+            return Conflict(new { message = $"集群 '{cluster.Id}' 已存在" });
+        }
+
         var created = await _apiManagementService.CreateClusterAsync(cluster);
         return CreatedAtAction(nameof(GetCluster), new { id = created.Id }, created);
     }

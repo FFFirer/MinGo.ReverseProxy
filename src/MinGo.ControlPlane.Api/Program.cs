@@ -7,6 +7,7 @@ using MinGo.Application.Services;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Logging;
 using MinGo.Core.Services;
+using MinGo.ControlPlane.Api.Configuration;
 using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
 using MinGo.ControlPlane.Api.Services;
@@ -107,6 +108,12 @@ builder.Services.AddSingleton<EventSubscriptionService>();
 
 // 配置变更 gRPC 广播
 builder.Services.AddHostedService<MinGo.ControlPlane.Api.Services.ConfigUpdateGrpcBroadcaster>();
+
+// Portainer 只读发现（配置驱动，不落库）
+builder.Services.Configure<PortainerOptions>(builder.Configuration.GetSection(PortainerOptions.SectionName));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<PortainerClient>();
+builder.Services.AddScoped<PortainerDiscoveryService>();
 
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");
