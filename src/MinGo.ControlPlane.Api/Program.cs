@@ -197,6 +197,10 @@ app.MapGrpcService<ConfigReplicationService>();
 app.MapGrpcService<HeartbeatCollectService>();
 app.MapGrpcService<EventSubscriptionService>();
 
+// 版本端点：前端用于检测新版本
+var appVersion = Environment.GetEnvironmentVariable("APP_VERSION") ?? "unknown";
+app.MapGet("/api/version", () => Results.Json(new { version = appVersion }));
+
 // 健康检查端点
 app.MapHealthChecks("/healthz/live", new HealthCheckOptions
 {

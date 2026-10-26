@@ -57,6 +57,8 @@ jobs:
           context: ${{ matrix.component.context }}
           file: ${{ matrix.component.dockerfile }}
           push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
           tags: |
             ${{ env.CONTAINER_REGISTRY }}/1mingo/${{ matrix.component.image }}:${{ env.VERSION }}
             ${{ env.CONTAINER_REGISTRY }}/1mingo/${{ matrix.component.image }}:latest

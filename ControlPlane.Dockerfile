@@ -53,6 +53,10 @@ RUN dotnet ef migrations bundle -c AppDbContext --configuration Release --no-bui
 # Stage 3: 运行阶段
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
+# 版本信息（从构建参数传入）
+ARG VERSION=unknown
+ENV APP_VERSION=${VERSION}
+
 # 安装 curl 用于容器健康检查
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \

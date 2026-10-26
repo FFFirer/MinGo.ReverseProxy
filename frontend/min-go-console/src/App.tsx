@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Suspense, Switch, Match } from 'solid-js';
+import { createEffect, onCleanup, Suspense, Switch, Match, Show } from 'solid-js';
 import { Router, Route, Navigate } from '@solidjs/router';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -13,7 +13,9 @@ import InstancesPage from './pages/Instances';
 import SettingsPage from './pages/Settings';
 import SecurityPage from './pages/Security';
 import Toast from './components/shared/Toast';
+import VersionUpdateNotification from './components/shared/VersionUpdateNotification';
 import { user, loading, fetchUser } from './store/auth';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 function ProtectedLayout(props: { children: any }) {
   return (
@@ -40,6 +42,8 @@ function ProtectedLayout(props: { children: any }) {
 }
 
 export default function App() {
+  const { newVersion, dismiss, reload } = useVersionCheck();
+
   createEffect(() => {
     fetchUser();
 
@@ -53,6 +57,13 @@ export default function App() {
   return (
     <Suspense fallback={<div class="flex items-center justify-center min-h-screen text-secondary">加载中...</div>}>
       <Toast />
+      <Show when={newVersion()}>
+        <VersionUpdateNotification
+          version={newVersion()}
+          onDismiss={dismiss}
+          onReload={reload}
+        />
+      </Show>
       <Router>
         <Route path="/login" component={Login} />
         <Route path="/" component={() => <Navigate href="/dashboard" />} />

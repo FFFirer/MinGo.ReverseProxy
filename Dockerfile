@@ -67,6 +67,10 @@ RUN dotnet ef migrations bundle --configuration Release --no-build --output /app
 # 第三阶段：发布
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
+# 版本信息（从构建参数传入）
+ARG VERSION=unknown
+ENV APP_VERSION=${VERSION}
+
 # 设置工作目录
 WORKDIR /app
 
