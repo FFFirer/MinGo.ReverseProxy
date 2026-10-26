@@ -6,6 +6,8 @@ import type {
   InstanceRouteInfo,
   InstanceClusterInfo,
 } from '../../types';
+import type { Column } from './Table';
+import Table from './Table';
 
 interface Props {
   instance: GatewayInstance;
@@ -50,6 +52,31 @@ export default function InstanceConfigModal(props: Props) {
   const handleOverlayClick = (e: MouseEvent) => {
     if (e.target === e.currentTarget) props.onClose();
   };
+
+  const routeColumns: Column<InstanceRouteInfo>[] = [
+    {
+      key: 'routeId',
+      title: '路由ID',
+      mobileVisible: true,
+      cell: (route) => <span class="font-mono text-xs">{route.routeId}</span>,
+    },
+    {
+      key: 'clusterId',
+      title: '目标集群',
+      cell: (route) => route.clusterId,
+    },
+    {
+      key: 'path',
+      title: '匹配路径',
+      mobileVisible: true,
+      cell: (route) => <span class="font-mono text-xs">{route.match?.path || '-'}</span>,
+    },
+    {
+      key: 'hosts',
+      title: '匹配域名',
+      cell: (route) => <span class="font-mono text-xs">{route.match?.hosts?.join(', ') || '-'}</span>,
+    },
+  ];
 
   return (
     <div
@@ -116,28 +143,12 @@ export default function InstanceConfigModal(props: Props) {
                       </div>
                     }
                   >
-                    <div class="overflow-x-auto">
-                      <table class="w-full text-sm">
-                        <thead>
-                          <tr class="border-b border-gray-200 dark:border-dark-200">
-                            <th class="text-left py-2 px-3 font-medium text-secondary">路由ID</th>
-                            <th class="text-left py-2 px-3 font-medium text-secondary">目标集群</th>
-                            <th class="text-left py-2 px-3 font-medium text-secondary">匹配路径</th>
-                            <th class="text-left py-2 px-3 font-medium text-secondary">匹配域名</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={config()?.routes ?? []}>{(route: InstanceRouteInfo) => (
-                            <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                              <td class="py-2 px-3 font-mono text-xs">{route.routeId}</td>
-                              <td class="py-2 px-3">{route.clusterId}</td>
-                              <td class="py-2 px-3 font-mono text-xs">{route.match?.path || '-'}</td>
-                              <td class="py-2 px-3 font-mono text-xs">{route.match?.hosts?.join(', ') || '-'}</td>
-                            </tr>
-                          )}</For>
-                        </tbody>
-                      </table>
-                    </div>
+                    <Table
+                      columns={routeColumns}
+                      data={config()?.routes ?? []}
+                      rowKey={(r) => r.routeId}
+                      compact
+                    />
                   </Show>
                 </div>
 

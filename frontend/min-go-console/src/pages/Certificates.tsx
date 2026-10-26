@@ -1,7 +1,9 @@
-import { createSignal, onMount, For, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { CertificateConfig, CertificateParseResult } from '../types';
+import type { Column } from '../components/shared/Table';
+import Table from '../components/shared/Table';
 import { FaSolidUpload } from 'solid-icons/fa';
 
 export default function CertificatesPage() {
@@ -40,6 +42,71 @@ export default function CertificatesPage() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
+  const columns: Column<CertificateConfig>[] = [
+    {
+      key: 'domain',
+      title: '域名',
+      mobileVisible: true,
+      cell: (cert) => <span class="font-medium">{cert.domainName}</span>,
+    },
+    {
+      key: 'type',
+      title: '类型',
+      cell: (cert) => cert.certificateType,
+    },
+    {
+      key: 'subject',
+      title: '主题',
+      cell: (cert) => <span class="text-sm">{cert.subject || '-'}</span>,
+    },
+    {
+      key: 'expiresAt',
+      title: '过期时间',
+      cell: (cert) => cert.expiresAt ? new Date(cert.expiresAt).toLocaleDateString() : '-',
+    },
+    {
+      key: 'countdown',
+      title: '过期倒计时',
+      cell: (cert) => {
+        const days = daysUntilExpiry(cert);
+        if (days === null) return '-';
+        if (days > 0) return <span class="text-success">{days} 天</span>;
+        return <span class="text-danger">已过期 {Math.abs(days)} 天</span>;
+      },
+    },
+    {
+      key: 'status',
+      title: '状态',
+      mobileVisible: true,
+      cell: (cert) => (
+        <span class={`badge ${cert.isValid ? 'badge-success' : 'badge-danger'}`}>
+          {cert.isValid ? '有效' : '无效'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      mobileVisible: true,
+      cell: (cert) => (
+        <div class="flex space-x-2">
+          <button
+            class="btn-text btn-text-primary"
+            onClick={(e) => { e.stopPropagation(); setEditingCert(cert); setShowManual(true); setShowUpload(false); }}
+          >
+            查看
+          </button>
+          <button
+            class="btn-text btn-text-danger"
+            onClick={(e) => { e.stopPropagation(); handleDelete(cert.id); }}
+          >
+            删除
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div class="mb-6 flex items-center justify-between">
@@ -55,64 +122,16 @@ export default function CertificatesPage() {
       </div>
 
       <div class="card">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="border-b border-gray-200 dark:border-dark-200">
-                <th class="text-left py-3 px-4 font-medium text-secondary">域名</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">类型</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">主题</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">过期时间</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">过期倒计时</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={certs()}>{(cert) => {
-                const days = daysUntilExpiry(cert);
-                return (
-                  <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                    <td class="py-3 px-4 font-medium">{cert.domainName}</td>
-                    <td class="py-3 px-4">{cert.certificateType}</td>
-                    <td class="py-3 px-4 text-sm">{cert.subject || '-'}</td>
-                    <td class="py-3 px-4">{cert.expiresAt ? new Date(cert.expiresAt).toLocaleDateString() : '-'}</td>
-                    <td class="py-3 px-4 text-sm">
-                      {days !== null ? (
-                        days > 0 ? (
-                          <span class="text-success">{days} 天</span>
-                        ) : (
-                          <span class="text-danger">已过期 {Math.abs(days)} 天</span>
-                        )
-                      ) : '-'}
-                    </td>
-                    <td class="py-3 px-4">
-                      <span class={`badge ${cert.isValid ? 'badge-success' : 'badge-danger'}`}>
-                        {cert.isValid ? '有效' : '无效'}
-                      </span>
-                    </td>
-                    <td class="py-3 px-4">
-                      <div class="flex space-x-2">
-                        <button class="btn-text btn-text-primary" onClick={() => { setEditingCert(cert); setShowManual(true); setShowUpload(false); }}>
-                          查看
-                        </button>
-                        <button class="btn-text btn-text-danger" onClick={() => handleDelete(cert.id)}>
-                          删除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              }}</For>
-              {!loading() && certs().length === 0 && (
-                <tr><td colspan="7" class="py-8 text-center text-secondary">暂无证书</td></tr>
-              )}
-              {loading() && (
-                <tr><td colspan="7" class="py-8 text-center text-secondary">加载中...</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Show when={loading()} fallback={
+          <Table
+            columns={columns}
+            data={certs()}
+            rowKey={(c) => c.id}
+            emptyMessage="暂无证书"
+          />
+        }>
+          <div class="py-12 text-center text-secondary">加载中...</div>
+        </Show>
       </div>
 
       {showUpload() && (

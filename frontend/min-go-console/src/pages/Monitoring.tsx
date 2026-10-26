@@ -2,6 +2,8 @@ import { createSignal, onMount, For, Show } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { MetricsSummary, ServiceMetrics, ErrorMetrics } from '../types';
+import type { Column } from '../components/shared/Table';
+import Table from '../components/shared/Table';
 
 export default function MonitoringPage() {
   const [timeRange, setTimeRange] = createSignal('1h');
@@ -35,6 +37,39 @@ export default function MonitoringPage() {
     setTimeRange(val);
     fetchAll();
   };
+
+  const serviceColumns: Column<ServiceMetrics>[] = [
+    {
+      key: 'name',
+      title: '路由',
+      mobileVisible: true,
+      cell: (svc) => <span class="font-mono text-xs">{svc.serviceName}</span>,
+    },
+    {
+      key: 'requests',
+      title: '请求数',
+      cell: (svc) => <span class="text-right">{svc.totalRequests}</span>,
+    },
+    {
+      key: 'errors',
+      title: '错误数',
+      cell: (svc) => <span class="text-right text-danger">{svc.errorRequests}</span>,
+    },
+    {
+      key: 'errorRate',
+      title: '错误率',
+      cell: (svc) => (
+        <span class={`text-right ${svc.errorRate > 0 ? 'text-danger' : 'text-success'}`}>
+          {svc.errorRate.toFixed(1)}%
+        </span>
+      ),
+    },
+    {
+      key: 'avgResponse',
+      title: '平均响应',
+      cell: (svc) => <span class="text-right">{svc.averageResponseTime.toFixed(1)}ms</span>,
+    },
+  ];
 
   return (
     <div>
@@ -78,33 +113,12 @@ export default function MonitoringPage() {
       <div class="card mb-6">
         <h3 class="font-semibold mb-4">服务指标</h3>
         <Show when={services().length > 0} fallback={<p class="text-secondary text-center py-4">暂无数据</p>}>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-gray-200 dark:border-dark-200">
-                  <th class="text-left py-2 px-3">路由</th>
-                  <th class="text-right py-2 px-3">请求数</th>
-                  <th class="text-right py-2 px-3">错误数</th>
-                  <th class="text-right py-2 px-3">错误率</th>
-                  <th class="text-right py-2 px-3">平均响应</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={services()}>{(svc, _) => (
-                  <tr class="border-b border-gray-100 dark:border-dark-200">
-                    <td class="py-2 px-3 font-mono text-xs">{svc.serviceName}</td>
-                    <td class="py-2 px-3 text-right">{svc.totalRequests}</td>
-                    <td class="py-2 px-3 text-right text-danger">{svc.errorRequests}</td>
-                    <td class="py-2 px-3 text-right">
-                      <span class={svc.errorRate > 0 ? 'text-danger' : 'text-success'}>{svc.errorRate.toFixed(1)}%</span>
-                    </td>
-                    <td class="py-2 px-3 text-right">{svc.averageResponseTime.toFixed(1)}ms</td>
-                  </tr>
-                )}
-                </For>
-              </tbody>
-            </table>
-          </div>
+          <Table
+            columns={serviceColumns}
+            data={services()}
+            rowKey={(s) => s.serviceId}
+            expandable={false}
+          />
         </Show>
       </div>
 

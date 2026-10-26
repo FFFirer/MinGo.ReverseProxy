@@ -1,7 +1,9 @@
-import { createSignal, onMount, For, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { GatewayInstance } from '../types';
+import type { Column } from '../components/shared/Table';
+import Table from '../components/shared/Table';
 import InstanceConfigModal from '../components/shared/InstanceConfigModal';
 
 export default function InstancesPage() {
@@ -80,6 +82,104 @@ export default function InstancesPage() {
   const offlineCount = () => instances().filter(i => i.status === 'Offline').length;
   const timeoutCount = () => instances().filter(i => i.status === 'HeartbeatTimeout').length;
 
+  const columns: Column<GatewayInstance>[] = [
+    {
+      key: 'name',
+      title: '实例名称',
+      mobileVisible: true,
+      cell: (inst) => (
+        <div>
+          <div class="font-medium">{inst.name}</div>
+          {inst.version && inst.version !== 'unknown' && (
+            <div class="text-xs text-secondary">{inst.version}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'address',
+      title: '地址',
+      cell: (inst) => <span class="text-sm">{inst.address || inst.listenerAddresses?.[0] || '-'}</span>,
+    },
+    {
+      key: 'status',
+      title: '状态',
+      mobileVisible: true,
+      cell: (inst) => (
+        <span class={`badge ${statusBadge(inst.status)}`}>{statusLabel(inst.status)}</span>
+      ),
+    },
+    {
+      key: 'cpu',
+      title: 'CPU',
+      cell: (inst) => <span class="text-sm">{formatMetric(inst.cpuUsage)}%</span>,
+    },
+    {
+      key: 'memory',
+      title: '内存',
+      cell: (inst) => <span class="text-sm">{formatMetric(inst.memoryUsage)}%</span>,
+    },
+    {
+      key: 'requests',
+      title: '请求数',
+      cell: (inst) => (
+        <span class="text-sm">
+          <span class="text-success">{formatCount(inst.totalRequests)}</span>
+          {inst.errorRequests > 0 && (
+            <span class="text-danger ml-1">({formatCount(inst.errorRequests)})</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'errorRate',
+      title: '错误率',
+      cell: (inst) => (
+        <span class={`text-sm ${inst.errorRate > 5 ? 'text-danger' : inst.errorRate > 1 ? 'text-warning' : ''}`}>
+          {formatMetric(inst.errorRate, 1)}%
+        </span>
+      ),
+    },
+    {
+      key: 'uptime',
+      title: '运行时长',
+      cell: (inst) => <span class="text-sm">{formatUptime(inst.uptime)}</span>,
+    },
+    {
+      key: 'lastHeartbeat',
+      title: '最后心跳',
+      cell: (inst) => (
+        <span class="text-sm">
+          {inst.lastHeartbeat ? new Date(inst.lastHeartbeat).toLocaleString() : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      mobileVisible: true,
+      class: 'w-20',
+      cell: (inst) => (
+        <div class="flex gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfigTarget(inst); }}
+            class="btn-text-primary text-sm"
+            title="查看实例配置"
+          >
+            查看
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDelete(inst); }}
+            class="text-danger hover:text-red-400 text-sm"
+            title="删除实例"
+          >
+            删除
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div class="mb-6">
@@ -107,75 +207,17 @@ export default function InstancesPage() {
       </div>
 
       <div class="card">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="border-b border-gray-200 dark:border-dark-200">
-                <th class="text-left py-3 px-4 font-medium text-secondary">实例名称</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">地址</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">CPU</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">内存</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">请求数</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">错误率</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">运行时长</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">最后心跳</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary w-20">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={instances()}>{(inst) => (
-                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                  <td class="py-3 px-4">
-                    <div class="font-medium">{inst.name}</div>
-                    {inst.version && inst.version !== 'unknown' && (
-                      <div class="text-xs text-secondary">{inst.version}</div>
-                    )}
-                  </td>
-                  <td class="py-3 px-4 text-sm">{inst.address || (inst.listenerAddresses?.[0]) || '-'}</td>
-                  <td class="py-3 px-4">
-                    <span class={`badge ${statusBadge(inst.status)}`}>{statusLabel(inst.status)}</span>
-                  </td>
-                  <td class="py-3 px-4 text-sm">{formatMetric(inst.cpuUsage)}%</td>
-                  <td class="py-3 px-4 text-sm">{formatMetric(inst.memoryUsage)}%</td>
-                  <td class="py-3 px-4 text-sm">
-                    <span class="text-success">{formatCount(inst.totalRequests)}</span>
-                    {inst.errorRequests > 0 && (
-                      <span class="text-danger ml-1">({formatCount(inst.errorRequests)})</span>
-                    )}
-                  </td>
-                  <td class="py-3 px-4 text-sm">
-                    <span class={inst.errorRate > 5 ? 'text-danger' : inst.errorRate > 1 ? 'text-warning' : ''}>
-                      {formatMetric(inst.errorRate, 1)}%
-                    </span>
-                  </td>
-                  <td class="py-3 px-4 text-sm">{formatUptime(inst.uptime)}</td>
-                  <td class="py-3 px-4 text-sm">
-                    {inst.lastHeartbeat ? new Date(inst.lastHeartbeat).toLocaleString() : '-'}
-                  </td>
-                  <td class="py-3 px-4 flex gap-2">
-                    <button
-                      onClick={() => setConfigTarget(inst)}
-                      class="btn-text-primary text-sm"
-                      title="查看实例配置"
-                    >查看</button>
-                    <button
-                      onClick={() => handleDelete(inst)}
-                      class="text-danger hover:text-red-400 text-sm"
-                      title="删除实例"
-                    >删除</button>
-                  </td>
-                </tr>
-              )}</For>
-              {instances().length === 0 && (
-                <tr><td colspan="10" class="py-12 text-center text-secondary">
-                  <div class="text-lg mb-1">暂无实例</div>
-                  <div class="text-sm">等待数据面通过 gRPC 连接后，实例将自动出现在此列表</div>
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          columns={columns}
+          data={instances()}
+          rowKey={(i) => i.instanceId}
+          emptyMessage={
+            <div>
+              <div class="text-lg mb-1">暂无实例</div>
+              <div class="text-sm">等待数据面通过 gRPC 连接后，实例将自动出现在此列表</div>
+            </div>
+          }
+        />
       </div>
 
       <Show when={configTarget()}>
