@@ -36,6 +36,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('json')) {
+    // 典型场景：后端路由变更后，旧前端请求落到 SPA 回退拿到 HTML
+    throw new Error(
+      `服务返回了非 JSON 响应（HTTP ${res.status}），请确认控制面与前端版本一致`,
+    );
+  }
+
   return res.json();
 }
 
@@ -55,13 +64,24 @@ export const api = {
   getPortainerInstance: (id: string) =>
     request<import('../types').PortainerInstance>(`/portainer/instances/${encodeURIComponent(id)}`),
   createPortainerInstance: (data: import('../types').PortainerInstance) =>
-    request<import('../types').PortainerInstance>('/portainer/instances', data),
+    request<import('../types').PortainerInstance>('/portainer/instances', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   updatePortainerInstance: (id: string, data: import('../types').PortainerInstance) =>
-    request<import('../types').PortainerInstance>(`/portainer/instances/${encodeURIComponent(id)}`, data),
+    request<import('../types').PortainerInstance>(
+      `/portainer/instances/${encodeURIComponent(id)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
   deletePortainerInstance: (id: string) =>
-    request<void>(`/portainer/instances/${encodeURIComponent(id)}`),
+    request<void>(`/portainer/instances/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
   testPortainerInstance: (id: string) =>
-    request<import('../types').PortainerStatus>(`/portainer/instances/${encodeURIComponent(id)}/test`),
+    request<import('../types').PortainerStatus>(
+      `/portainer/instances/${encodeURIComponent(id)}/test`,
+      { method: 'POST' },
+    ),
 
   // Portainer 发现（按实例）
   getPortainerStatus: (instanceId: string) =>

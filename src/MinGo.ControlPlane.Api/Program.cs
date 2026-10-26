@@ -193,6 +193,17 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
 // SPA 回退：必须放在所有路由映射之后，防止吞掉 API/gRPC 404
 if (!app.Environment.IsDevelopment())
 {
+    // API 路径未命中任何路由时返回 404 JSON，避免 SPA 回退返回 HTML
+    // 导致前端 JSON 解析报 "Unexpected token '<'" 这类难以定位的错误
+    app.MapFallback("/api/{**path}", (HttpContext context) =>
+        Results.Json(
+            new
+            {
+                error = "NotFound",
+                message = $"API endpoint not found: {context.Request.Method} {context.Request.Path}",
+            },
+            statusCode: StatusCodes.Status404NotFound));
+
     app.MapFallbackToFile("index.html");
 }
 
