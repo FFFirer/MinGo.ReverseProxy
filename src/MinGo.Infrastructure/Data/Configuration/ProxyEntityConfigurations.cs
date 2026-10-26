@@ -55,3 +55,20 @@ public class ApiCertificateEntityConfiguration : IEntityTypeConfiguration<ApiCer
         builder.HasKey(c => c.Id);
     }
 }
+
+/// <summary>
+/// Portainer 实例实体配置
+/// </summary>
+public class PortainerInstanceEntityConfiguration : IEntityTypeConfiguration<PortainerInstanceEntity>
+{
+    public void Configure(EntityTypeBuilder<PortainerInstanceEntity> builder)
+    {
+        builder.ToTable("PortainerInstances");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(128);
+        builder.Property(e => e.Name).HasMaxLength(256);
+        builder.Property(e => e.BaseUrl).HasMaxLength(1024);
+        builder.Property(e => e.ApiKey).HasMaxLength(1024);
+        builder.Property(e => e.HostAddress).HasMaxLength(1024);
+    }
+}

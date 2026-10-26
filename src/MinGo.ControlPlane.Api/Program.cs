@@ -109,10 +109,12 @@ builder.Services.AddSingleton<EventSubscriptionService>();
 // 配置变更 gRPC 广播
 builder.Services.AddHostedService<MinGo.ControlPlane.Api.Services.ConfigUpdateGrpcBroadcaster>();
 
-// Portainer 只读发现（配置驱动，不落库）
+// Portainer 多实例管理（DB 存储 + 页面 CRUD）
 builder.Services.Configure<PortainerOptions>(builder.Configuration.GetSection(PortainerOptions.SectionName));
 builder.Services.AddMemoryCache();
-builder.Services.AddHttpClient<PortainerClient>();
+builder.Services.AddScoped<IPortainerInstanceService, PortainerInstanceService>();
+builder.Services.AddSingleton<PortainerClientFactory>();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<PortainerDiscoveryService>();
 
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)

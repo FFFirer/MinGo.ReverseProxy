@@ -68,7 +68,24 @@ export interface HealthCheckPassiveConfig {
   reactivationPeriod: string;
 }
 
-// ── Portainer 只读发现 ──
+// ── Portainer 多实例管理 ──
+
+export interface PortainerInstance {
+  id: string;
+  name: string;
+  enabled: boolean;
+  baseUrl: string;
+  apiKey: string;
+  timeoutSeconds: number;
+  cacheSeconds: number;
+  hostAddress?: string | null;
+  dataPlaneService: string;
+  selfStackNames: string[];
+  selfImagePatterns: string[];
+  extraExcludedStacks: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface PortainerSelfIdentity {
   detected: boolean;
@@ -78,6 +95,7 @@ export interface PortainerSelfIdentity {
 }
 
 export interface PortainerStatus {
+  instanceId: string;
   enabled: boolean;
   baseUrl?: string | null;
   reachable: boolean;
@@ -89,6 +107,7 @@ export interface PortainerStatus {
 }
 
 export interface PortainerDiscovery {
+  instanceId: string;
   connected: boolean;
   version?: string | null;
   self: PortainerSelfIdentity;

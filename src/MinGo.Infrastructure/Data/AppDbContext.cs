@@ -31,6 +31,11 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     /// </summary>
     public DbSet<ApiCertificateEntity> Certificates { get; set; }
 
+    /// <summary>
+    /// Portainer 实例表
+    /// </summary>
+    public DbSet<PortainerInstanceEntity> PortainerInstances { get; set; }
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
@@ -53,5 +58,6 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         builder.ApplyConfiguration(new ApiClusterEntityConfiguration());
         builder.ApplyConfiguration(new ApiDestinationEntityConfiguration());
         builder.ApplyConfiguration(new ApiCertificateEntityConfiguration());
+        builder.ApplyConfiguration(new PortainerInstanceEntityConfiguration());
     }
 }

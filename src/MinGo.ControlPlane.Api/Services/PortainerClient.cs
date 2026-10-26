@@ -1,14 +1,13 @@
 using System.Net;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
-using MinGo.ControlPlane.Api.Configuration;
 using MinGo.ControlPlane.Api.Models.Portainer;
+using MinGo.Core.Entities;
 
 namespace MinGo.ControlPlane.Api.Services;
 
 /// <summary>
 /// Portainer 只读 API 客户端（system/status、endpoints、containers、networks）。
-/// 仅依赖 2.39 与 2.45 均验证过的端点。
+/// 由 PortainerClientFactory 按实例创建，不再直接绑定 DI Options。
 /// </summary>
 public sealed class PortainerClient
 {
@@ -17,55 +16,61 @@ public sealed class PortainerClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _http;
-    private readonly PortainerOptions _options;
+    private readonly PortainerInstanceEntity _instance;
     private readonly ILogger<PortainerClient> _logger;
 
-    public PortainerClient(
+    internal PortainerClient(
         HttpClient http,
-        IOptions<PortainerOptions> options,
+        PortainerInstanceEntity instance,
         ILogger<PortainerClient> logger)
     {
         _http = http;
-        _options = options.Value;
+        _instance = instance;
         _logger = logger;
 
-        if (_options.TryGetBaseUri() is { } baseUri)
+        if (TryGetBaseUri(instance.BaseUrl) is { } baseUri)
         {
             _http.BaseAddress = EnsureTrailingSlash(baseUri);
         }
 
-        if (_options.ApiKeyConfigured)
+        if (!string.IsNullOrWhiteSpace(instance.ApiKey))
         {
-            _http.DefaultRequestHeaders.TryAddWithoutValidation(ApiKeyHeader, _options.ApiKey!.Trim());
+            _http.DefaultRequestHeaders.TryAddWithoutValidation(ApiKeyHeader, instance.ApiKey.Trim());
         }
 
-        _http.Timeout = TimeSpan.FromSeconds(Math.Clamp(_options.TimeoutSeconds, 1, 120));
+        _http.Timeout = TimeSpan.FromSeconds(Math.Clamp(instance.TimeoutSeconds, 1, 120));
     }
 
-    public bool IsConfigured => _options.IsConfigured && _http.BaseAddress is not null;
+    public string InstanceId => _instance.Id;
+
+    public bool IsConfigured =>
+        _instance.Enabled &&
+        !string.IsNullOrWhiteSpace(_instance.BaseUrl) &&
+        !string.IsNullOrWhiteSpace(_instance.ApiKey) &&
+        _http.BaseAddress is not null;
 
     public string? NotConfiguredReason
     {
         get
         {
-            if (!_options.Enabled)
+            if (!_instance.Enabled)
             {
-                return "Portainer 集成未启用（Portainer:Enabled=false）";
+                return $"Portainer 实例 '{_instance.Id}' 未启用";
             }
 
-            if (string.IsNullOrWhiteSpace(_options.BaseUrl))
+            if (string.IsNullOrWhiteSpace(_instance.BaseUrl))
             {
-                return "未配置 Portainer:BaseUrl";
+                return $"Portainer 实例 '{_instance.Id}' 未配置 BaseUrl";
             }
 
-            if (!_options.ApiKeyConfigured)
+            if (string.IsNullOrWhiteSpace(_instance.ApiKey))
             {
-                return "未配置 Portainer:ApiKey";
+                return $"Portainer 实例 '{_instance.Id}' 未配置 ApiKey";
             }
 
             if (_http.BaseAddress is null)
             {
-                return "Portainer:BaseUrl 不是合法的绝对 URL";
+                return $"Portainer 实例 '{_instance.Id}' 的 BaseUrl 不是合法的绝对 URL";
             }
 
             return null;
@@ -106,35 +111,42 @@ public sealed class PortainerClient
             if (!response.IsSuccessStatusCode)
             {
                 var message = DescribeHttpError(response.StatusCode, body);
-                _logger.LogWarning("Portainer 请求 {Path} 失败：{Status} {Message}", path, (int)response.StatusCode, message);
+                _logger.LogWarning("Portainer [{InstanceId}] 请求 {Path} 失败：{Status} {Message}",
+                    _instance.Id, path, (int)response.StatusCode, message);
                 throw new PortainerException(message, (int)response.StatusCode);
             }
         }
         catch (HttpRequestException ex)
         {
-            throw new PortainerException($"无法连接 Portainer：{ex.Message}", 502, ex);
+            throw new PortainerException($"无法连接 Portainer [{_instance.Id}]：{ex.Message}", 502, ex);
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             throw new PortainerException(
-                $"Portainer 请求超时（{_http.Timeout.TotalSeconds:0} 秒）", 504, ex);
+                $"Portainer [{_instance.Id}] 请求超时（{_http.Timeout.TotalSeconds:0} 秒）", 504, ex);
         }
 
         try
         {
             return JsonSerializer.Deserialize<T>(body, JsonOptions)
-                ?? throw new PortainerException($"Portainer 返回空响应：{path}", 502);
+                ?? throw new PortainerException($"Portainer [{_instance.Id}] 返回空响应：{path}", 502);
         }
         catch (JsonException ex)
         {
-            throw new PortainerException($"Portainer 响应解析失败：{path}", 502, ex);
+            throw new PortainerException($"Portainer [{_instance.Id}] 响应解析失败：{path}", 502, ex);
         }
+    }
+
+    private static Uri? TryGetBaseUri(string? baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl)) return null;
+        return Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var uri) ? uri : null;
     }
 
     private static Uri EnsureTrailingSlash(Uri uri)
     {
         var value = uri.ToString();
-        return value.EndsWith('/') ? uri : new Uri(value + "/", UriKind.Absolute);
+        return value.EndsWith('/') ? uri : new Uri(value + '/', UriKind.Absolute);
     }
 
     private static string DescribeHttpError(HttpStatusCode status, string body)

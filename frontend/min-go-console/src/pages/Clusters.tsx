@@ -5,7 +5,7 @@ import type {
   ClusterConfig,
   DestinationConfig,
   HealthCheckConfig,
-  PortainerStatus,
+  PortainerInstance,
 } from "../types";
 import {
   FaSolidPlus,
@@ -24,8 +24,8 @@ export default function ClustersPage() {
   const [editingCluster, setEditingCluster] =
     createSignal<ClusterConfig | null>(null);
   const [showModal, setShowModal] = createSignal(false);
-  const [portainerStatus, setPortainerStatus] = createSignal<PortainerStatus | null>(null);
-  const [portainerStatusLoading, setPortainerStatusLoading] = createSignal(true);
+  const [portainerInstances, setPortainerInstances] = createSignal<PortainerInstance[]>([]);
+  const [portainerInstancesLoading, setPortainerInstancesLoading] = createSignal(true);
   const [showPortainerImport, setShowPortainerImport] = createSignal(false);
   const [importTargetClusterId, setImportTargetClusterId] = createSignal<string | undefined>();
 
@@ -33,15 +33,15 @@ export default function ClustersPage() {
     setClusters(await api.get<ClusterConfig[]>("/apimanagement/clusters"));
   };
 
-  const loadPortainerStatus = async () => {
-    setPortainerStatusLoading(true);
+  const loadPortainerInstances = async () => {
+    setPortainerInstancesLoading(true);
     try {
-      setPortainerStatus(await api.getPortainerStatus());
+      const all = await api.getPortainerInstances();
+      setPortainerInstances(all.filter((i) => i.enabled));
     } catch {
-      // 状态获取失败不阻塞集群管理，打开向导时会再次尝试
-      setPortainerStatus(null);
+      setPortainerInstances([]);
     } finally {
-      setPortainerStatusLoading(false);
+      setPortainerInstancesLoading(false);
     }
   };
 
@@ -55,17 +55,11 @@ export default function ClustersPage() {
     }
   });
 
-  onMount(loadPortainerStatus);
+  onMount(loadPortainerInstances);
 
   const portainerDisabledReason = (): string | null => {
-    if (portainerStatusLoading()) return "正在检查 Portainer 配置...";
-    const status = portainerStatus();
-    if (!status) return null;
-    if (!status.enabled) {
-      return status.error || "Portainer 集成未启用（Portainer:Enabled=false）";
-    }
-    if (!status.apiKeyConfigured) return "未配置 Portainer:ApiKey";
-    if (!status.reachable) return status.error || "Portainer 不可达";
+    if (portainerInstancesLoading()) return "正在检查 Portainer 配置...";
+    if (portainerInstances().length === 0) return "没有可用的 Portainer 实例，请在设置中添加";
     return null;
   };
 

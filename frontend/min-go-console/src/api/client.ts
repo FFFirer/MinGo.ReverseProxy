@@ -48,8 +48,24 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   getTransformSchemas: () =>
     request<import('../types').TransformSchema[]>('/transforms/schemas'),
-  getPortainerStatus: () =>
-    request<import('../types').PortainerStatus>('/portainer/status'),
-  getPortainerDiscovery: () =>
-    request<import('../types').PortainerDiscovery>('/portainer/discovery'),
+
+  // Portainer 实例 CRUD
+  getPortainerInstances: () =>
+    request<import('../types').PortainerInstance[]>('/portainer/instances'),
+  getPortainerInstance: (id: string) =>
+    request<import('../types').PortainerInstance>(`/portainer/instances/${encodeURIComponent(id)}`),
+  createPortainerInstance: (data: import('../types').PortainerInstance) =>
+    request<import('../types').PortainerInstance>('/portainer/instances', data),
+  updatePortainerInstance: (id: string, data: import('../types').PortainerInstance) =>
+    request<import('../types').PortainerInstance>(`/portainer/instances/${encodeURIComponent(id)}`, data),
+  deletePortainerInstance: (id: string) =>
+    request<void>(`/portainer/instances/${encodeURIComponent(id)}`),
+  testPortainerInstance: (id: string) =>
+    request<import('../types').PortainerStatus>(`/portainer/instances/${encodeURIComponent(id)}/test`),
+
+  // Portainer 发现（按实例）
+  getPortainerStatus: (instanceId: string) =>
+    request<import('../types').PortainerStatus>(`/portainer/${encodeURIComponent(instanceId)}/status`),
+  getPortainerDiscovery: (instanceId: string) =>
+    request<import('../types').PortainerDiscovery>(`/portainer/${encodeURIComponent(instanceId)}/discovery`),
 };

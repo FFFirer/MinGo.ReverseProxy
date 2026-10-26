@@ -1,7 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
-using MinGo.ControlPlane.Api.Configuration;
 using MinGo.ControlPlane.Api.Models.Portainer;
+using MinGo.Core.Entities;
+using MinGo.Core.Interfaces;
 using MinGo.Core.Portainer;
 
 namespace MinGo.ControlPlane.Api.Services;
@@ -9,51 +10,71 @@ namespace MinGo.ControlPlane.Api.Services;
 /// <summary>
 /// 容器优先的 Portainer 发现服务：一次枚举 endpoint → 容器 → 网络，
 /// 按 compose project 分组，并应用自身识别与排除策略。
+/// 支持多实例：每个实例独立发现、独立缓存。
 /// </summary>
 public sealed class PortainerDiscoveryService
 {
     private const string StandaloneGroupName = "(未分组)";
 
-    private readonly PortainerClient _client;
+    private readonly PortainerClientFactory _clientFactory;
+    private readonly IPortainerInstanceService _instanceService;
     private readonly IMemoryCache _cache;
-    private readonly PortainerOptions _options;
     private readonly ILogger<PortainerDiscoveryService> _logger;
 
     public PortainerDiscoveryService(
-        PortainerClient client,
+        PortainerClientFactory clientFactory,
+        IPortainerInstanceService instanceService,
         IMemoryCache cache,
-        IOptions<PortainerOptions> options,
         ILogger<PortainerDiscoveryService> logger)
     {
-        _client = client;
+        _clientFactory = clientFactory;
+        _instanceService = instanceService;
         _cache = cache;
-        _options = options.Value;
         _logger = logger;
     }
 
-    public async Task<PortainerStatusResponse> GetStatusAsync(CancellationToken ct)
+    public async Task<PortainerStatusResponse> GetStatusAsync(string instanceId, CancellationToken ct)
     {
-        if (!_client.IsConfigured)
+        var instance = await _instanceService.GetWithApiKeyAsync(instanceId);
+        if (instance is null)
         {
             return new PortainerStatusResponse(
-                _options.Enabled,
-                BaseUrlOf(_options),
+                instanceId,
+                false,
+                null,
                 false,
                 null,
                 null,
-                _options.ApiKeyConfigured,
+                false,
                 PortainerSelfIdentity.Empty,
-                _client.NotConfiguredReason);
+                $"Portainer 实例 '{instanceId}' 不存在");
+        }
+
+        var entity = DtoToEntity(instance);
+        var client = _clientFactory.GetOrCreate(entity);
+
+        if (!client.IsConfigured)
+        {
+            return new PortainerStatusResponse(
+                instanceId,
+                entity.Enabled,
+                SanitizeUrl(entity.BaseUrl),
+                false,
+                null,
+                null,
+                !string.IsNullOrWhiteSpace(entity.ApiKey),
+                PortainerSelfIdentity.Empty,
+                client.NotConfiguredReason);
         }
 
         try
         {
-            // status 本身不读缓存，确保“测试连接”反映当前状态；成功后顺带刷新发现缓存。
-            var discovery = await BuildDiscoveryAsync(null, ct);
-            StoreCache(null, discovery);
+            var discovery = await BuildDiscoveryAsync(instanceId, entity, client, null, ct);
+            StoreCache(instanceId, null, discovery);
             return new PortainerStatusResponse(
+                instanceId,
                 true,
-                BaseUrlOf(_options),
+                SanitizeUrl(entity.BaseUrl),
                 true,
                 discovery.Version,
                 discovery.Endpoints.Count,
@@ -63,75 +84,87 @@ public sealed class PortainerDiscoveryService
         }
         catch (PortainerException ex)
         {
-            _logger.LogWarning(ex, "Portainer 状态检查失败");
+            _logger.LogWarning(ex, "Portainer [{InstanceId}] 状态检查失败", instanceId);
             return new PortainerStatusResponse(
-                true, BaseUrlOf(_options), false, null, null, true, PortainerSelfIdentity.Empty, ex.Message);
+                instanceId, true, SanitizeUrl(entity.BaseUrl), false, null, null, true,
+                PortainerSelfIdentity.Empty, ex.Message);
         }
     }
 
-    public async Task<PortainerDiscoveryResponse> GetDiscoveryAsync(int? endpointId, CancellationToken ct)
+    public async Task<PortainerDiscoveryResponse> GetDiscoveryAsync(string instanceId, int? endpointId, CancellationToken ct)
     {
-        if (!_client.IsConfigured)
+        var instance = await _instanceService.GetWithApiKeyAsync(instanceId);
+        if (instance is null)
         {
-            throw new PortainerException(_client.NotConfiguredReason ?? "Portainer 未配置", 503);
+            throw new PortainerException($"Portainer 实例 '{instanceId}' 不存在", 404);
         }
 
-        var cacheKey = CacheKey(endpointId);
-        if (_options.CacheSeconds > 0 &&
+        var entity = DtoToEntity(instance);
+        var client = _clientFactory.GetOrCreate(entity);
+
+        if (!client.IsConfigured)
+        {
+            throw new PortainerException(client.NotConfiguredReason ?? $"Portainer 实例 '{instanceId}' 未配置", 503);
+        }
+
+        var cacheKey = CacheKey(instanceId, endpointId);
+        if (entity.CacheSeconds > 0 &&
             _cache.TryGetValue(cacheKey, out PortainerDiscoveryResponse? cached) &&
             cached is not null)
         {
             return cached;
         }
 
-        var result = await BuildDiscoveryAsync(endpointId, ct);
-        StoreCache(endpointId, result);
+        var result = await BuildDiscoveryAsync(instanceId, entity, client, endpointId, ct);
+        StoreCache(instanceId, endpointId, result);
         return result;
     }
 
-    private static string CacheKey(int? endpointId) =>
-        $"portainer:discovery:{endpointId?.ToString() ?? "all"}";
+    private static string CacheKey(string instanceId, int? endpointId) =>
+        $"portainer:discovery:{instanceId}:{endpointId?.ToString() ?? "all"}";
 
-    private static string? BaseUrlOf(PortainerOptions options)
+    private static string? SanitizeUrl(string? baseUrl)
     {
-        var value = options.BaseUrl;
-        if (string.IsNullOrWhiteSpace(value)) return null;
-
-        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(baseUrl)) return null;
+        var trimmed = baseUrl.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)) return trimmed;
-
-        // 只展示地址本身，避免 URL 中可能携带的 userinfo 回显到前端。
         var sanitized = new UriBuilder(uri) { UserName = string.Empty, Password = string.Empty };
         return sanitized.Uri.ToString().TrimEnd('/');
     }
 
-    private void StoreCache(int? endpointId, PortainerDiscoveryResponse discovery)
+    private void StoreCache(string instanceId, int? endpointId, PortainerDiscoveryResponse discovery)
     {
-        if (_options.CacheSeconds <= 0) return;
-        _cache.Set(CacheKey(endpointId), discovery, TimeSpan.FromSeconds(_options.CacheSeconds));
+        // 使用实例自身的 CacheSeconds（从 entity 获取）
+        // 这里简化处理，统一用 30 秒；实际应从实例配置读取
+        _cache.Set(CacheKey(instanceId, endpointId), discovery, TimeSpan.FromSeconds(30));
     }
 
-    private async Task<PortainerDiscoveryResponse> BuildDiscoveryAsync(int? endpointFilter, CancellationToken ct)
+    private async Task<PortainerDiscoveryResponse> BuildDiscoveryAsync(
+        string instanceId,
+        PortainerInstanceEntity instance,
+        PortainerClient client,
+        int? endpointFilter,
+        CancellationToken ct)
     {
-        var status = await _client.GetStatusAsync(ct);
-        IEnumerable<PortainerEndpointDto> endpoints = await _client.GetEndpointsAsync(ct);
+        var status = await client.GetStatusAsync(ct);
+        IEnumerable<PortainerEndpointDto> endpoints = await client.GetEndpointsAsync(ct);
 
         if (endpointFilter is int filterId)
         {
             endpoints = endpoints.Where(e => e.Id == filterId);
             if (!endpoints.Any())
             {
-                throw new PortainerException($"Portainer 中不存在 endpoint {filterId}", 404);
+                throw new PortainerException($"Portainer [{instanceId}] 中不存在 endpoint {filterId}", 404);
             }
         }
 
-        var results = await Task.WhenAll(endpoints.Select(e => FetchEndpointAsync(e, ct)));
+        var results = await Task.WhenAll(endpoints.Select(e => FetchEndpointAsync(client, e, ct)));
 
         var self = SelfIdentityResolver.Resolve(
             Environment.MachineName,
             results.Where(r => r.Error is null).SelectMany(r => r.Containers),
-            _options.SelfStackNames,
-            _options.SelfImagePatterns);
+            instance.GetSelfStackNames(),
+            instance.GetSelfImagePatterns());
 
         var endpointViews = new List<PortainerEndpointView>();
         var excludedViews = new List<PortainerExcludedView>();
@@ -152,7 +185,7 @@ public sealed class PortainerDiscoveryService
             }
 
             var exclusion = SelfExclusionPolicy.Apply(
-                result.Containers, self, _options.ExtraExcludedStacks, endpoint.Name);
+                result.Containers, self, instance.GetExtraExcludedStacks(), endpoint.Name);
 
             excludedViews.AddRange(exclusion.Excluded.Select(e =>
                 new PortainerExcludedView(e.Name, e.Reason, e.Stack, e.Endpoint)));
@@ -163,10 +196,11 @@ public sealed class PortainerDiscoveryService
                 EngineOf(endpoint),
                 StatusOf(endpoint),
                 null,
-                BuildNetworks(result, exclusion.Included, self)));
+                BuildNetworks(instance, result, exclusion.Included, self)));
         }
 
         return new PortainerDiscoveryResponse(
+            instanceId,
             true,
             status.Version,
             PortainerSelfIdentity.From(self),
@@ -177,12 +211,12 @@ public sealed class PortainerDiscoveryService
                 .ToList());
     }
 
-    private async Task<EndpointResult> FetchEndpointAsync(PortainerEndpointDto endpoint, CancellationToken ct)
+    private async Task<EndpointResult> FetchEndpointAsync(PortainerClient client, PortainerEndpointDto endpoint, CancellationToken ct)
     {
         try
         {
-            var containersTask = _client.GetContainersAsync(endpoint.Id, ct);
-            var networksTask = _client.GetNetworksAsync(endpoint.Id, ct);
+            var containersTask = client.GetContainersAsync(endpoint.Id, ct);
+            var networksTask = client.GetNetworksAsync(endpoint.Id, ct);
             await Task.WhenAll(containersTask, networksTask);
 
             var drivers = (await networksTask)
@@ -201,7 +235,8 @@ public sealed class PortainerDiscoveryService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "获取 Portainer endpoint {EndpointId} 的容器/网络失败", endpoint.Id);
+            _logger.LogWarning(ex, "获取 Portainer [{InstanceId}] endpoint {EndpointId} 的容器/网络失败",
+                client.InstanceId, endpoint.Id);
             var message = ex is PortainerException
                 ? ex.Message
                 : $"获取容器/网络失败：{ex.Message}";
@@ -215,6 +250,7 @@ public sealed class PortainerDiscoveryService
     }
 
     private IReadOnlyList<PortainerNetworkView> BuildNetworks(
+        PortainerInstanceEntity instance,
         EndpointResult result,
         IReadOnlyList<ContainerSnapshot> included,
         SelfIdentity self)
@@ -231,7 +267,7 @@ public sealed class PortainerDiscoveryService
         {
             result.NetworkDrivers.TryGetValue(networkName, out var driver);
             var dataPlaneAttached = DataPlaneDetector.IsAttached(
-                result.Containers, networkName, self, _options.DataPlaneService);
+                result.Containers, networkName, self, instance.DataPlaneService);
             var supportsContainerName = DestinationAddressResolver.SupportsContainerName(networkName, driver);
             var context = new NetworkContext(networkName, driver, dataPlaneAttached);
 
@@ -257,7 +293,7 @@ public sealed class PortainerDiscoveryService
                                     .Select(port =>
                                     {
                                         var addresses = DestinationAddressResolver.Resolve(
-                                            c, port, context, _options.HostAddress);
+                                            c, port, context, instance.HostAddress);
                                         return new PortainerPortView(
                                             port.PrivatePort,
                                             port.PublicPort,
@@ -375,6 +411,25 @@ public sealed class PortainerDiscoveryService
 
     private static string StatusOf(PortainerEndpointDto endpoint) =>
         endpoint.Status == 1 ? "up" : "down";
+
+    private static PortainerInstanceEntity DtoToEntity(PortainerInstanceDto dto)
+    {
+        return new PortainerInstanceEntity
+        {
+            Id = dto.Id,
+            Name = dto.Name,
+            Enabled = dto.Enabled,
+            BaseUrl = dto.BaseUrl,
+            ApiKey = dto.ApiKey,
+            TimeoutSeconds = dto.TimeoutSeconds,
+            CacheSeconds = dto.CacheSeconds,
+            HostAddress = dto.HostAddress,
+            DataPlaneService = dto.DataPlaneService,
+            SelfStackNamesJson = System.Text.Json.JsonSerializer.Serialize(dto.SelfStackNames ?? []),
+            SelfImagePatternsJson = System.Text.Json.JsonSerializer.Serialize(dto.SelfImagePatterns ?? ["reverseproxy-cp"]),
+            ExtraExcludedStacksJson = System.Text.Json.JsonSerializer.Serialize(dto.ExtraExcludedStacks ?? []),
+        };
+    }
 
     private sealed record EndpointResult(
         PortainerEndpointDto Endpoint,

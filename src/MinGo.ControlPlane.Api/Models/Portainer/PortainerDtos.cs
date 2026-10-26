@@ -5,6 +5,7 @@ namespace MinGo.ControlPlane.Api.Models.Portainer;
 // 前端消费的响应模型。ApiKey 永不出现在任何响应中。
 
 public sealed record PortainerStatusResponse(
+    string InstanceId,
     bool Enabled,
     string? BaseUrl,
     bool Reachable,
@@ -27,6 +28,7 @@ public sealed record PortainerSelfIdentity(
 }
 
 public sealed record PortainerDiscoveryResponse(
+    string InstanceId,
     bool Connected,
     string? Version,
     PortainerSelfIdentity Self,
