@@ -145,6 +145,29 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    // 缓存策略：index.html 及 SPA 回退页禁止缓存，保证发版后客户端立即拿到新入口；
+    // 带内容哈希的静态资源（/assets/*）长期缓存。
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path;
+        context.Response.OnStarting(() =>
+        {
+            var response = context.Response;
+            if (path.StartsWithSegments("/assets"))
+            {
+                response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            }
+            else if (response.ContentType?.StartsWith("text/html") == true)
+            {
+                response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+                response.Headers.Pragma = "no-cache";
+                response.Headers.Expires = "0";
+            }
+            return Task.CompletedTask;
+        });
+        await next();
+    });
+
     // 生产环境：从 wwwroot 提供前端静态文件
     app.UseDefaultFiles();
     app.UseStaticFiles();
