@@ -11,6 +11,8 @@ export interface Column<T> {
   cell: (row: T) => JSX.Element | string | number;
   /** 移动端详情面板中的标签（默认用 title） */
   mobileLabel?: string;
+  /** 移动端展开详情中是否显示此列，默认 true；操作列应设为 false 以避免与行上操作按钮重复 */
+  mobileDetailVisible?: boolean;
   /** td/th 额外样式类 */
   class?: string;
 }
@@ -104,7 +106,7 @@ export default function Table<T>(props: TableProps<T>) {
                         class="px-4 py-3 bg-gray-50/80 dark:bg-dark-200/40"
                       >
                         <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                          <For each={props.columns}>
+                          <For each={props.columns.filter(c => c.mobileDetailVisible !== false)}>
                             {(col) => (
                               <div class="flex flex-col gap-0.5">
                                 <span class="text-secondary text-xs font-medium">

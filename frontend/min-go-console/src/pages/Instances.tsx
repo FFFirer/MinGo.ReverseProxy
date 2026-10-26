@@ -158,6 +158,7 @@ export default function InstancesPage() {
       key: 'actions',
       title: '操作',
       mobileVisible: true,
+      mobileDetailVisible: false,
       class: 'w-20',
       cell: (inst) => (
         <div class="flex gap-2">

@@ -88,6 +88,7 @@ export default function CertificatesPage() {
       key: 'actions',
       title: '操作',
       mobileVisible: true,
+      mobileDetailVisible: false,
       cell: (cert) => (
         <div class="flex space-x-2">
           <button

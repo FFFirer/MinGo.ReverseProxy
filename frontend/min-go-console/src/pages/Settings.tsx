@@ -142,6 +142,7 @@ export default function SettingsPage() {
       key: 'actions',
       title: '操作',
       mobileVisible: true,
+      mobileDetailVisible: false,
       class: 'w-24',
       cell: (inst) => (
         <div class="flex items-center justify-end gap-1">

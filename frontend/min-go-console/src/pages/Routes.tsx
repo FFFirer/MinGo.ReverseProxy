@@ -107,6 +107,7 @@ export default function RoutesPage() {
       key: 'actions',
       title: '操作',
       mobileVisible: true,
+      mobileDetailVisible: false,
       class: 'w-20',
       cell: (route) => (
         <div class="flex space-x-2">
