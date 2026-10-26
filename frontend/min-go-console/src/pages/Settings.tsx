@@ -2,6 +2,8 @@ import { createSignal, onMount, Show, For, Index } from 'solid-js';
 import { addToast } from '../store/toast';
 import { api } from '../api/client';
 import type { PortainerInstance, PortainerStatus } from '../types';
+import type { Column } from '../components/shared/Table';
+import Table from '../components/shared/Table';
 import {
   FaSolidUndo,
   FaSolidSave,
@@ -100,6 +102,78 @@ export default function SettingsPage() {
     }
   };
 
+  const portainerColumns: Column<PortainerInstance>[] = [
+    {
+      key: 'id',
+      title: 'ID',
+      cell: (inst) => <span class="font-mono text-xs">{inst.id}</span>,
+    },
+    {
+      key: 'name',
+      title: '名称',
+      mobileVisible: true,
+      cell: (inst) => inst.name || '-',
+    },
+    {
+      key: 'baseUrl',
+      title: '地址',
+      cell: (inst) => <span class="font-mono text-xs break-all">{inst.baseUrl || '-'}</span>,
+    },
+    {
+      key: 'enabled',
+      title: '状态',
+      mobileVisible: true,
+      cell: (inst) => (
+        <span class={`badge ${inst.enabled ? 'badge-success' : 'badge-warning'}`}>
+          {inst.enabled ? '启用' : '禁用'}
+        </span>
+      ),
+    },
+    {
+      key: 'apiKey',
+      title: 'API Key',
+      cell: (inst) => (
+        inst.apiKey && inst.apiKey.length > 0
+          ? <span class="badge badge-success text-xs">已配置</span>
+          : <span class="badge badge-warning text-xs">未配置</span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      mobileVisible: true,
+      class: 'w-24',
+      cell: (inst) => (
+        <div class="flex items-center justify-end gap-1">
+          <button
+            class="btn-icon btn-icon-secondary"
+            title="测试连接"
+            disabled={testingId() === inst.id}
+            onClick={(e) => { e.stopPropagation(); handleTest(inst.id); }}
+          >
+            <Show when={testingId() === inst.id} fallback={<FaSolidCheck />}>
+              <FaSolidSpinner class="animate-spin" />
+            </Show>
+          </button>
+          <button
+            class="btn-icon btn-icon-primary"
+            title="编辑"
+            onClick={(e) => { e.stopPropagation(); setEditingInstance(inst); setShowForm(true); }}
+          >
+            <FaSolidEdit />
+          </button>
+          <button
+            class="btn-icon btn-icon-danger"
+            title="删除"
+            onClick={(e) => { e.stopPropagation(); handleDelete(inst.id); }}
+          >
+            <FaSolidTrash />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div class="mb-6">
@@ -184,74 +258,11 @@ export default function SettingsPage() {
         </Show>
 
         <Show when={!instancesLoading() && instances().length > 0}>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-gray-200 dark:border-dark-200 text-left">
-                  <th class="py-2 px-3 font-medium text-secondary">ID</th>
-                  <th class="py-2 px-3 font-medium text-secondary">名称</th>
-                  <th class="py-2 px-3 font-medium text-secondary">地址</th>
-                  <th class="py-2 px-3 font-medium text-secondary">状态</th>
-                  <th class="py-2 px-3 font-medium text-secondary">API Key</th>
-                  <th class="py-2 px-3 font-medium text-secondary text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={instances()}>
-                  {(inst) => (
-                    <tr class="border-b border-gray-100 dark:border-dark-200 hover:bg-gray-50 dark:hover:bg-dark-200 transition">
-                      <td class="py-2 px-3 font-mono text-xs">{inst.id}</td>
-                      <td class="py-2 px-3">{inst.name || '-'}</td>
-                      <td class="py-2 px-3 font-mono text-xs break-all">{inst.baseUrl || '-'}</td>
-                      <td class="py-2 px-3">
-                        <span class={`badge ${inst.enabled ? 'badge-success' : 'badge-warning'}`}>
-                          {inst.enabled ? '启用' : '禁用'}
-                        </span>
-                      </td>
-                      <td class="py-2 px-3 font-mono text-xs">
-                        {inst.apiKey && inst.apiKey.length > 0 ? (
-                          <span class="badge badge-success text-xs">已配置</span>
-                        ) : (
-                          <span class="badge badge-warning text-xs">未配置</span>
-                        )}
-                      </td>
-                      <td class="py-2 px-3">
-                        <div class="flex items-center justify-end gap-1">
-                          <button
-                            class="btn-icon btn-icon-secondary"
-                            title="测试连接"
-                            disabled={testingId() === inst.id}
-                            onClick={() => handleTest(inst.id)}
-                          >
-                            <Show when={testingId() === inst.id} fallback={<FaSolidCheck />}>
-                              <FaSolidSpinner class="animate-spin" />
-                            </Show>
-                          </button>
-                          <button
-                            class="btn-icon btn-icon-primary"
-                            title="编辑"
-                            onClick={() => {
-                              setEditingInstance(inst);
-                              setShowForm(true);
-                            }}
-                          >
-                            <FaSolidEdit />
-                          </button>
-                          <button
-                            class="btn-icon btn-icon-danger"
-                            title="删除"
-                            onClick={() => handleDelete(inst.id)}
-                          >
-                            <FaSolidTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
+          <Table
+            columns={portainerColumns}
+            data={instances()}
+            rowKey={(inst) => inst.id}
+          />
 
           <Show when={testResult()}>
             <div class="mt-3 p-3 rounded-lg bg-gray-50 dark:bg-dark-200 text-xs">

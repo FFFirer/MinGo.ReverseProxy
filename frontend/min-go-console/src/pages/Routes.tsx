@@ -3,6 +3,8 @@ import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { RouteConfig, ClusterConfig, TransformSchema, TransformFieldSchema } from '../types';
 import { FaSolidPlus, FaSolidSearch, FaSolidChevronDown, FaSolidChevronRight, FaSolidTrash } from 'solid-icons/fa';
+import type { Column } from '../components/shared/Table';
+import Table from '../components/shared/Table';
 
 export default function RoutesPage() {
   const [routes, setRoutes] = createSignal<RouteConfig[]>([]);
@@ -69,6 +71,62 @@ export default function RoutesPage() {
     }
   };
 
+  const columns: Column<RouteConfig>[] = [
+    {
+      key: 'name',
+      title: '路由名称',
+      mobileVisible: true,
+      cell: (route) => <span class="font-medium">{route.name}</span>,
+    },
+    {
+      key: 'path',
+      title: '路径',
+      cell: (route) => <span class="font-mono text-sm">{route.match?.path || '-'}</span>,
+    },
+    {
+      key: 'host',
+      title: '匹配域名',
+      cell: (route) => <span class="font-mono text-sm">{route.match?.host || '-'}</span>,
+    },
+    {
+      key: 'clusterId',
+      title: '集群',
+      cell: (route) => route.clusterId,
+    },
+    {
+      key: 'enabled',
+      title: '状态',
+      mobileVisible: true,
+      cell: (route) => (
+        <span class={`badge ${route.enabled ? 'badge-success' : 'badge-warning'}`}>
+          {route.enabled ? '启用' : '禁用'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      mobileVisible: true,
+      class: 'w-20',
+      cell: (route) => (
+        <div class="flex space-x-2">
+          <button
+            class="btn-text btn-text-primary"
+            onClick={(e) => { e.stopPropagation(); setEditingRoute(route); setShowModal(true); }}
+          >
+            编辑
+          </button>
+          <button
+            class="btn-text btn-text-danger"
+            onClick={(e) => { e.stopPropagation(); handleDelete(route.id); }}
+          >
+            删除
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div class="mb-6 flex items-center justify-between">
@@ -95,51 +153,14 @@ export default function RoutesPage() {
           </select>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="border-b border-gray-200 dark:border-dark-200">
-                <th class="text-left py-3 px-4 font-medium text-secondary">路由名称</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">路径</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">匹配域名</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">集群</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">状态</th>
-                <th class="text-left py-3 px-4 font-medium text-secondary">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={filteredRoutes()}>{(route) => (
-                <tr class="border-b border-gray-100 dark:border-dark-100 hover:bg-gray-50 dark:hover:bg-dark-100/50">
-                  <td class="py-3 px-4 font-medium">{route.name}</td>
-                  <td class="py-3 px-4 font-mono text-sm">{route.match?.path || '-'}</td>
-                  <td class="py-3 px-4 font-mono text-sm">{route.match?.host || '-'}</td>
-                  <td class="py-3 px-4">{route.clusterId}</td>
-                  <td class="py-3 px-4">
-                    <span class={`badge ${route.enabled ? 'badge-success' : 'badge-warning'}`}>
-                      {route.enabled ? '启用' : '禁用'}
-                    </span>
-                  </td>
-                  <td class="py-3 px-4">
-                    <div class="flex space-x-2">
-                      <button class="btn-text btn-text-primary" onClick={() => { setEditingRoute(route); setShowModal(true); }}>
-                        编辑
-                      </button>
-                      <button class="btn-text btn-text-danger" onClick={() => handleDelete(route.id)}>
-                        删除
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}</For>
-              {!loading() && filteredRoutes().length === 0 && (
-                <tr><td colspan="6" class="py-8 text-center text-secondary">暂无路由</td></tr>
-              )}
-              {loading() && (
-                <tr><td colspan="6" class="py-8 text-center text-secondary">加载中...</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          columns={columns}
+          data={filteredRoutes()}
+          rowKey={(r) => r.id}
+          emptyMessage={
+            loading() ? '加载中...' : '暂无路由'
+          }
+        />
       </div>
 
       {showModal() && (
