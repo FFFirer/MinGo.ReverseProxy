@@ -44,7 +44,8 @@ jobs:
         id: extract_version
         run: |
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "VERSION=${TAG#v}" >> $GITHUB_ENV
           else
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
             echo "VERSION=dev-${GITHUB_SHA:0:7}-${TIMESTAMP}" >> $GITHUB_ENV
