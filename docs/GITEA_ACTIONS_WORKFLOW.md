@@ -109,7 +109,10 @@ jobs:
 
 ### Dockerfile 要求
 
-项目根目录需要存在有效的 `Dockerfile` 文件，用于构建 Docker 镜像。
+镜像构建使用仓库根目录的两个拆分 Dockerfile，工作流已显式指定，无需根 `Dockerfile`：
+
+- `ControlPlane.Dockerfile` —— 控制面 API 镜像
+- `DataPlane.Dockerfile` —— 数据面代理镜像
 
 ## 使用方法
 
