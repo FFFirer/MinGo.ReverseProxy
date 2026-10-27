@@ -133,6 +133,11 @@ public class CertificateConfig
     public string? Subject { get; set; }
     public string? Issuer { get; set; }
     public string Thumbprint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 上传时刻的判定快照，不是当前状态。
+    /// 是否在时效内请按 <see cref="ExpiresAt"/> 实时判断；任何过滤/选择逻辑都不得依赖本字段。
+    /// </summary>
     public bool IsValid { get; set; } = true;
     public byte[]? CertificateData { get; set; }
     public string? Password { get; set; }

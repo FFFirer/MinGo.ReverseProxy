@@ -329,12 +329,14 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 获取所有证书
+    /// 获取所有证书（按域名排序，保证列表与快照组建顺序稳定）
     /// </summary>
     /// <returns>证书列表</returns>
     public async Task<IEnumerable<CertificateConfig>> GetCertificatesAsync()
     {
-        var entities = await _dbContext.Certificates.ToListAsync();
+        var entities = await _dbContext.Certificates
+            .OrderBy(c => c.DomainName)
+            .ToListAsync();
         return entities.Select(MapToCertificateModel);
     }
 

@@ -3,6 +3,7 @@ using MinGo.Core.Entities;
 using MinGo.Core.Interfaces;
 using MinGo.DataPlane.Grpc;
 using MinGo.Infrastructure.Data;
+using CertificateSnapshotPolicy = MinGo.Core.Models.CertificateSnapshotPolicy;
 
 namespace MinGo.ControlPlane.Api.GrpcServices;
 
@@ -158,10 +159,14 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     /// <summary>
     /// 将证书数据添加到 ConfigSnapshot
     /// </summary>
+    /// <remarks>
+    /// 只剔除不可加载的记录（无字节、无域名），每个域名一张；过期证书照常下发，
+    /// 否则 <c>enable-https-redirect</c> 的 fail-closed 会退化成明文回退。
+    /// </remarks>
     private static async Task AddCertificatesToSnapshotAsync(IApiDbService apiDbService, ConfigSnapshot snapshot)
     {
         var certificates = await apiDbService.GetCertificatesAsync();
-        foreach (var cert in certificates)
+        foreach (var cert in CertificateSnapshotPolicy.SelectForDelivery(certificates, DateTimeOffset.UtcNow))
         {
             snapshot.Certificates.Add(new CertificateData
             {

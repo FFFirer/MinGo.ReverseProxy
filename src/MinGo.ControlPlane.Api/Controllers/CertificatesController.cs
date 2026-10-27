@@ -23,6 +23,9 @@ public class CertificatesController : ControllerBase
     public async Task<ActionResult<IEnumerable<CertificateConfig>>> GetCertificates()
     {
         var certs = await _apiManagementService.GetCertificatesAsync();
+        var now = DateTimeOffset.UtcNow;
+        foreach (var cert in certs)
+            cert.IsValid = CertificateValidity.HasNotExpired(cert.ExpiresAt, now);
         return Ok(certs);
     }
 
@@ -31,12 +34,18 @@ public class CertificatesController : ControllerBase
     {
         var cert = await _apiManagementService.GetCertificateAsync(id);
         if (cert == null) return NotFound();
+        cert.IsValid = CertificateValidity.HasNotExpired(cert.ExpiresAt, DateTimeOffset.UtcNow);
         return Ok(cert);
     }
 
     [HttpPost]
     public async Task<ActionResult<CertificateConfig>> CreateCertificate([FromBody] CertificateConfig certificate)
     {
+        // IsValid 是"入库时刻的判定快照"，只能由服务端按字节计算，不接受客户端提交的值
+        certificate.IsValid = certificate.CertificateData is { Length: > 0 }
+            ? ParseCertificate(certificate.CertificateData, certificate.Password, certificate.DomainName).IsValid
+            : false;
+
         var created = await _apiManagementService.CreateCertificateAsync(certificate);
         return CreatedAtAction(nameof(GetCertificate), new { id = created.Id }, created);
     }
@@ -91,7 +100,7 @@ public class CertificatesController : ControllerBase
                 cert.HasPrivateKey ? "Pfx" : "Cer",
                 cert.NotBefore,
                 cert.NotAfter,
-                DateTime.Now >= cert.NotBefore && DateTime.Now <= cert.NotAfter,
+                CertificateValidity.IsWithinWindow(cert, DateTimeOffset.Now),
                 sanNames,
                 existingId,
                 existingDomain));
@@ -171,7 +180,7 @@ public class CertificatesController : ControllerBase
             Subject = certificate.Subject,
             Issuer = certificate.Issuer,
             Thumbprint = certificate.Thumbprint,
-            IsValid = DateTime.Now >= certificate.NotBefore && DateTime.Now <= certificate.NotAfter,
+            IsValid = CertificateValidity.IsWithinWindow(certificate, DateTimeOffset.Now),
             CertificateData = certificateData,
             Password = password
         };
