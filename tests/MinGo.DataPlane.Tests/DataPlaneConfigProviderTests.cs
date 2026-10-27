@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Grpc;
@@ -14,8 +15,10 @@ public class DataPlaneConfigProviderTests
         var inMemoryProvider = new Yarp.ReverseProxy.Configuration.InMemoryConfigProvider(
             Array.Empty<Yarp.ReverseProxy.Configuration.RouteConfig>(),
             Array.Empty<Yarp.ReverseProxy.Configuration.ClusterConfig>());
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton("DataPlane", inMemoryProvider);
         var logger = new Mock<ILogger<DataPlaneConfigProvider>>();
-        _provider = new DataPlaneConfigProvider(inMemoryProvider, logger.Object);
+        _provider = new DataPlaneConfigProvider(services.BuildServiceProvider(), logger.Object);
     }
 
     private static ConfigSnapshot CreateValidSnapshot(int version = 1) => new()
