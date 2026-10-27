@@ -64,6 +64,7 @@ services:
       - ControlPlane__GrpcUrl=http://control-plane:5001
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
       - Serilog__MinimumLevel__Default=Debug
+      - HttpsRedirect__Enabled=false   # 本地验证需要 http://localhost:8080 明文可用
     depends_on:
       control-plane:
         condition: service_healthy

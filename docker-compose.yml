@@ -55,10 +55,11 @@ services:
       dockerfile: DataPlane.Dockerfile
     container_name: min-go-data-plane
     ports:
-      - "8080:8080"     # HTTP 代理端口
+      - "8080:8080"     # HTTP 代理端口（已配证书的域名会 308 跳转到 8443）
       - "8443:8443"     # HTTPS 代理端口
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      # ASPNETCORE_URLS 决定监听的 socket；HttpsRedirect:Port（默认 8443）只决定 Location 里的对外端口
       - ASPNETCORE_URLS=http://+:8080;https://+:8443
       - ControlPlane__GrpcUrl=http://control-plane:5001
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317

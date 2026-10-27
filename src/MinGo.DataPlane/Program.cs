@@ -3,8 +3,9 @@ using MinGo.Core.Services;
 using MinGo.DataPlane;
 using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Heartbeat;
-using MinGo.DataPlane.Telemetry;
 using MinGo.DataPlane.Kestrel;
+using MinGo.DataPlane.Middleware;
+using MinGo.DataPlane.Telemetry;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -47,6 +48,20 @@ builder.Services.AddReverseProxy()
 // Kestrel 证书选择
 builder.Services.AddCertificateServices();
 
+// HTTP → HTTPS 跳转（默认开启；Development 与本地 compose 关闭）
+var httpsRedirectOptions = builder.Configuration
+    .GetSection(HttpsRedirectOptions.SectionName)
+    .Get<HttpsRedirectOptions>() ?? new HttpsRedirectOptions();
+
+// 内置中间件在端口未知时 fail-open（放行明文 + warning），这里改为启动即失败
+httpsRedirectOptions.Validate();
+
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = httpsRedirectOptions.Port;
+    options.RedirectStatusCode = StatusCodes.Status308PermanentRedirect;
+});
+
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");
 if (otelSection.GetValue<bool>("Enabled", true))
@@ -74,7 +89,7 @@ var app = builder.Build();
 
 // 健康检查端点
 var configProvider = app.Services.GetRequiredService<DataPlaneConfigProvider>();
-
+var certificateSelector = app.Services.GetRequiredService<DataPlaneCertificateSelector>();
 app.MapHealthChecks("/healthz/live", new HealthCheckOptions
 {
     Predicate = _ => false // 存活检查：不运行任何检查，仅返回 200
@@ -91,6 +106,15 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
         await context.Response.WriteAsync($"{{\"status\":\"{status}\"}}");
     }
 });
+
+// 明文 → HTTPS：准入 = 域名证书命中（不回退默认证书）；健康检查、localhost、IP 直连豁免。
+// 必须位于 UseRouting 之前 —— 实测端点注册不会提前吞掉请求
+if (httpsRedirectOptions.Enabled)
+{
+    app.MapWhen(
+        context => HttpsRedirectPolicy.NeedsRedirect(context, httpsRedirectOptions, certificateSelector),
+        branch => branch.UseHttpsRedirection());
+}
 
 app.UseRouting();
 app.UseGatewayTelemetry();

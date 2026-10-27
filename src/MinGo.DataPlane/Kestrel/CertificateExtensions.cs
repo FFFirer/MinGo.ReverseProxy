@@ -46,6 +46,20 @@ public class DataPlaneCertificateSelector
         return null;
     }
 
+    /// <summary>
+    /// 只读判定：host（小写、去端口）是否精确命中某张证书或被 <c>*.example.com</c> 覆盖。
+    /// <para>
+    /// 不回退默认证书，也不写日志 —— 供明文跳转准入使用，未命中是正常业务而非握手失败。
+    /// </para>
+    /// </summary>
+    public bool TryGetCertificate(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return false;
+
+        return TryFindInCache(host, out _);
+    }
+
     private bool TryFindInCache(string host, out X509Certificate2? certificate)
     {
         var normalized = NormalizeHost(host);
