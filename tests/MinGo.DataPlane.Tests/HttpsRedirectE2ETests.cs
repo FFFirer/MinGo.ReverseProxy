@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -96,6 +97,14 @@ public class HttpsRedirectE2ETests : IAsyncLifetime
                 {
                     services.AddSingleton(provider);
                     services.AddCertificateServices();
+                    services.Configure<ForwardedHeadersOptions>(o =>
+                    {
+                        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                                           | ForwardedHeaders.XForwardedProto
+                                           | ForwardedHeaders.XForwardedHost;
+                        o.KnownProxies.Clear();
+                        o.KnownIPNetworks.Clear();
+                    });
                     services.AddHttpsRedirection(o =>
                     {
                         o.HttpsPort = _httpsPort;
@@ -107,6 +116,7 @@ public class HttpsRedirectE2ETests : IAsyncLifetime
                 });
                 web.Configure(app =>
                 {
+                    app.UseForwardedHeaders();
                     app.MapWhen(
                         ctx => HttpsRedirectPolicy.NeedsRedirect(ctx, _options, selector),
                         branch => branch.UseHttpsRedirection());
@@ -265,5 +275,62 @@ public class HttpsRedirectE2ETests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null(response.Headers.Location);
+    }
+
+    // ========== Cloudflare Tunnel 场景（前置 TLS 终结） ==========
+
+    /// <summary>
+    /// 模拟 Cloudflare Tunnel：客户端 HTTPS → CF → HTTP + X-Forwarded-Proto: https → DataPlane:8080。
+    /// ForwardedHeadersMiddleware 解析 X-Forwarded-Proto 后覆盖 Request.Scheme，
+    /// NeedsRedirect 的 IsHttps 检查返回 true，不触发跳转。
+    /// </summary>
+    [Fact]
+    public async Task CloudflareTunnel_XForwardedProtoHttps_IsNotRedirected()
+    {
+        using var client = CreatePlainClient();
+        using var request = CreateRequest(HttpMethod.Get, "api.example.com", "/ping");
+        request.Headers.Add("X-Forwarded-Proto", "https");
+        request.Headers.Add("X-Forwarded-For", "203.0.113.50");
+
+        var response = await client.SendAsync(request);
+
+        // 不应跳转，应正常代理到后端
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+        Assert.Contains("GET||/ping", await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// 前置代理场景：X-Forwarded-Proto 为 http（非 HTTPS），仍应触发跳转。
+    /// </summary>
+    [Fact]
+    public async Task ForwardedProtoHttp_StillRedirects()
+    {
+        using var client = CreatePlainClient();
+        using var request = CreateRequest(HttpMethod.Get, "api.example.com:8080", "/ping");
+        request.Headers.Add("X-Forwarded-Proto", "http");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.PermanentRedirect, response.StatusCode);
+        Assert.Equal($"https://api.example.com:{_httpsPort}/ping", response.Headers.Location!.ToString());
+    }
+
+    /// <summary>
+    /// 前置代理场景：X-Forwarded-Host 覆盖原始 Host，跳转 Location 应使用转发后的 Host。
+    /// </summary>
+    [Fact]
+    public async Task ForwardedHost_UsedInRedirectLocation()
+    {
+        using var client = CreatePlainClient();
+        using var request = CreateRequest(HttpMethod.Get, "internal-host:8080", "/ping");
+        request.Headers.Add("X-Forwarded-Proto", "http");
+        request.Headers.Add("X-Forwarded-Host", "api.example.com");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.PermanentRedirect, response.StatusCode);
+        // Location 应使用 X-Forwarded-Host 的值
+        Assert.Equal($"https://api.example.com:{_httpsPort}/ping", response.Headers.Location!.ToString());
     }
 }

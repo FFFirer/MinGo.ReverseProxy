@@ -1,3 +1,4 @@
+using System.Net;
 using MinGo.Core.Logging;
 using MinGo.Core.Services;
 using MinGo.DataPlane;
@@ -7,6 +8,7 @@ using MinGo.DataPlane.Kestrel;
 using MinGo.DataPlane.Middleware;
 using MinGo.DataPlane.Telemetry;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -62,6 +64,46 @@ builder.Services.AddHttpsRedirection(options =>
     options.RedirectStatusCode = StatusCodes.Status308PermanentRedirect;
 });
 
+// ForwardedHeaders — 前置 TLS 终结层（Cloudflare Tunnel 等）场景
+// 解析 X-Forwarded-For/Proto/Host，覆盖 HttpContext 使 Request.IsHttps 正确
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                             | ForwardedHeaders.XForwardedProto
+                             | ForwardedHeaders.XForwardedHost;
+
+    // 清空 KnownProxies/KnownIPNetworks = 信任所有来源的转发头
+    // 安全约束：仅在数据面前有可信代理（如 Cloudflare Tunnel）时启用
+    // 若需限制来源，在 ForwardedHeaders:KnownProxies 配置信任 IP 列表
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
+
+    // 从配置读取信任网络（支持 KnownProxies / KnownNetworks / ForwardLimit）
+    var fhSection = builder.Configuration.GetSection("ForwardedHeaders");
+    var knownProxies = fhSection.GetSection("KnownProxies").Get<string[]>() ?? [];
+    foreach (var proxy in knownProxies)
+    {
+        if (IPAddress.TryParse(proxy, out var ip))
+            options.KnownProxies.Add(ip);
+    }
+
+    var knownNetworks = fhSection.GetSection("KnownNetworks").Get<string[]>() ?? [];
+    foreach (var network in knownNetworks)
+    {
+        var parts = network.Split('/');
+        if (parts.Length == 2
+            && IPAddress.TryParse(parts[0], out var netAddr)
+            && int.TryParse(parts[1], out var prefixLen))
+        {
+            options.KnownIPNetworks.Add(new System.Net.IPNetwork(netAddr, prefixLen));
+        }
+    }
+
+    var forwardLimit = fhSection.GetValue<int?>("ForwardLimit");
+    if (forwardLimit.HasValue)
+        options.ForwardLimit = forwardLimit.Value;
+});
+
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");
 if (otelSection.GetValue<bool>("Enabled", true))
@@ -106,6 +148,10 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
         await context.Response.WriteAsync($"{{\"status\":\"{status}\"}}");
     }
 });
+
+// ForwardedHeaders 必须在 HTTPS 跳转判定之前执行，
+// 使 X-Forwarded-Proto 覆盖 Request.Scheme，避免前置 TLS 终结场景下的重定向死循环
+app.UseForwardedHeaders();
 
 // 明文 → HTTPS：准入 = 域名证书命中（不回退默认证书）；健康检查、localhost、IP 直连豁免。
 // 必须位于 UseRouting 之前 —— 实测端点注册不会提前吞掉请求

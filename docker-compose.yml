@@ -63,6 +63,11 @@ services:
       - ASPNETCORE_URLS=http://+:8080;https://+:8443
       - ControlPlane__GrpcUrl=http://control-plane:5001
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
+      # ForwardedHeaders: 前置 TLS 终结层（Cloudflare Tunnel 等）场景
+      # KnownProxies/KnownNetworks 为空 = 信任所有来源的转发头
+      # 若需限制来源，配置具体 IP 或网段，如：
+      #   ForwardedHeaders__KnownProxies__0=172.16.0.1
+      #   ForwardedHeaders__KnownNetworks__0=10.0.0.0/8
     depends_on:
       control-plane:
         condition: service_healthy
