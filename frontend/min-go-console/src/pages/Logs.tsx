@@ -52,6 +52,14 @@ export default function LogsPage() {
             <For each={logs()}>{(log) => (
               <div class={`mb-2 ${logClass(log.statusCode)}`}>
                 {new Date(log.timestamp).toLocaleTimeString()} [{log.method}] {log.path} {log.statusCode} {log.durationMs}ms {log.clientIp}
+                {/* 代理维度与链路键由心跳上报；老数据面没上报，留空而不是显示 none */}
+                {(log.clusterId || log.destinationId || log.traceId) && (
+                  <span class="text-gray-500">
+                    {log.clusterId ? ` cluster=${log.clusterId}` : ''}
+                    {log.destinationId ? ` dest=${log.destinationId}` : ''}
+                    {log.traceId ? ` trace=${log.traceId}` : ''}
+                  </span>
+                )}
               </div>
             )}</For>
           ) : (

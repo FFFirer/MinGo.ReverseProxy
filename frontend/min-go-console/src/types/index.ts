@@ -216,6 +216,10 @@ export type InstanceStatus = 'Online' | 'Offline' | 'HeartbeatTimeout' | 'Unheal
 
 export interface MetricsSummary {
   averageResponseTime: number;
+  /** 分位数与总同时序同口径（nearest-rank），平均值会稀释尾延迟，看板应以分位数为主 */
+  p50ResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   totalRequests: number;
   errorRequests: number;
   errorRate: number;
@@ -230,6 +234,8 @@ export interface RequestMetrics {
   count: number;
   errorCount: number;
   averageResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
 }
 
 export interface ServiceMetrics {
@@ -259,6 +265,14 @@ export interface AccessLog {
   statusCode: number;
   durationMs: number;
   clientIp: string;
+  instanceId?: string;
+  routeId?: string;
+  /** 后端未上报时为 undefined（老数据面）；不要用 'none' 判断，那是采集侧的哨兵 */
+  clusterId?: string;
+  destinationId?: string;
+  /** 链路关联键：在 OTLP / Aspire 后端按此 id 定位该请求的链路 */
+  traceId?: string;
+  spanId?: string;
 }
 
 export interface UserInfo {

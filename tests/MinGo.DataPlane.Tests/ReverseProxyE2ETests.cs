@@ -385,6 +385,52 @@ public class ReverseProxyE2ETests : IAsyncLifetime
         Assert.True(store.Metrics.ContainsKey("gateway.requests.total"));
     }
 
+    /// <summary>
+    /// 代理维度标签：锁定 cluster/destination 来自 IReverseProxyFeature，
+    /// 并防止中间件被挪到 next() 之前导致特征不可读
+    /// </summary>
+    [Fact]
+    public async Task Telemetry_ProxiedRequest_RecordsClusterAndDestination()
+    {
+        ResetBackend();
+        var store = _dataPlane.Services.GetRequiredService<TelemetryStore>();
+        using var client = new HttpClient { BaseAddress = new Uri(_dataPlaneUrl) };
+        await client.GetAsync("/api/orders");
+
+        var tags = store.Metrics["gateway.requests.total"].Last().Tags;
+        Assert.Equal("r1", tags["route"]);
+        Assert.Equal("backend", tags["cluster"]);
+        Assert.Equal("d1", tags["destination"]);
+        Assert.Equal(200, tags["status"]);
+
+        // duration 与 total 同一份维度，可按 cluster 下钻延迟
+        var durationTags = store.Metrics["gateway.request.duration"].Last().Tags;
+        Assert.Equal("backend", durationTags["cluster"]);
+        Assert.Equal("d1", durationTags["destination"]);
+    }
+
+    /// <summary>
+    /// 上游不可达时 YARP 直接返回 502（不抛异常），errors 仍应记录且维度可定位
+    /// </summary>
+    [Fact]
+    public async Task Telemetry_UpstreamUnavailable_RecordsErrorWithDestination()
+    {
+        ResetBackend(ctx =>
+        {
+            ctx.Response.StatusCode = 502;
+            return Task.CompletedTask;
+        });
+
+        var store = _dataPlane.Services.GetRequiredService<TelemetryStore>();
+        using var client = new HttpClient { BaseAddress = new Uri(_dataPlaneUrl) };
+        await client.GetAsync("/api/orders");
+
+        var errorTags = store.Metrics["gateway.requests.errors"].Last().Tags;
+        Assert.Equal(502, errorTags["status"]);
+        Assert.Equal("backend", errorTags["cluster"]);
+        Assert.Equal("d1", errorTags["destination"]);
+    }
+
     // ========== 二进制响应 ==========
 
     [Fact]
@@ -424,37 +470,5 @@ public class ReverseProxyE2ETests : IAsyncLifetime
 
         // 清理
         _configSource.Set("ReverseProxy:Routes:r2:ClusterId", null!);
-    }
-
-    // ========== InMemoryConfigurationSource ==========
-
-    private sealed class InMemoryConfigurationSource : IConfigurationSource
-    {
-        private readonly Dictionary<string, string?> _data = new(StringComparer.OrdinalIgnoreCase);
-
-        public void Set(string key, string? value)
-        {
-            _data[key] = value;
-        }
-
-        public IConfigurationProvider Build(IConfigurationBuilder builder) => new InMemoryProvider(this);
-
-        private sealed class InMemoryProvider : ConfigurationProvider
-        {
-            private readonly InMemoryConfigurationSource _source;
-
-            public InMemoryProvider(InMemoryConfigurationSource source)
-            {
-                _source = source;
-            }
-
-            public override void Load()
-            {
-                Data = new Dictionary<string, string?>(_source._data.Where(kv => kv.Value != null),
-                    StringComparer.OrdinalIgnoreCase);
-            }
-
-            public override string? ToString() => "InMemoryTestConfig";
-        }
     }
 }

@@ -88,7 +88,14 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
                         DurationMs = grpcLog.DurationMs,
                         ClientIp = grpcLog.ClientIp,
                         Route = grpcLog.Route,
-                        InstanceId = request.DataPlaneId
+                        InstanceId = request.DataPlaneId,
+                        // 阶段二建立的关联键与代理维度到此跨过了进程边界。
+                        // proto3 的缺省是空串（老数据面不填），归一成 null 表示"未传输"，
+                        // 绝不能填成采集侧的 none 哨兵 —— 那会把"没上报"伪装成"量到了不存在的维度"
+                        TraceId = NullIfEmpty(grpcLog.TraceId),
+                        SpanId = NullIfEmpty(grpcLog.SpanId),
+                        Cluster = NullIfEmpty(grpcLog.Cluster),
+                        Destination = NullIfEmpty(grpcLog.Destination)
                     });
                 }
 
@@ -123,4 +130,10 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
             _logger.LogWarning(ex, "Heartbeat connection lost for data plane {DataPlaneId}", dataPlaneId);
         }
     }
+
+    /// <summary>
+    /// proto3 的 string 没有"未设置"状态，空串即生产者没填。
+    /// 归一成 null 让"未传输"与采集侧的 none 哨兵在下游可区分。
+    /// </summary>
+    private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

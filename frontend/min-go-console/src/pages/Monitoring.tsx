@@ -100,8 +100,12 @@ export default function MonitoringPage() {
           <h3 class="text-2xl font-bold text-danger">{metrics()?.errorRate.toFixed(1) ?? '-'}%</h3>
         </div>
         <div class="card">
-          <p class="text-secondary text-sm">平均响应时间</p>
+          <p class="text-secondary text-sm">响应时间</p>
           <h3 class="text-2xl font-bold">{metrics()?.averageResponseTime.toFixed(0) ?? '-'}ms</h3>
+          {/* 平均值会被大量快请求稀释，尾延迟才是网关要盯的东西 */}
+          <p class="text-secondary text-xs mt-1">
+            P50 {metrics()?.p50ResponseTime.toFixed(0) ?? '-'} / P95 {metrics()?.p95ResponseTime.toFixed(0) ?? '-'} / P99 {metrics()?.p99ResponseTime.toFixed(0) ?? '-'} ms
+          </p>
         </div>
         <div class="card">
           <p class="text-secondary text-sm">错误请求数</p>

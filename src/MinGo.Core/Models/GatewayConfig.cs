@@ -119,6 +119,11 @@ public class RateLimitPerApiKeyConfig
 public class MonitoringConfig
 {
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// 未实现，且不是待办：指标的对外出口是 OTLP，控制面看板由心跳喂。
+    /// 配置键保留只为不打破既有配置文件；仓库不引入 Prometheus 依赖。
+    /// </summary>
     public string MetricsEndpoint { get; set; } = "/metrics";
     public string LogLevel { get; set; } = "Information";
 }

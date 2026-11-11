@@ -3,6 +3,9 @@ namespace MinGo.Core.Models;
 public class MetricsSummary
 {
     public double AverageResponseTime { get; set; }
+    public double P50ResponseTime { get; set; }
+    public double P95ResponseTime { get; set; }
+    public double P99ResponseTime { get; set; }
     public int TotalRequests { get; set; }
     public int ErrorRequests { get; set; }
     public double ErrorRate { get; set; }

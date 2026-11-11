@@ -97,6 +97,11 @@ message AccessLogEntry {
     int64 duration_ms = 5;
     string client_ip = 6;
     string route = 7;
+    // 字段 8-11 为追加：已有编号与类型不得改动，老数据面留空即"未传输"
+    string trace_id = 8;
+    string span_id = 9;
+    string cluster = 10;
+    string destination = 11;
 }
 
 message MetricPoint {

@@ -29,6 +29,18 @@ public class AccessLog
     public string? RouteId { get; set; }
     public string? ClusterId { get; set; }
     public string? DestinationAddress { get; set; }
+
+    /// <summary>代理目的地标识（不是地址）。老数据面未上报时为 null</summary>
+    public string? DestinationId { get; set; }
+
+    /// <summary>
+    /// 链路关联键。控制面不存 span 本体，这个 id 用于在 OTLP 后端定位该请求的链路；
+    /// 老数据面未上报时为 null，不能伪造
+    /// </summary>
+    public string? TraceId { get; set; }
+
+    /// <summary>该请求在数据面的 span id；无 Activity 时数据面就不写，保持 null</summary>
+    public string? SpanId { get; set; }
 }
 
 public class ErrorLog

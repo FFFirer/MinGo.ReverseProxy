@@ -1,37 +1,29 @@
 using Grpc.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MinGo.Core.Services;
-using MinGo.DataPlane.ConfigSync;
 using MinGo.DataPlane.Grpc;
-using CoreMetricPoint = MinGo.Core.Services.MetricPoint;
 
 namespace MinGo.DataPlane.Heartbeat;
 
 /// <summary>
 /// 心跳上报服务 - 通过 gRPC 双向流定期上报系统指标
+/// 请求内容由 <see cref="HeartbeatRequestBuilder"/> 构造；本类只管连接、节律与重连。
 /// </summary>
 public class HeartbeatReporter : BackgroundService
 {
     private readonly HeartbeatCollect.HeartbeatCollectClient _client;
-    private readonly TelemetryStore _telemetryStore;
-    private readonly DataPlaneConfigProvider _configProvider;
-    private readonly GatewayIdentity _identity;
+    private readonly HeartbeatRequestBuilder _builder;
     private readonly ILogger<HeartbeatReporter> _logger;
 
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
 
     public HeartbeatReporter(
         HeartbeatCollect.HeartbeatCollectClient client,
-        TelemetryStore telemetryStore,
-        DataPlaneConfigProvider configProvider,
-        GatewayIdentity identity,
+        HeartbeatRequestBuilder builder,
         ILogger<HeartbeatReporter> logger)
     {
         _client = client;
-        _telemetryStore = telemetryStore;
-        _configProvider = configProvider;
-        _identity = identity;
+        _builder = builder;
         _logger = logger;
     }
 
@@ -52,8 +44,12 @@ public class HeartbeatReporter : BackgroundService
                 {
                     await Task.Delay(HeartbeatInterval, stoppingToken);
 
-                    var request = BuildHeartbeatRequest();
+                    var request = _builder.Build();
                     await call.RequestStream.WriteAsync(request, stoppingToken);
+
+                    // 只有写成功了才算送达。写失败时游标不动，下一周期重取同一页 —— 
+                    // 至多重复一个周期，而不是把没送出去的数据当成已上报。
+                    _builder.Commit();
 
                     if (await call.ResponseStream.MoveNext(stoppingToken))
                     {
@@ -76,63 +72,6 @@ public class HeartbeatReporter : BackgroundService
                 retryDelay = TimeSpan.FromSeconds(Math.Min(retryDelay.TotalSeconds * 2, 30));
             }
         }
-    }
-
-    private HeartbeatRequest BuildHeartbeatRequest()
-    {
-        var totalRequests = _telemetryStore.Metrics.TryGetValue("gateway.requests.total", out var total)
-            ? (long)total.Sum(p => p.Value) : 0;
-        var errorRequests = _telemetryStore.Metrics.TryGetValue("gateway.requests.errors", out var errors)
-            ? (long)errors.Sum(p => p.Value) : 0;
-
-        var request = new HeartbeatRequest
-        {
-            DataPlaneId = _identity.Id,
-            CpuUsage = 0,
-            MemoryUsage = 0,
-            TotalRequests = totalRequests,
-            ErrorRequests = errorRequests,
-            IsHealthy = true,
-            TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-        };
-
-        // 添加访问日志
-        var accessLogs = _telemetryStore.DrainAccessLogs(200);
-        foreach (var log in accessLogs)
-        {
-            request.AccessLogs.Add(new Grpc.AccessLogEntry
-            {
-                TimestampUnixMs = new DateTimeOffset(log.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
-                Method = log.Method,
-                Path = log.Path,
-                StatusCode = log.StatusCode,
-                DurationMs = log.DurationMs,
-                ClientIp = log.ClientIp,
-                Route = log.Route
-            });
-        }
-
-        // 添加遥测指标点
-        foreach (var (name, points) in _telemetryStore.Metrics)
-        {
-            var pointsList = points.ToList();
-            foreach (var point in pointsList.Skip(Math.Max(0, pointsList.Count - 10)))
-            {
-                var grpcPoint = new Grpc.MetricPoint
-                {
-                    Name = name,
-                    Value = point.Value,
-                    TimestampUnixMs = new DateTimeOffset(point.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds()
-                };
-                foreach (var (key, val) in point.Tags)
-                {
-                    grpcPoint.Tags[key] = val?.ToString() ?? "";
-                }
-                request.Metrics.Add(grpcPoint);
-            }
-        }
-
-        return request;
     }
 
     private async Task HandleCommandsAsync(IEnumerable<ControlCommand> commands, CancellationToken ct)

@@ -31,8 +31,25 @@ builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.HeartbeatCollect.HeartbeatCo
 builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.EventSubscription.EventSubscriptionClient>(o =>
     o.Address = new Uri(controlPlaneGrpcUrl));
 
-// 遥测存储
-builder.Services.AddSingleton<TelemetryStore>();
+// 遥测存储：每指标点数上限可配置，把标签基数带来的内存风险约束在有界范围内
+var maxMetricPoints = builder.Configuration.GetValue(
+    "Telemetry:MaxMetricPoints", TelemetryStore.DefaultMaxPointsPerMetric);
+builder.Services.AddSingleton(_ => new TelemetryStore(maxMetricPoints));
+
+// 心跳上报的两个阀门：单指标单周期上限与访问日志单周期上限。
+// 它们是吞吐阀门而不是抽样率——超限时顺延，丢没丢由 gateway.telemetry.unreported.dropped 说明。
+var maxPointsPerHeartbeat = builder.Configuration.GetValue("Telemetry:MaxMetricPointsPerHeartbeat", 2000);
+var maxAccessLogsPerHeartbeat = builder.Configuration.GetValue("Telemetry:MaxAccessLogsPerHeartbeat", 200);
+builder.Services.AddSingleton<IProcessSampler, ProcessSampler>();
+builder.Services.AddSingleton(sp => new HeartbeatRequestBuilder(
+    sp.GetRequiredService<TelemetryStore>(),
+    sp.GetRequiredService<GatewayIdentity>(),
+    sp.GetRequiredService<IProcessSampler>(),
+    sp.GetRequiredService<DataPlaneConfigProvider>(),
+    static () => (GatewayMetrics.LifetimeRequestsTotal, GatewayMetrics.LifetimeRequestsErrors),
+    maxPointsPerHeartbeat,
+    maxAccessLogsPerHeartbeat,
+    sp.GetRequiredService<ILogger<HeartbeatRequestBuilder>>()));
 
 // 后台服务：配置同步、事件订阅、心跳上报
 // GatewayIdentity 为所有服务提供统一的 DataPlaneId，程序启动时即就绪
@@ -111,17 +128,7 @@ if (otelSection.GetValue<bool>("Enabled", true))
     var otelEndpoint = otelSection["OtlpEndpoint"] ?? "http://localhost:4317";
     var serviceName = otelSection["ServiceName"] ?? "min-go-data-plane";
     builder.Services.AddOpenTelemetry()
-        .ConfigureResource(r => r.AddService(serviceName))
-        .WithTracing(tracing => tracing
-            .AddSource("Gateway")
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
-        .WithMetrics(metrics => metrics
-            .AddMeter("Gateway")
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
+        .AddGatewayTelemetry(serviceName, new Uri(otelEndpoint));
 }
 
 // 健康检查
