@@ -1,8 +1,11 @@
 version: '3.8'
 
+# 这里的镜像由 GitHub Actions 构建并推到公开 ghcr（仓库为 public，包继承公开可见性，
+# 匿名 docker pull 即可，不需要凭据）。Gitea 流水线仍推私有 registry
+# registry.private.fffirer.top:9081/1mingo/*，两条产物并行，按部署侧网络可达性选择。
 services:
   migrate:
-    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
+    image: ghcr.io/fffirer/reverseproxy-cp:latest
     build:
       context: .
       dockerfile: ControlPlane.Dockerfile
@@ -15,7 +18,7 @@ services:
     restart: "no"
 
   control-plane:
-    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-cp:latest
+    image: ghcr.io/fffirer/reverseproxy-cp:latest
     build:
       context: .
       dockerfile: ControlPlane.Dockerfile
@@ -49,7 +52,7 @@ services:
     restart: unless-stopped
 
   data-plane:
-    image: registry.private.fffirer.top:9081/1mingo/reverseproxy-dp:latest
+    image: ghcr.io/fffirer/reverseproxy-dp:latest
     build:
       context: .
       dockerfile: DataPlane.Dockerfile
