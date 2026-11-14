@@ -1,4 +1,5 @@
 import { createSignal, onMount, For, Show } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { MetricsSummary, ServiceMetrics, ErrorMetrics } from '../types';
@@ -6,6 +7,7 @@ import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 
 export default function MonitoringPage() {
+  const navigate = useNavigate();
   const [timeRange, setTimeRange] = createSignal('1h');
   const [metrics, setMetrics] = createSignal<MetricsSummary | null>(null);
   const [services, setServices] = createSignal<ServiceMetrics[]>([]);
@@ -38,12 +40,22 @@ export default function MonitoringPage() {
     fetchAll();
   };
 
+  const routeName = (id?: string) =>
+    (id && services().find((s) => s.serviceId === id)?.serviceName) || id || '-';
+
   const serviceColumns: Column<ServiceMetrics>[] = [
     {
       key: 'name',
       title: '路由',
       mobileVisible: true,
-      cell: (svc) => <span class="font-mono text-xs">{svc.serviceName}</span>,
+      cell: (svc) => (
+        <div>
+          <span class="text-sm">{svc.serviceName}</span>
+          <Show when={svc.serviceName !== svc.serviceId}>
+            <span class="block font-mono text-xs text-secondary truncate max-w-[240px]" title={svc.serviceId}>{svc.serviceId}</span>
+          </Show>
+        </div>
+      ),
     },
     {
       key: 'requests',
@@ -68,6 +80,18 @@ export default function MonitoringPage() {
       key: 'avgResponse',
       title: '平均响应',
       cell: (svc) => <span class="text-right">{svc.averageResponseTime.toFixed(1)}ms</span>,
+    },
+    {
+      key: 'actions',
+      title: '',
+      cell: (svc) => (
+        <button
+          class="btn btn-secondary text-xs"
+          onClick={() => navigate(`/logs?routeId=${svc.serviceId}`)}
+        >
+          日志
+        </button>
+      ),
     },
   ];
 
@@ -128,14 +152,25 @@ export default function MonitoringPage() {
         <Show when={errors().length > 0} fallback={<p class="text-secondary text-center py-4">暂无错误数据</p>}>
           <div class="space-y-3">
             <For each={errors()}>{(err) => (
-              <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+              <div
+                class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-200 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-300"
+                title="点击查看该路由此状态码的请求日志"
+                onClick={() => navigate(`/logs?routeId=${err.routeId ?? ''}&status=${err.errorCode}`)}
+              >
                 <div class="flex items-center gap-3">
                   <span class={`px-2 py-1 rounded text-xs font-bold ${parseInt(err.errorCode) >= 500 ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'
                     }`}>{err.errorCode}</span>
                   <span class="text-sm">{err.errorMessage}</span>
                 </div>
                 <div class="flex items-center gap-4">
-                  {err.routeId && <span class="text-xs text-secondary font-mono">{err.routeId}</span>}
+                  {err.routeId && (
+                    <span class="text-xs text-secondary">
+                      {routeName(err.routeId)}
+                      <Show when={routeName(err.routeId) !== err.routeId}>
+                        <span class="font-mono ml-1 hidden xl:inline">({err.routeId})</span>
+                      </Show>
+                    </span>
+                  )}
                   <span class="text-sm font-bold">{err.count} 次</span>
                 </div>
               </div>

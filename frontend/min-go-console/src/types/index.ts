@@ -258,7 +258,11 @@ export interface AccessLog {
   path: string;
   statusCode: number;
   durationMs: number;
+  ttfbMs: number;
+  downloadMs: number;
   clientIp: string;
+  routeId?: string;
+  instanceId?: string;
 }
 
 export interface UserInfo {

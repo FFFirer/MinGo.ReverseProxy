@@ -20,10 +20,16 @@ public class LogService : ILogService
     {
         var logs = _store.AccessLogs.ToList();
 
+        if (query.StartTime.HasValue)
+            logs = logs.Where(l => l.Timestamp >= query.StartTime.Value.UtcDateTime).ToList();
+        if (query.EndTime.HasValue)
+            logs = logs.Where(l => l.Timestamp <= query.EndTime.Value.UtcDateTime).ToList();
         if (query.StatusCode.HasValue)
             logs = logs.Where(l => l.StatusCode == query.StatusCode.Value).ToList();
+        else if (TryGetStatusClassRange(query.StatusClass, out var classMin))
+            logs = logs.Where(l => l.StatusCode >= classMin && l.StatusCode < classMin + 100).ToList();
         if (!string.IsNullOrEmpty(query.RouteId))
-            logs = logs.Where(l => l.Route.Contains(query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
+            logs = logs.Where(l => string.Equals(l.Route, query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!string.IsNullOrEmpty(query.Message))
             logs = logs.Where(l => l.Path.Contains(query.Message, StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -40,10 +46,24 @@ public class LogService : ILogService
                 Path = l.Path,
                 StatusCode = l.StatusCode,
                 DurationMs = l.DurationMs,
+                TtfbMs = l.TtfbMs,
+                DownloadMs = l.DownloadMs,
                 RouteId = l.Route
             });
 
         return Task.FromResult(result.AsEnumerable());
+    }
+
+    private static bool TryGetStatusClassRange(string? statusClass, out int min)
+    {
+        min = statusClass switch
+        {
+            "2xx" => 200,
+            "4xx" => 400,
+            "5xx" => 500,
+            _ => 0
+        };
+        return min > 0;
     }
 
     public Task<IEnumerable<ErrorLog>> GetErrorLogsAsync(LogQuery query)
@@ -53,7 +73,7 @@ public class LogService : ILogService
             .ToList();
 
         if (!string.IsNullOrEmpty(query.RouteId))
-            logs = logs.Where(l => l.Route.Contains(query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
+            logs = logs.Where(l => string.Equals(l.Route, query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
         if (query.StatusCode.HasValue)
             logs = logs.Where(l => l.StatusCode == query.StatusCode.Value).ToList();
 
@@ -108,10 +128,10 @@ public class LogService : ILogService
     {
         var logs = await GetAccessLogsAsync(query);
         using var writer = new StreamWriter(stream, leaveOpen: true);
-        await writer.WriteLineAsync("Timestamp,InstanceId,Method,Path,StatusCode,DurationMs,ClientIp,RouteId");
+        await writer.WriteLineAsync("Timestamp,InstanceId,Method,Path,StatusCode,DurationMs,TtfbMs,DownloadMs,ClientIp,RouteId");
         foreach (var log in logs)
         {
-            await writer.WriteLineAsync($"{log.Timestamp:O},{log.InstanceId},{log.Method},{log.Path},{log.StatusCode},{log.DurationMs},{log.ClientIp},{log.RouteId}");
+            await writer.WriteLineAsync($"{log.Timestamp:O},{log.InstanceId},{log.Method},{log.Path},{log.StatusCode},{log.DurationMs},{log.TtfbMs},{log.DownloadMs},{log.ClientIp},{log.RouteId}");
         }
         await writer.FlushAsync();
     }

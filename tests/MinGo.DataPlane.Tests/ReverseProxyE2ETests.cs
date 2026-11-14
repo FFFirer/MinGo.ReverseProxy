@@ -385,6 +385,33 @@ public class ReverseProxyE2ETests : IAsyncLifetime
         Assert.True(store.Metrics.ContainsKey("gateway.requests.total"));
     }
 
+    [Fact]
+    public async Task Telemetry_ProxyRequest_RecordsPhaseTimings()
+    {
+        ResetBackend(async ctx =>
+        {
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentType = "text/plain";
+            await Task.Delay(150);
+            await ctx.Response.WriteAsync("head");
+            await ctx.Response.Body.FlushAsync();
+            await Task.Delay(120);
+            await ctx.Response.WriteAsync("tail");
+        });
+
+        var store = _dataPlane.Services.GetRequiredService<TelemetryStore>();
+        using var client = new HttpClient { BaseAddress = new Uri(_dataPlaneUrl) };
+        var body = await client.GetStringAsync("/timed");
+
+        Assert.Equal("headtail", body);
+        var entry = store.AccessLogs.Last(l => l.Path == "/timed");
+        Assert.Equal(200, entry.StatusCode);
+        Assert.True(entry.TtfbMs >= 100, $"TtfbMs={entry.TtfbMs} 应覆盖上游 150ms 处理延迟");
+        Assert.True(entry.DownloadMs >= 50, $"DownloadMs={entry.DownloadMs} 应覆盖响应体 120ms 传输间隔");
+        Assert.True(entry.TtfbMs + entry.DownloadMs <= entry.DurationMs + 50,
+            $"分段之和({entry.TtfbMs}+{entry.DownloadMs})不应超过总耗时({entry.DurationMs})");
+    }
+
     // ========== 二进制响应 ==========
 
     [Fact]

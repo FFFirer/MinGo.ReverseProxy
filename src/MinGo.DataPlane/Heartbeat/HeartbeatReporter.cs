@@ -80,24 +80,19 @@ public class HeartbeatReporter : BackgroundService
 
     private HeartbeatRequest BuildHeartbeatRequest()
     {
-        var totalRequests = _telemetryStore.Metrics.TryGetValue("gateway.requests.total", out var total)
-            ? (long)total.Sum(p => p.Value) : 0;
-        var errorRequests = _telemetryStore.Metrics.TryGetValue("gateway.requests.errors", out var errors)
-            ? (long)errors.Sum(p => p.Value) : 0;
-
         var request = new HeartbeatRequest
         {
             DataPlaneId = _identity.Id,
             CpuUsage = 0,
             MemoryUsage = 0,
-            TotalRequests = totalRequests,
-            ErrorRequests = errorRequests,
+            TotalRequests = _telemetryStore.TotalRequests,
+            ErrorRequests = _telemetryStore.ErrorRequests,
             IsHealthy = true,
             TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         };
 
         // 添加访问日志
-        var accessLogs = _telemetryStore.DrainAccessLogs(200);
+        var accessLogs = _telemetryStore.DrainAccessLogs(1000);
         foreach (var log in accessLogs)
         {
             request.AccessLogs.Add(new Grpc.AccessLogEntry
@@ -108,28 +103,26 @@ public class HeartbeatReporter : BackgroundService
                 StatusCode = log.StatusCode,
                 DurationMs = log.DurationMs,
                 ClientIp = log.ClientIp,
-                Route = log.Route
+                Route = log.Route,
+                TtfbMs = log.TtfbMs,
+                DownloadMs = log.DownloadMs
             });
         }
 
-        // 添加遥测指标点
-        foreach (var (name, points) in _telemetryStore.Metrics)
+        // 添加遥测指标点：drain 语义，每个点只上报一次，控制面无需去重
+        foreach (var (name, point) in _telemetryStore.DrainMetrics())
         {
-            var pointsList = points.ToList();
-            foreach (var point in pointsList.Skip(Math.Max(0, pointsList.Count - 10)))
+            var grpcPoint = new Grpc.MetricPoint
             {
-                var grpcPoint = new Grpc.MetricPoint
-                {
-                    Name = name,
-                    Value = point.Value,
-                    TimestampUnixMs = new DateTimeOffset(point.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds()
-                };
-                foreach (var (key, val) in point.Tags)
-                {
-                    grpcPoint.Tags[key] = val?.ToString() ?? "";
-                }
-                request.Metrics.Add(grpcPoint);
+                Name = name,
+                Value = point.Value,
+                TimestampUnixMs = new DateTimeOffset(point.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds()
+            };
+            foreach (var (key, val) in point.Tags)
+            {
+                grpcPoint.Tags[key] = val?.ToString() ?? "";
             }
+            request.Metrics.Add(grpcPoint);
         }
 
         return request;

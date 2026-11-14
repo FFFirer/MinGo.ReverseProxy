@@ -35,27 +35,46 @@ public class GatewayTelemetryMiddleware
         using var activity = Source.StartActivity($"gateway.request: {route}", ActivityKind.Server);
 
         var sw = Stopwatch.StartNew();
+        var timing = new ResponseTiming();
+        ctx.Response.OnStarting(state =>
+        {
+            ((ResponseTiming)state!).MarkHeaders(sw.ElapsedMilliseconds);
+            return Task.CompletedTask;
+        }, timing);
+        ctx.Response.Body = new TimingResponseBodyStream(ctx.Response.Body, timing, sw);
 
         try
         {
             await _next(ctx);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetTag("error", ex.Message);
+            throw;
+        }
+        finally
+        {
             sw.Stop();
 
             var statusCode = ctx.Response.StatusCode;
             var duration = sw.Elapsed.TotalMilliseconds;
+            var tags = new Dictionary<string, object> { { "route", route }, { "status", statusCode } };
+
+            // 无论成功或异常，每个请求恰好记录一次 total/duration/access log，保证比率分母完整
+            _store.IncrementCounters(statusCode);
 
             _store.AddMetric("gateway.requests.total", new MetricPoint
             {
                 Timestamp = DateTime.UtcNow,
                 Value = 1,
-                Tags = new Dictionary<string, object> { { "route", route }, { "status", statusCode } }
+                Tags = tags
             });
 
             _store.AddMetric("gateway.request.duration", new MetricPoint
             {
                 Timestamp = DateTime.UtcNow,
                 Value = duration,
-                Tags = new Dictionary<string, object> { { "route", route }, { "status", statusCode } }
+                Tags = tags
             });
 
             if (statusCode >= 400)
@@ -64,7 +83,7 @@ public class GatewayTelemetryMiddleware
                 {
                     Timestamp = DateTime.UtcNow,
                     Value = 1,
-                    Tags = new Dictionary<string, object> { { "route", route }, { "status", statusCode } }
+                    Tags = tags
                 });
             }
 
@@ -80,23 +99,10 @@ public class GatewayTelemetryMiddleware
                 StatusCode = statusCode,
                 DurationMs = (long)duration,
                 ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
-                Route = route
+                Route = route,
+                TtfbMs = timing.TtfbMs,
+                DownloadMs = timing.DownloadMs
             });
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            var duration = sw.Elapsed.TotalMilliseconds;
-
-            _store.AddMetric("gateway.requests.errors", new MetricPoint
-            {
-                Timestamp = DateTime.UtcNow,
-                Value = 1,
-                Tags = new Dictionary<string, object> { { "route", route }, { "error", ex.Message } }
-            });
-
-            activity?.SetTag("error", ex.Message);
-            throw;
         }
     }
 }

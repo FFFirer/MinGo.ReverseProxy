@@ -33,6 +33,31 @@ namespace MinGo.Core.Services
         /// </summary>
         public ConcurrentQueue<AccessLogEntry> AccessLogs { get; } = new();
 
+        private long _totalRequests;
+        private long _errorRequests;
+
+        /// <summary>
+        /// 累计请求总数（心跳上报用，不随指标队列 drain 清零）
+        /// </summary>
+        public long TotalRequests => Interlocked.Read(ref _totalRequests);
+
+        /// <summary>
+        /// 累计错误请求数（状态码 >= 400）
+        /// </summary>
+        public long ErrorRequests => Interlocked.Read(ref _errorRequests);
+
+        /// <summary>
+        /// 记录一次请求的累计计数
+        /// </summary>
+        public void IncrementCounters(int statusCode)
+        {
+            Interlocked.Increment(ref _totalRequests);
+            if (statusCode >= 400)
+            {
+                Interlocked.Increment(ref _errorRequests);
+            }
+        }
+
         /// <summary>
         /// 添加跟踪数据
         /// </summary>
@@ -101,6 +126,23 @@ namespace MinGo.Core.Services
             }
             return result;
         }
+
+        /// <summary>
+        /// 批量取出并清空指标点（用于心跳上报）。
+        /// 与访问日志相同的 drain 语义：每个点只上报一次，避免控制面重复累加。
+        /// </summary>
+        public List<(string Name, MetricPoint Point)> DrainMetrics(int maxCount = 5000)
+        {
+            var result = new List<(string, MetricPoint)>();
+            foreach (var (name, queue) in Metrics)
+            {
+                while (result.Count < maxCount && queue.TryDequeue(out var point))
+                {
+                    result.Add((name, point));
+                }
+            }
+            return result;
+        }
     }
 
     /// <summary>
@@ -116,6 +158,16 @@ namespace MinGo.Core.Services
         public string ClientIp { get; set; } = "";
         public string Route { get; set; } = "";
         public string? InstanceId { get; set; }
+
+        /// <summary>
+        /// 等待上游响应时间（请求开始到响应头发出，含上游连接与处理）
+        /// </summary>
+        public long TtfbMs { get; set; }
+
+        /// <summary>
+        /// 响应体传输时间（首字节到末字节写入）
+        /// </summary>
+        public long DownloadMs { get; set; }
     }
 
     /// <summary>

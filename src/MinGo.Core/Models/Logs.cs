@@ -11,6 +11,11 @@ public class LogQuery
     public string? RouteId { get; set; }
     public string? ClusterId { get; set; }
     public int? StatusCode { get; set; }
+
+    /// <summary>
+    /// 状态码类别过滤：2xx / 4xx / 5xx
+    /// </summary>
+    public string? StatusClass { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 100;
 }
@@ -25,6 +30,16 @@ public class AccessLog
     public string Path { get; set; } = string.Empty;
     public int StatusCode { get; set; }
     public long DurationMs { get; set; }
+
+    /// <summary>
+    /// 等待上游响应时间（ms）
+    /// </summary>
+    public long TtfbMs { get; set; }
+
+    /// <summary>
+    /// 响应体传输时间（ms）
+    /// </summary>
+    public long DownloadMs { get; set; }
     public string? UserAgent { get; set; }
     public string? RouteId { get; set; }
     public string? ClusterId { get; set; }

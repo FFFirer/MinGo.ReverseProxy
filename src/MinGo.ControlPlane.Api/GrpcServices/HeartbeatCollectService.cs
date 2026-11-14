@@ -88,7 +88,9 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
                         DurationMs = grpcLog.DurationMs,
                         ClientIp = grpcLog.ClientIp,
                         Route = grpcLog.Route,
-                        InstanceId = request.DataPlaneId
+                        InstanceId = request.DataPlaneId,
+                        TtfbMs = grpcLog.TtfbMs,
+                        DownloadMs = grpcLog.DownloadMs
                     });
                 }
 

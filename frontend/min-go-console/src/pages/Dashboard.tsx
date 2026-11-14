@@ -1,10 +1,12 @@
 import { createSignal, onMount, onCleanup, For, Show } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { MetricsSummary, RequestMetrics, GatewayInstance, ServiceMetrics, AccessLog } from '../types';
 import { FaSolidArrowUp, FaSolidExclamationCircle, FaSolidClock, FaSolidServer, FaSolidRefresh } from 'solid-icons/fa';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = createSignal<MetricsSummary | null>(null);
   const [requestMetrics, setRequestMetrics] = createSignal<RequestMetrics[]>([]);
   const [instances, setInstances] = createSignal<GatewayInstance[]>([]);
@@ -181,8 +183,12 @@ export default function Dashboard() {
           <Show when={services().length > 0} fallback={<p class="text-secondary text-center py-8">暂无数据</p>}>
             <div class="space-y-2">
               <For each={services().slice(0, 8)}>{(svc) => (
-                <div class="flex items-center justify-between text-sm">
-                  <span class="font-mono text-xs truncate max-w-[160px]" title={svc.serviceName}>{svc.serviceName}</span>
+                <div
+                  class="flex items-center justify-between text-sm cursor-pointer rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-dark-300"
+                  title={`查看 ${svc.serviceName} 的请求日志`}
+                  onClick={() => navigate(`/logs?routeId=${svc.serviceId}`)}
+                >
+                  <span class="text-xs truncate max-w-[160px]" title={svc.serviceId}>{svc.serviceName}</span>
                   <div class="flex items-center gap-3">
                     <span>{svc.totalRequests} 请求</span>
                     <span class={svc.errorRate > 0 ? 'text-danger' : 'text-success'}>{svc.errorRate.toFixed(0)}%</span>

@@ -10,14 +10,32 @@ namespace MinGo.Application.Services;
 public class MonitoringService : IMonitoringService
 {
     private readonly TelemetryStore _store;
+    private readonly IApiDbService _apiDb;
 
     /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="store">遥测存储</param>
-    public MonitoringService(TelemetryStore store)
+    /// <param name="apiDb">路由配置查询（用于路由 ID → 显示名映射）</param>
+    public MonitoringService(TelemetryStore store, IApiDbService apiDb)
     {
         _store = store;
+        _apiDb = apiDb;
+    }
+
+    private async Task<Dictionary<string, string>> GetRouteNamesAsync()
+    {
+        try
+        {
+            var routes = await _apiDb.GetRoutesAsync();
+            return routes.Where(r => !string.IsNullOrWhiteSpace(r.Name))
+                .GroupBy(r => r.Id)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+        }
+        catch
+        {
+            return new Dictionary<string, string>();
+        }
     }
 
     /// <inheritdoc />
@@ -110,11 +128,13 @@ public class MonitoringService : IMonitoringService
     }
 
     /// <inheritdoc />
-    public Task<IEnumerable<ServiceMetrics>> GetServiceMetricsAsync()
+    public async Task<IEnumerable<ServiceMetrics>> GetServiceMetricsAsync()
     {
         var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total.ToList() : new List<MetricPoint>();
         var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors.ToList() : new List<MetricPoint>();
         var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations.ToList() : new List<MetricPoint>();
+
+        var routeNames = await GetRouteNamesAsync();
 
         var serviceGroups = totalPoints
             .GroupBy(p => p.Tags.TryGetValue("route", out var route) ? route?.ToString() ?? "unknown" : "unknown")
@@ -128,7 +148,7 @@ public class MonitoringService : IMonitoringService
                 return new ServiceMetrics
                 {
                     ServiceId = routeName,
-                    ServiceName = routeName,
+                    ServiceName = routeNames.TryGetValue(routeName, out var displayName) ? displayName : routeName,
                     TotalRequests = serviceTotal,
                     ErrorRequests = serviceErrors,
                     ErrorRate = serviceTotal > 0 ? (double)serviceErrors / serviceTotal * 100 : 0,
@@ -137,7 +157,7 @@ public class MonitoringService : IMonitoringService
                 };
             });
 
-        return Task.FromResult(serviceGroups.AsEnumerable());
+        return serviceGroups.ToList();
     }
 
     /// <inheritdoc />
@@ -147,16 +167,19 @@ public class MonitoringService : IMonitoringService
             ? errors.Where(p => p.Timestamp >= start.UtcDateTime && p.Timestamp <= end.UtcDateTime).ToList()
             : new List<MetricPoint>();
 
+        // 按 (状态码, 路由) 双键分组，保留错误的完整路由归属
         var errorMetrics = errorPoints
-            .GroupBy(p => p.Tags.TryGetValue("status", out var status) ? status?.ToString() ?? "unknown" : "unknown")
+            .GroupBy(p => (
+                Status: p.Tags.TryGetValue("status", out var status) ? status?.ToString() ?? "unknown" : "unknown",
+                Route: p.Tags.TryGetValue("route", out var route) ? route?.ToString() : null))
             .Select(g => new ErrorMetrics
             {
                 Timestamp = end,
-                ErrorCode = g.Key,
-                ErrorMessage = $"HTTP {(int.TryParse(g.Key, out var code) ? code : 500)}",
+                ErrorCode = g.Key.Status,
+                ErrorMessage = $"HTTP {(int.TryParse(g.Key.Status, out var code) ? code : 500)}",
                 Count = g.Sum(p => (int)p.Value),
-                RouteId = g.First().Tags.TryGetValue("route", out var route) ? route?.ToString() : null,
-                ClusterId = g.First().Tags.TryGetValue("cluster", out var cluster) ? cluster?.ToString() : null
+                RouteId = g.Key.Route,
+                ClusterId = null
             });
 
         return Task.FromResult(errorMetrics.AsEnumerable());

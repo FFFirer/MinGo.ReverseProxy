@@ -24,6 +24,10 @@ public class LogsController : ControllerBase
         [FromQuery] string? routeId = null,
         [FromQuery] string? clusterId = null,
         [FromQuery] int? statusCode = null,
+        [FromQuery] string? statusClass = null,
+        [FromQuery] DateTimeOffset? start = null,
+        [FromQuery] DateTimeOffset? end = null,
+        [FromQuery] string? message = null,
         [FromQuery] int pageSize = 100)
     {
         var query = new LogQuery
@@ -31,6 +35,10 @@ public class LogsController : ControllerBase
             RouteId = routeId,
             ClusterId = clusterId,
             StatusCode = statusCode,
+            StatusClass = statusClass,
+            StartTime = start,
+            EndTime = end,
+            Message = message,
             PageSize = pageSize
         };
         var logs = await _logService.GetAccessLogsAsync(query);
