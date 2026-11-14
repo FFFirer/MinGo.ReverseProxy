@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/MinGo.Core.Tests/MinGo.Core.Tests.csproj" />
     <Project Path="tests/MinGo.DataPlane.Tests/MinGo.DataPlane.Tests.csproj" />
+    <Project Path="tests/MinGo.ControlPlane.Api.Tests/MinGo.ControlPlane.Api.Tests.csproj" />
   </Folder>
 </Solution>

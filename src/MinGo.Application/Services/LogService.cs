@@ -32,6 +32,8 @@ public class LogService : ILogService
             logs = logs.Where(l => string.Equals(l.Route, query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!string.IsNullOrEmpty(query.ClusterId))
             logs = logs.Where(l => string.Equals(l.Cluster, query.ClusterId, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!string.IsNullOrEmpty(query.InstanceId))
+            logs = logs.Where(l => string.Equals(l.InstanceId, query.InstanceId, StringComparison.Ordinal)).ToList();
         if (!string.IsNullOrEmpty(query.Message))
             logs = logs.Where(l => l.Path.Contains(query.Message, StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -51,7 +53,12 @@ public class LogService : ILogService
                 TtfbMs = l.TtfbMs,
                 DownloadMs = l.DownloadMs,
                 RouteId = l.Route,
+                // 关联键与代理维度由心跳带上；ingest 已把空串归一成 null，这里不再二次判断，
+                // 也不把 null 写成 none —— none 是采集侧"量过且不存在"的哨兵，不是"没传输"
                 ClusterId = l.Cluster,
+                DestinationId = l.Destination,
+                TraceId = l.TraceId,
+                SpanId = l.SpanId,
                 Host = l.Host
             });
 

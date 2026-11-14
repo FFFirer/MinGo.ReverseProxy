@@ -97,10 +97,15 @@ message AccessLogEntry {
     int64 duration_ms = 5;
     string client_ip = 6;
     string route = 7;
-    int64 ttfb_ms = 8;
-    int64 download_ms = 9;
-    string host = 10;
-    string cluster = 11;
+    // 字段 8-11 为追加：已有编号与类型不得改动，老数据面留空即"未传输"
+    string trace_id = 8;
+    string span_id = 9;
+    string cluster = 10;
+    string destination = 11;
+    // 分段计时与访问域名（本轮下钻/瀑布新增，同样追加不改旧号）
+    int64 ttfb_ms = 12;
+    int64 download_ms = 13;
+    string host = 14;
 }
 
 message MetricPoint {

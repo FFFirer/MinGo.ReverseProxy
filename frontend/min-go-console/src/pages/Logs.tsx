@@ -166,13 +166,18 @@ export default function LogsPage() {
                 <Show when={expandedId() === log.id}>
                   <div class="ml-6 mt-1 mb-2 pl-3 border-l-2 border-gray-500/40">
                     <Waterfall log={log} />
+                    {/* 代理维度与链路键由心跳上报；老数据面没上报，留空而不是显示 none */}
                     <div class="font-sans text-xs text-secondary mt-2">
                       路由 {routeName(log.routeId)}
                       <Show when={log.routeId && routeName(log.routeId) !== log.routeId}>
                         <span class="font-mono ml-1">({log.routeId})</span>
                       </Show>
                       <Show when={log.clusterId}> · 集群 {log.clusterId}</Show>
+                      <Show when={log.destinationId}> · 目的地 {log.destinationId}</Show>
                       <Show when={log.instanceId}> · 实例 {log.instanceId}</Show>
+                      <Show when={log.traceId}>
+                        <span class="font-mono ml-1">trace={log.traceId}</span>
+                      </Show>
                     </div>
                   </div>
                 </Show>

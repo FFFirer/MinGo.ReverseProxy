@@ -41,20 +41,23 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public Task<MetricsSummary> GetMetricsSummaryAsync()
     {
-        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total.ToList() : new List<MetricPoint>();
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors.ToList() : new List<MetricPoint>();
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations.ToList() : new List<MetricPoint>();
+        var totalPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsTotal, out var total) ? total.ToList() : new List<MetricPoint>();
+        var errorPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsErrors, out var errors) ? errors.ToList() : new List<MetricPoint>();
+        var durationPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestDuration, out var durations) ? durations.ToList() : new List<MetricPoint>();
 
         var totalRequests = totalPoints.Sum(p => (int)p.Value);
         var errorRequests = errorPoints.Sum(p => (int)p.Value);
-        var avgResponseTime = durationPoints.Count > 0 ? durationPoints.Average(p => p.Value) : 0;
+        var latencies = durationPoints.Select(p => p.Value).ToList();
 
         var summary = new MetricsSummary
         {
             TotalRequests = totalRequests,
             ErrorRequests = errorRequests,
             ErrorRate = totalRequests > 0 ? (double)errorRequests / totalRequests * 100 : 0,
-            AverageResponseTime = avgResponseTime,
+            AverageResponseTime = latencies.Count > 0 ? latencies.Average() : 0,
+            P50ResponseTime = MetricPercentiles.NearestRank(latencies, 50),
+            P95ResponseTime = MetricPercentiles.NearestRank(latencies, 95),
+            P99ResponseTime = MetricPercentiles.NearestRank(latencies, 99),
             ActiveConnections = 0,
             CpuUsage = 0,
             MemoryUsage = 0,
@@ -67,15 +70,15 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public Task<IEnumerable<RequestMetrics>> GetRequestMetricsAsync(DateTimeOffset start, DateTimeOffset end)
     {
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations)
+        var durationPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestDuration, out var durations)
             ? durations.Where(p => p.Timestamp >= start.UtcDateTime && p.Timestamp <= end.UtcDateTime).ToList()
             : new List<MetricPoint>();
 
-        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total)
+        var totalPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsTotal, out var total)
             ? total.Where(p => p.Timestamp >= start.UtcDateTime && p.Timestamp <= end.UtcDateTime).ToList()
             : new List<MetricPoint>();
 
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors)
+        var errorPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsErrors, out var errors)
             ? errors.Where(p => p.Timestamp >= start.UtcDateTime && p.Timestamp <= end.UtcDateTime).ToList()
             : new List<MetricPoint>();
 
@@ -97,6 +100,8 @@ public class MonitoringService : IMonitoringService
             var intervalTotalPoints = totalPoints.Where(p => p.Timestamp >= intervalStart.UtcDateTime && p.Timestamp < intervalEnd.UtcDateTime).ToList();
             var intervalErrorPoints = errorPoints.Where(p => p.Timestamp >= intervalStart.UtcDateTime && p.Timestamp < intervalEnd.UtcDateTime).ToList();
             
+            var intervalDurations = intervalDurationPoints.Select(p => p.Value).ToList();
+
             if (intervalTotalPoints.Count > 0 || intervalErrorPoints.Count > 0)
             {
                 metrics.Add(new RequestMetrics
@@ -104,9 +109,9 @@ public class MonitoringService : IMonitoringService
                     Timestamp = intervalStart,
                     Count = intervalTotalPoints.Sum(p => (int)p.Value),
                     ErrorCount = intervalErrorPoints.Sum(p => (int)p.Value),
-                    AverageResponseTime = intervalDurationPoints.Count > 0 ? intervalDurationPoints.Average(p => p.Value) : 0,
-                    P95ResponseTime = GetPercentile(intervalDurationPoints.Select(p => p.Value).ToList(), 95),
-                    P99ResponseTime = GetPercentile(intervalDurationPoints.Select(p => p.Value).ToList(), 99)
+                    AverageResponseTime = intervalDurations.Count > 0 ? intervalDurations.Average() : 0,
+                    P95ResponseTime = MetricPercentiles.NearestRank(intervalDurations, 95),
+                    P99ResponseTime = MetricPercentiles.NearestRank(intervalDurations, 99)
                 });
             }
             else
@@ -130,9 +135,9 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public async Task<IEnumerable<ServiceMetrics>> GetServiceMetricsAsync()
     {
-        var totalPoints = _store.Metrics.TryGetValue("gateway.requests.total", out var total) ? total.ToList() : new List<MetricPoint>();
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors) ? errors.ToList() : new List<MetricPoint>();
-        var durationPoints = _store.Metrics.TryGetValue("gateway.request.duration", out var durations) ? durations.ToList() : new List<MetricPoint>();
+        var totalPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsTotal, out var total) ? total.ToList() : new List<MetricPoint>();
+        var errorPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsErrors, out var errors) ? errors.ToList() : new List<MetricPoint>();
+        var durationPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestDuration, out var durations) ? durations.ToList() : new List<MetricPoint>();
 
         var routeNames = await GetRouteNamesAsync();
 
@@ -164,7 +169,7 @@ public class MonitoringService : IMonitoringService
     /// <inheritdoc />
     public Task<IEnumerable<ErrorMetrics>> GetErrorMetricsAsync(DateTimeOffset start, DateTimeOffset end)
     {
-        var errorPoints = _store.Metrics.TryGetValue("gateway.requests.errors", out var errors)
+        var errorPoints = _store.Metrics.TryGetValue(GatewayMetricNames.RequestsErrors, out var errors)
             ? errors.Where(p => p.Timestamp >= start.UtcDateTime && p.Timestamp <= end.UtcDateTime).ToList()
             : new List<MetricPoint>();
 
@@ -201,21 +206,5 @@ public class MonitoringService : IMonitoringService
         };
 
         return Task.FromResult(metrics);
-    }
-
-    /// <summary>
-    /// 计算百分位数
-    /// </summary>
-    /// <param name="values">值列表</param>
-    /// <param name="percentile">百分位</param>
-    /// <returns>百分位值</returns>
-    private static double GetPercentile(List<double> values, int percentile)
-    {
-        if (values.Count == 0) return 0;
-
-        var sorted = values.OrderBy(v => v).ToList();
-        var index = (int)Math.Ceiling((percentile / 100.0) * sorted.Count) - 1;
-        index = Math.Max(0, Math.Min(sorted.Count - 1, index));
-        return sorted[index];
     }
 }
