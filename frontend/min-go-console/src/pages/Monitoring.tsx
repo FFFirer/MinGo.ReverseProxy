@@ -58,6 +58,11 @@ export default function MonitoringPage() {
       ),
     },
     {
+      key: 'cluster',
+      title: '集群',
+      cell: (svc) => <span class="font-mono text-xs text-secondary">{svc.clusterId || '-'}</span>,
+    },
+    {
       key: 'requests',
       title: '请求数',
       cell: (svc) => <span class="text-right">{svc.totalRequests}</span>,
@@ -168,6 +173,9 @@ export default function MonitoringPage() {
                       {routeName(err.routeId)}
                       <Show when={routeName(err.routeId) !== err.routeId}>
                         <span class="font-mono ml-1 hidden xl:inline">({err.routeId})</span>
+                      </Show>
+                      <Show when={err.clusterId}>
+                        <span class="font-mono ml-1 hidden xl:inline">· {err.clusterId}</span>
                       </Show>
                     </span>
                   )}

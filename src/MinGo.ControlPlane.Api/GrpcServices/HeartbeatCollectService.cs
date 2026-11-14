@@ -90,7 +90,9 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
                         Route = grpcLog.Route,
                         InstanceId = request.DataPlaneId,
                         TtfbMs = grpcLog.TtfbMs,
-                        DownloadMs = grpcLog.DownloadMs
+                        DownloadMs = grpcLog.DownloadMs,
+                        Host = grpcLog.Host,
+                        Cluster = grpcLog.Cluster
                     });
                 }
 

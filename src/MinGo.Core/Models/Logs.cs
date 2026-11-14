@@ -43,6 +43,7 @@ public class AccessLog
     public string? UserAgent { get; set; }
     public string? RouteId { get; set; }
     public string? ClusterId { get; set; }
+    public string? Host { get; set; }
     public string? DestinationAddress { get; set; }
 }
 

@@ -235,6 +235,7 @@ export interface RequestMetrics {
 export interface ServiceMetrics {
   serviceId: string;
   serviceName: string;
+  clusterId?: string;
   totalRequests: number;
   errorRequests: number;
   errorRate: number;
@@ -261,7 +262,9 @@ export interface AccessLog {
   ttfbMs: number;
   downloadMs: number;
   clientIp: string;
+  host?: string;
   routeId?: string;
+  clusterId?: string;
   instanceId?: string;
 }
 

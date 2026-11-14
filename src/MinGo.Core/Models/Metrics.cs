@@ -26,6 +26,7 @@ public class ServiceMetrics
 {
     public string ServiceId { get; set; } = string.Empty;
     public string ServiceName { get; set; } = string.Empty;
+    public string? ClusterId { get; set; }
     public int TotalRequests { get; set; }
     public int ErrorRequests { get; set; }
     public double ErrorRate { get; set; }

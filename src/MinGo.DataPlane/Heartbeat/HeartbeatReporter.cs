@@ -105,7 +105,9 @@ public class HeartbeatReporter : BackgroundService
                 ClientIp = log.ClientIp,
                 Route = log.Route,
                 TtfbMs = log.TtfbMs,
-                DownloadMs = log.DownloadMs
+                DownloadMs = log.DownloadMs,
+                Host = log.Host,
+                Cluster = log.Cluster
             });
         }
 

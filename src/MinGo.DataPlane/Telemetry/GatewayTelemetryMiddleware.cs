@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
 using MinGo.Core.Services;
+using Yarp.ReverseProxy.Model;
 
 namespace MinGo.DataPlane.Telemetry;
 
@@ -58,7 +59,14 @@ public class GatewayTelemetryMiddleware
 
             var statusCode = ctx.Response.StatusCode;
             var duration = sw.Elapsed.TotalMilliseconds;
-            var tags = new Dictionary<string, object> { { "route", route }, { "status", statusCode } };
+            var proxyFeature = ctx.Features.Get<IReverseProxyFeature>();
+            var clusterId = proxyFeature?.Cluster?.Config.ClusterId ?? "";
+            var tags = new Dictionary<string, object>
+            {
+                { "route", route },
+                { "status", statusCode },
+                { "cluster", clusterId }
+            };
 
             // 无论成功或异常，每个请求恰好记录一次 total/duration/access log，保证比率分母完整
             _store.IncrementCounters(statusCode);
@@ -100,6 +108,8 @@ public class GatewayTelemetryMiddleware
                 DurationMs = (long)duration,
                 ClientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
                 Route = route,
+                Host = ctx.Request.Host.Value ?? "",
+                Cluster = clusterId,
                 TtfbMs = timing.TtfbMs,
                 DownloadMs = timing.DownloadMs
             });

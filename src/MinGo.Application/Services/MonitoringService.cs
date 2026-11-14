@@ -149,6 +149,7 @@ public class MonitoringService : IMonitoringService
                 {
                     ServiceId = routeName,
                     ServiceName = routeNames.TryGetValue(routeName, out var displayName) ? displayName : routeName,
+                    ClusterId = g.First().Tags.TryGetValue("cluster", out var clusterTag) ? clusterTag?.ToString() : null,
                     TotalRequests = serviceTotal,
                     ErrorRequests = serviceErrors,
                     ErrorRate = serviceTotal > 0 ? (double)serviceErrors / serviceTotal * 100 : 0,

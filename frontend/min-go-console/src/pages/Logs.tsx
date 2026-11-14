@@ -155,6 +155,9 @@ export default function LogsPage() {
                   </span>
                   <span class="shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
                   <span class="shrink-0">[{log.method}]</span>
+                  <Show when={log.host}>
+                    <span class="shrink-0 text-secondary">{log.host}</span>
+                  </Show>
                   <span class="truncate">{log.path}</span>
                   <span class="shrink-0 font-bold">{log.statusCode}</span>
                   <span class="shrink-0">{log.durationMs}ms</span>
@@ -168,6 +171,7 @@ export default function LogsPage() {
                       <Show when={log.routeId && routeName(log.routeId) !== log.routeId}>
                         <span class="font-mono ml-1">({log.routeId})</span>
                       </Show>
+                      <Show when={log.clusterId}> · 集群 {log.clusterId}</Show>
                       <Show when={log.instanceId}> · 实例 {log.instanceId}</Show>
                     </div>
                   </div>

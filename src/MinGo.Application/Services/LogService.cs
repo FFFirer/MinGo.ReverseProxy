@@ -30,6 +30,8 @@ public class LogService : ILogService
             logs = logs.Where(l => l.StatusCode >= classMin && l.StatusCode < classMin + 100).ToList();
         if (!string.IsNullOrEmpty(query.RouteId))
             logs = logs.Where(l => string.Equals(l.Route, query.RouteId, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!string.IsNullOrEmpty(query.ClusterId))
+            logs = logs.Where(l => string.Equals(l.Cluster, query.ClusterId, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!string.IsNullOrEmpty(query.Message))
             logs = logs.Where(l => l.Path.Contains(query.Message, StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -48,7 +50,9 @@ public class LogService : ILogService
                 DurationMs = l.DurationMs,
                 TtfbMs = l.TtfbMs,
                 DownloadMs = l.DownloadMs,
-                RouteId = l.Route
+                RouteId = l.Route,
+                ClusterId = l.Cluster,
+                Host = l.Host
             });
 
         return Task.FromResult(result.AsEnumerable());
@@ -128,10 +132,10 @@ public class LogService : ILogService
     {
         var logs = await GetAccessLogsAsync(query);
         using var writer = new StreamWriter(stream, leaveOpen: true);
-        await writer.WriteLineAsync("Timestamp,InstanceId,Method,Path,StatusCode,DurationMs,TtfbMs,DownloadMs,ClientIp,RouteId");
+        await writer.WriteLineAsync("Timestamp,InstanceId,Method,Path,StatusCode,DurationMs,TtfbMs,DownloadMs,ClientIp,Host,RouteId,ClusterId");
         foreach (var log in logs)
         {
-            await writer.WriteLineAsync($"{log.Timestamp:O},{log.InstanceId},{log.Method},{log.Path},{log.StatusCode},{log.DurationMs},{log.TtfbMs},{log.DownloadMs},{log.ClientIp},{log.RouteId}");
+            await writer.WriteLineAsync($"{log.Timestamp:O},{log.InstanceId},{log.Method},{log.Path},{log.StatusCode},{log.DurationMs},{log.TtfbMs},{log.DownloadMs},{log.ClientIp},{log.Host},{log.RouteId},{log.ClusterId}");
         }
         await writer.FlushAsync();
     }

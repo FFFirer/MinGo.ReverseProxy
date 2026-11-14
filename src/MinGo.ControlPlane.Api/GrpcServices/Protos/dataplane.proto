@@ -99,6 +99,8 @@ message AccessLogEntry {
     string route = 7;
     int64 ttfb_ms = 8;
     int64 download_ms = 9;
+    string host = 10;
+    string cluster = 11;
 }
 
 message MetricPoint {

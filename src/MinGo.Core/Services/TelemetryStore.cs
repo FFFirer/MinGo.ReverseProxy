@@ -157,6 +157,8 @@ namespace MinGo.Core.Services
         public long DurationMs { get; set; }
         public string ClientIp { get; set; } = "";
         public string Route { get; set; } = "";
+        public string Host { get; set; } = "";
+        public string Cluster { get; set; } = "";
         public string? InstanceId { get; set; }
 
         /// <summary>
