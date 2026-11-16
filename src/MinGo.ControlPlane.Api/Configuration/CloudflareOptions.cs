@@ -1,7 +1,8 @@
 namespace MinGo.ControlPlane.Api.Configuration;
 
 /// <summary>
-/// Cloudflare 全局连接配置。凭据只走配置文件/环境变量，UI 只读展示，不落数据库。
+/// Cloudflare 连接默认配置。ApiToken/AccountId/TimeoutSeconds 以设置页保存值优先，
+/// 未保存时回退到本配置节；DataPlaneOrigin/DefaultCatchAll 始终来自配置节（部署拓扑相关）。
 /// </summary>
 public sealed class CloudflareOptions
 {

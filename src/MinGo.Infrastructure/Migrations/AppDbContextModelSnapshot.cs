@@ -347,6 +347,33 @@ namespace MinGo.Infrastructure.Migrations
                     b.ToTable("ApiRoutes", (string)null);
                 });
 
+            modelBuilder.Entity("MinGo.Core.Entities.CloudflareSettingsEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiToken")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CloudflareSettings", (string)null);
+                });
+
             modelBuilder.Entity("MinGo.Core.Entities.PortainerInstanceEntity", b =>
                 {
                     b.Property<string>("Id")

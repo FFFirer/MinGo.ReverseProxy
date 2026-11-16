@@ -72,3 +72,15 @@ public class PortainerInstanceEntityConfiguration : IEntityTypeConfiguration<Por
         builder.Property(e => e.HostAddress).HasMaxLength(1024);
     }
 }
+
+public class CloudflareSettingsEntityConfiguration : IEntityTypeConfiguration<CloudflareSettingsEntity>
+{
+    public void Configure(EntityTypeBuilder<CloudflareSettingsEntity> builder)
+    {
+        builder.ToTable("CloudflareSettings");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(64);
+        builder.Property(e => e.ApiToken).HasMaxLength(1024);
+        builder.Property(e => e.AccountId).HasMaxLength(128);
+    }
+}

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-网关支持把 Cloudflare Tunnel 作为与本地数据面并列的「接入通道」：隧道经 Cloudflare API 在控制面内完成增删改查，路由通过 `ConnectionId` 选择发布到本地数据面或某个隧道；发布到隧道的路由由控制面对账到该隧道的 ingress 规则与 DNS 记录（网关回源模式，流量经隧道 → 本地数据面）。Cloudflare 凭据仅由配置提供（`Cloudflare:ApiToken` / `AccountId`），不落库、不回显。
+网关支持把 Cloudflare Tunnel 作为与本地数据面并列的「接入通道」：隧道经 Cloudflare API 在控制面内完成增删改查，路由通过 `ConnectionId` 选择发布到本地数据面或某个隧道；发布到隧道的路由由控制面对账到该隧道的 ingress 规则与 DNS 记录（网关回源模式，流量经隧道 → 本地数据面）。Cloudflare 接入配置在「设置」页管理并落库（仿 Portainer 模式），配置节仅作默认值兜底；Token 读取一律脱敏，不回显明文。
 
 ## Requirements
 
@@ -20,20 +20,25 @@
 - **WHEN** 数据库升级应用 `AddRouteConnectionId` 迁移
 - **THEN** 已有路由的 `ConnectionId` SHALL 为 `local`，行为与升级前一致
 
-### Requirement: Cloudflare 凭据 SHALL 由配置驱动且不回显
+### Requirement: 接入配置 SHALL 在设置页管理且不回显
 
-Cloudflare 访问凭据（API Token、AccountId）SHALL 只从 `Cloudflare` 配置节（appsettings / 环境变量）读取，SHALL NOT 存入数据库，任何 API 响应与页面 SHALL NOT 回显 Token。未配置 Token 时，接入通道页面 SHALL 显示配置指引（所需权限：Account:Cloudflare Tunnel:Edit、Zone:DNS:Edit、Zone:Zone:Read），隧道接口 SHALL 返回 503 而不是报错泄漏内部细节。
+Cloudflare 接入配置（API Token、AccountId、请求超时）SHALL 在「设置」页编辑并持久化到数据库（单行配置，仿 Portainer 实例管理模式）；`Cloudflare` 配置节（appsettings / 环境变量）SHALL 仅作为未保存时的默认值兜底。DataPlaneOrigin 与 DefaultCatchAll 为部署拓扑参数，SHALL 始终来自配置节。任何 API 响应与页面 SHALL NOT 回显 Token 明文（读取返回脱敏值，保存时空值或含 `***` 视为不修改）。未配置 Token 时，接入通道页面 SHALL 指引用户前往设置页，隧道接口 SHALL 返回 503 而不是报错泄漏内部细节。
 
 #### Scenario: 未配置凭据
 
-- **WHEN** `Cloudflare:ApiToken` 为空且前端调用隧道相关接口
-- **THEN** 接口 SHALL 返回 `503` 与「Cloudflare 不可用」说明
-- **AND** 接入通道页面 SHALL 展示配置指引而非报错堆栈
+- **WHEN** 设置页与配置节均未提供 API Token，且前端调用隧道相关接口
+- **THEN** 接口 SHALL 返回 `503` 与「Cloudflare 不可用/未配置」说明
+- **AND** 接入通道页面 SHALL 指引前往设置页配置，而非展示报错堆栈
+
+#### Scenario: 设置页保存后立即生效
+
+- **WHEN** 用户在设置页填写 API Token 并保存
+- **THEN** 后续请求 SHALL 使用该 Token，无需重启控制面
 
 #### Scenario: 凭据不出现在任何输出中
 
-- **WHEN** 用户打开接入通道页面或调用状态接口
-- **THEN** 响应与页面 SHALL 只包含账号名、区域数、隧道资源信息，不包含 Token 原文
+- **WHEN** 用户打开设置页或调用设置/状态接口
+- **THEN** 响应 SHALL 只包含脱敏 Token（前 4 字符 + `***`）、AccountId、超时与状态，不含 Token 原文
 
 ### Requirement: 隧道资源 SHALL 经 Cloudflare API 实时管理
 

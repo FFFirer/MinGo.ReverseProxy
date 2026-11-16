@@ -299,6 +299,15 @@ export interface CloudflareStatus {
   error?: string | null;
 }
 
+export interface CloudflareSettings {
+  /** 脱敏 Token；保存时传空或含 *** 表示不修改 */
+  apiToken: string;
+  accountId: string;
+  timeoutSeconds: number;
+  configured: boolean;
+  updatedAt?: string | null;
+}
+
 export interface CloudflareZone {
   id: string;
   name: string;

@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using MinGo.ControlPlane.Api.Configuration;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Models;
@@ -36,18 +35,18 @@ public sealed class CloudflareSyncService
 {
     private readonly IApiDbService _apiDbService;
     private readonly CloudflareClient _client;
-    private readonly CloudflareOptions _options;
+    private readonly CloudflareConfigProvider _config;
     private readonly ILogger<CloudflareSyncService> _logger;
 
     public CloudflareSyncService(
         IApiDbService apiDbService,
         CloudflareClient client,
-        IOptions<CloudflareOptions> options,
+        CloudflareConfigProvider config,
         ILogger<CloudflareSyncService> logger)
     {
         _apiDbService = apiDbService;
         _client = client;
-        _options = options.Value;
+        _config = config;
         _logger = logger;
     }
 
@@ -55,7 +54,8 @@ public sealed class CloudflareSyncService
 
     public async Task<CloudflareStatusInfo> GetStatusAsync(CancellationToken ct)
     {
-        if (!_options.IsConfigured)
+        var options = await _config.GetAsync(ct);
+        if (!options.IsConfigured)
         {
             return new CloudflareStatusInfo(false, null, null, null, null);
         }
@@ -91,7 +91,7 @@ public sealed class CloudflareSyncService
             new(ConnectionIds.Local, "本地数据面", "local", null),
         };
 
-        if (!_options.IsConfigured)
+        if (!(await _config.GetAsync(ct)).IsConfigured)
         {
             return items.ToArray();
         }
@@ -120,9 +120,9 @@ public sealed class CloudflareSyncService
             return new RouteValidation(true, null);
         }
 
-        if (!_options.IsConfigured)
+        if (!(await _config.GetAsync(ct)).IsConfigured)
         {
-            return new RouteValidation(false, "Cloudflare 未配置（Cloudflare:ApiToken 为空），无法发布到隧道");
+            return new RouteValidation(false, "Cloudflare 未配置（请在设置页填写 API Token），无法发布到隧道");
         }
 
         var host = route.Match?.Host;
@@ -228,11 +228,12 @@ public sealed class CloudflareSyncService
             .ToArray();
 
         var config = await _client.GetConfigurationAsync(tunnelId, ct);
+        var options = await _config.GetAsync(ct);
         var merge = IngressReconciler.Merge(
             config.Ingress,
             managedHosts,
-            _options.DataPlaneOrigin,
-            _options.DefaultCatchAll);
+            options.DataPlaneOrigin,
+            options.DefaultCatchAll);
 
         var ingressUpdated = false;
         if (merge.Changed)

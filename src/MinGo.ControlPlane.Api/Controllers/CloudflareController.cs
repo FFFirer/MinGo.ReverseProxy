@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.ControlPlane.Api.Services;
+using MinGo.Core.Interfaces;
 
 namespace MinGo.ControlPlane.Api.Controllers;
 
@@ -11,16 +12,66 @@ public class CloudflareController : ControllerBase
 {
     private readonly CloudflareClient _client;
     private readonly CloudflareSyncService _syncService;
+    private readonly CloudflareConfigProvider _config;
+    private readonly ICloudflareSettingsService _settings;
     private readonly ILogger<CloudflareController> _logger;
 
     public CloudflareController(
         CloudflareClient client,
         CloudflareSyncService syncService,
+        CloudflareConfigProvider config,
+        ICloudflareSettingsService settings,
         ILogger<CloudflareController> logger)
     {
         _client = client;
         _syncService = syncService;
+        _config = config;
+        _settings = settings;
         _logger = logger;
+    }
+
+    // ── 接入配置（设置页） ──
+
+    [HttpGet("settings")]
+    public async Task<ActionResult<CloudflareSettingsView>> GetSettings()
+    {
+        var effective = await _config.GetAsync();
+        var stored = await _settings.GetAsync();
+        return Ok(new CloudflareSettingsView(
+            MaskToken(effective.ApiToken),
+            effective.AccountId,
+            effective.TimeoutSeconds,
+            effective.IsConfigured,
+            stored.UpdatedAt));
+    }
+
+    [HttpPut("settings")]
+    public async Task<ActionResult<CloudflareSettingsView>> SaveSettings(
+        [FromBody] SaveCloudflareSettingsRequest request)
+    {
+        await _settings.SaveAsync(new CloudflareSettingsDto
+        {
+            ApiToken = request.ApiToken ?? string.Empty,
+            AccountId = request.AccountId ?? string.Empty,
+            TimeoutSeconds = request.TimeoutSeconds,
+        });
+
+        // Provider 尚未解析过，此处读到的是保存后的生效值
+        var effective = await _config.GetAsync();
+        var stored = await _settings.GetAsync();
+        return Ok(new CloudflareSettingsView(
+            MaskToken(effective.ApiToken),
+            effective.AccountId,
+            effective.TimeoutSeconds,
+            effective.IsConfigured,
+            stored.UpdatedAt));
+    }
+
+    private static string MaskToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return string.Empty;
+        var visible = Math.Min(4, token.Length);
+        return token[..visible] + "***";
     }
 
     [HttpGet("status")]
@@ -168,3 +219,15 @@ public class CloudflareController : ControllerBase
 }
 
 public sealed record CreateTunnelRequest(string Name);
+
+public sealed record CloudflareSettingsView(
+    string ApiToken,
+    string AccountId,
+    int TimeoutSeconds,
+    bool Configured,
+    DateTimeOffset? UpdatedAt);
+
+public sealed record SaveCloudflareSettingsRequest(
+    string? ApiToken,
+    string? AccountId,
+    int TimeoutSeconds);

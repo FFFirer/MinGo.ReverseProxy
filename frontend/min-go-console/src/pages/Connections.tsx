@@ -180,7 +180,7 @@ export default function ConnectionsPage() {
           <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm flex items-start gap-2">
             <FaSolidInfoCircle class="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
             <div>
-              <p>Cloudflare 连接未配置：在控制面配置 <code class="font-mono text-xs">Cloudflare:ApiToken</code>（环境变量 <code class="font-mono text-xs">Cloudflare__ApiToken</code>）后刷新。</p>
+              <p>Cloudflare 连接未配置：请前往「设置」页面填写 Cloudflare API Token 后刷新。</p>
               <p class="text-secondary mt-1">所需权限：Account:Cloudflare Tunnel:Edit、Zone:DNS:Edit、Zone:Zone:Read。</p>
             </div>
           </div>

@@ -1,7 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
-using MinGo.ControlPlane.Api.Configuration;
 
 namespace MinGo.ControlPlane.Api.Services;
 
@@ -56,38 +54,40 @@ public sealed record CloudflareStatusInfo(
 // ── 客户端 ──
 
 /// <summary>
-/// Cloudflare REST API 封装（/client/v4），凭据来自 <see cref="CloudflareOptions"/>。
+/// Cloudflare REST API 封装（/client/v4）。凭据经 <see cref="CloudflareConfigProvider"/>
+/// 解析：设置页保存的值优先，未保存时回退到配置节。
 /// </summary>
 public sealed class CloudflareClient
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly CloudflareOptions _options;
+    private readonly CloudflareConfigProvider _config;
     private readonly ILogger<CloudflareClient> _logger;
 
     public CloudflareClient(
         IHttpClientFactory httpClientFactory,
-        IOptions<CloudflareOptions> options,
+        CloudflareConfigProvider config,
         ILogger<CloudflareClient> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
+        _config = config;
         _logger = logger;
     }
 
     private async Task<T> SendAsync<T>(
         HttpMethod method, string path, object? body, CancellationToken ct)
     {
-        if (!_options.IsConfigured)
+        var options = await _config.GetAsync(ct);
+        if (!options.IsConfigured)
         {
-            throw new CloudflareException("Cloudflare 未配置（Cloudflare:ApiToken 为空）");
+            throw new CloudflareException("Cloudflare 未配置（请在设置页填写 API Token）");
         }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, _options.TimeoutSeconds)));
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, options.TimeoutSeconds)));
 
         var client = _httpClientFactory.CreateClient("Cloudflare");
         using var request = new HttpRequestMessage(method, path);
-        request.Headers.Authorization = new("Bearer", _options.ApiToken);
+        request.Headers.Authorization = new("Bearer", options.ApiToken);
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);
@@ -151,11 +151,12 @@ public sealed class CloudflareClient
         return false;
     }
 
-    private string ResolveAccountId()
+    private async Task<string> ResolveAccountIdAsync(CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(_options.AccountId))
-            return _options.AccountId;
-        throw new CloudflareException("Cloudflare:AccountId 未配置，无法确定账号");
+        var options = await _config.GetAsync(ct);
+        if (!string.IsNullOrWhiteSpace(options.AccountId))
+            return options.AccountId;
+        throw new CloudflareException("Cloudflare AccountId 未配置，无法确定账号");
     }
 
     // ── 账号 / Zones ──
@@ -166,8 +167,9 @@ public sealed class CloudflareClient
     /// <summary>解析账号 ID：配置优先，其次自动发现（唯一账号时）。</summary>
     public async Task<string> GetEffectiveAccountIdAsync(CancellationToken ct = default)
     {
-        if (!string.IsNullOrWhiteSpace(_options.AccountId))
-            return _options.AccountId;
+        var options = await _config.GetAsync(ct);
+        if (!string.IsNullOrWhiteSpace(options.AccountId))
+            return options.AccountId;
 
         var accounts = await ListAccountsAsync(ct);
         if (accounts.Length == 1)
@@ -176,7 +178,7 @@ public sealed class CloudflareClient
             throw new CloudflareException("Cloudflare 账号下没有可用账户");
 
         throw new CloudflareException(
-            $"存在多个 Cloudflare 账号（{string.Join(", ", accounts.Select(a => a.Name))}），请配置 Cloudflare:AccountId");
+            $"存在多个 Cloudflare 账号（{string.Join(", ", accounts.Select(a => a.Name))}），请在设置页配置 AccountId");
     }
 
     public Task<CloudflareZone[]> ListZonesAsync(CancellationToken ct = default) =>
@@ -184,42 +186,42 @@ public sealed class CloudflareClient
 
     // ── 隧道 CRUD ──
 
-    public Task<CloudflareTunnel[]> ListTunnelsAsync(CancellationToken ct = default) =>
-        SendAsync<CloudflareTunnel[]>(
-            HttpMethod.Get, $"accounts/{ResolveAccountId()}/cfd_tunnel", null, ct);
+    public async Task<CloudflareTunnel[]> ListTunnelsAsync(CancellationToken ct = default) =>
+        await SendAsync<CloudflareTunnel[]>(
+            HttpMethod.Get, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel", null, ct);
 
-    public Task<CloudflareTunnel> GetTunnelAsync(string tunnelId, CancellationToken ct = default) =>
-        SendAsync<CloudflareTunnel>(
-            HttpMethod.Get, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}", null, ct);
+    public async Task<CloudflareTunnel> GetTunnelAsync(string tunnelId, CancellationToken ct = default) =>
+        await SendAsync<CloudflareTunnel>(
+            HttpMethod.Get, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}", null, ct);
 
-    public Task<CloudflareTunnel> CreateTunnelAsync(string name, CancellationToken ct = default) =>
-        SendAsync<CloudflareTunnel>(
-            HttpMethod.Post, $"accounts/{ResolveAccountId()}/cfd_tunnel",
+    public async Task<CloudflareTunnel> CreateTunnelAsync(string name, CancellationToken ct = default) =>
+        await SendAsync<CloudflareTunnel>(
+            HttpMethod.Post, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel",
             new { name, config_src = "cloudflare" }, ct);
 
-    public Task<CloudflareTunnel> UpdateTunnelAsync(string tunnelId, string name, CancellationToken ct = default) =>
-        SendAsync<CloudflareTunnel>(
-            HttpMethod.Patch, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}",
+    public async Task<CloudflareTunnel> UpdateTunnelAsync(string tunnelId, string name, CancellationToken ct = default) =>
+        await SendAsync<CloudflareTunnel>(
+            HttpMethod.Patch, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}",
             new { name }, ct);
 
-    public Task<CloudflareTunnel> DeleteTunnelAsync(string tunnelId, CancellationToken ct = default) =>
-        SendAsync<CloudflareTunnel>(
-            HttpMethod.Delete, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}", null, ct);
+    public async Task<CloudflareTunnel> DeleteTunnelAsync(string tunnelId, CancellationToken ct = default) =>
+        await SendAsync<CloudflareTunnel>(
+            HttpMethod.Delete, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}", null, ct);
 
     // ── 连接与 ingress 配置 ──
 
-    public Task<TunnelConnection[]> ListConnectionsAsync(string tunnelId, CancellationToken ct = default) =>
-        SendAsync<TunnelConnection[]>(
-            HttpMethod.Get, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}/connections", null, ct);
+    public async Task<TunnelConnection[]> ListConnectionsAsync(string tunnelId, CancellationToken ct = default) =>
+        await SendAsync<TunnelConnection[]>(
+            HttpMethod.Get, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}/connections", null, ct);
 
-    public Task<TunnelConfiguration> GetConfigurationAsync(string tunnelId, CancellationToken ct = default) =>
-        SendAsync<TunnelConfiguration>(
-            HttpMethod.Get, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}/configurations", null, ct);
+    public async Task<TunnelConfiguration> GetConfigurationAsync(string tunnelId, CancellationToken ct = default) =>
+        await SendAsync<TunnelConfiguration>(
+            HttpMethod.Get, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}/configurations", null, ct);
 
-    public Task<TunnelConfiguration> PutConfigurationAsync(
+    public async Task<TunnelConfiguration> PutConfigurationAsync(
         string tunnelId, IngressRule[] ingress, CancellationToken ct = default) =>
-        SendAsync<TunnelConfiguration>(
-            HttpMethod.Put, $"accounts/{ResolveAccountId()}/cfd_tunnel/{tunnelId}/configurations",
+        await SendAsync<TunnelConfiguration>(
+            HttpMethod.Put, $"accounts/{await ResolveAccountIdAsync(ct)}/cfd_tunnel/{tunnelId}/configurations",
             new { config = new { ingress } }, ct);
 
     // ── DNS 记录 ──

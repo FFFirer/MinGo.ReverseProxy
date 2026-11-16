@@ -36,6 +36,11 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     /// </summary>
     public DbSet<PortainerInstanceEntity> PortainerInstances { get; set; }
 
+    /// <summary>
+    /// Cloudflare 接入配置表（单行）
+    /// </summary>
+    public DbSet<CloudflareSettingsEntity> CloudflareSettings { get; set; }
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
@@ -59,5 +64,6 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         builder.ApplyConfiguration(new ApiDestinationEntityConfiguration());
         builder.ApplyConfiguration(new ApiCertificateEntityConfiguration());
         builder.ApplyConfiguration(new PortainerInstanceEntityConfiguration());
+        builder.ApplyConfiguration(new CloudflareSettingsEntityConfiguration());
     }
 }

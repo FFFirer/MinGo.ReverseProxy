@@ -117,13 +117,15 @@ builder.Services.AddSingleton<PortainerClientFactory>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<PortainerDiscoveryService>();
 
-// Cloudflare Tunnels（凭据配置驱动，隧道资源经 CF API 管理）
+// Cloudflare Tunnels（接入配置在设置页管理并落库，配置节仅作默认值兜底）
 builder.Services.Configure<CloudflareOptions>(builder.Configuration.GetSection(CloudflareOptions.SectionName));
 builder.Services.AddHttpClient("Cloudflare", client =>
 {
     client.BaseAddress = new Uri("https://api.cloudflare.com/client/v4/");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddScoped<ICloudflareSettingsService, CloudflareSettingsService>();
+builder.Services.AddScoped<CloudflareConfigProvider>();
 builder.Services.AddScoped<CloudflareClient>();
 builder.Services.AddScoped<CloudflareSyncService>();
 

@@ -1,7 +1,7 @@
 import { createSignal, onMount, Show, For, Index } from 'solid-js';
 import { addToast } from '../store/toast';
 import { api } from '../api/client';
-import type { PortainerInstance, PortainerStatus } from '../types';
+import type { PortainerInstance, PortainerStatus, CloudflareSettings, CloudflareStatus } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 import {
@@ -287,6 +287,9 @@ export default function SettingsPage() {
         </Show>
       </div>
 
+      {/* Cloudflare 接入配置 */}
+      <CloudflareSettingsCard />
+
       {/* 实例表单 Modal */}
       <Show when={showForm()}>
         <InstanceFormModal
@@ -538,6 +541,165 @@ function InstanceFormModal(props: {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function CloudflareSettingsCard() {
+  const [settings, setSettings] = createSignal<CloudflareSettings | null>(null);
+  const [apiToken, setApiToken] = createSignal('');
+  const [accountId, setAccountId] = createSignal('');
+  const [timeoutSeconds, setTimeoutSeconds] = createSignal(10);
+  const [loading, setLoading] = createSignal(true);
+  const [saving, setSaving] = createSignal(false);
+  const [testing, setTesting] = createSignal(false);
+  const [status, setStatus] = createSignal<CloudflareStatus | null>(null);
+
+  const applySettings = (s: CloudflareSettings) => {
+    setSettings(s);
+    setApiToken(s.apiToken);
+    setAccountId(s.accountId || '');
+    setTimeoutSeconds(s.timeoutSeconds || 10);
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      applySettings(await api.getCloudflareSettings());
+    } catch (err) {
+      addToast('error', `加载 Cloudflare 配置失败: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  onMount(load);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const saved = await api.saveCloudflareSettings({
+        apiToken: apiToken(),
+        accountId: accountId(),
+        timeoutSeconds: timeoutSeconds(),
+      });
+      applySettings(saved);
+      addToast('success', 'Cloudflare 接入配置已保存');
+    } catch (err) {
+      addToast('error', `保存失败: ${(err as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setStatus(null);
+    try {
+      const s = await api.getCloudflareStatus();
+      setStatus(s);
+      if (!s.configured) {
+        addToast('error', '尚未配置 API Token');
+      } else if (s.error) {
+        addToast('error', `连接失败: ${s.error}`);
+      } else {
+        addToast('success', `连接成功${s.accountName ? `（${s.accountName}）` : ''}`);
+      }
+    } catch (err) {
+      addToast('error', `测试连接失败: ${(err as Error).message}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div class="card mt-6">
+      <div class="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <h3 class="font-semibold">Cloudflare 接入</h3>
+          <p class="text-sm text-secondary mt-1">
+            管理 Cloudflare 隧道、ingress 与 DNS 记录。Token 权限：Account:Cloudflare Tunnel:Edit、Zone:DNS:Edit、Zone:Zone:Read。
+          </p>
+        </div>
+        <span class={`badge shrink-0 ${settings()?.configured ? 'badge-success' : 'badge-warning'}`}>
+          {settings()?.configured ? '已配置' : '未配置'}
+        </span>
+      </div>
+
+      <Show when={loading()}>
+        <div class="text-sm text-secondary py-6 text-center">正在加载...</div>
+      </Show>
+
+      <Show when={!loading()}>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">API Token</label>
+              <input
+                class="input font-mono"
+                type="password"
+                value={apiToken()}
+                onInput={(e) => setApiToken(e.currentTarget.value)}
+                placeholder={settings()?.configured ? '留空保持不变，输入新值覆盖' : 'Cloudflare API Token'}
+              />
+              <p class="text-xs text-secondary mt-1">读取时脱敏，服务端不回显明文</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Account ID</label>
+              <input
+                class="input font-mono"
+                value={accountId()}
+                onInput={(e) => setAccountId(e.currentTarget.value)}
+                placeholder="可选，留空自动发现（账号唯一时）"
+              />
+            </div>
+          </div>
+          <div class="w-48">
+            <label class="block text-sm font-medium mb-1">请求超时（秒）</label>
+            <input
+              type="number"
+              class="input"
+              value={timeoutSeconds()}
+              onInput={(e) => setTimeoutSeconds(parseInt(e.currentTarget.value) || 10)}
+              min="1"
+              max="120"
+            />
+          </div>
+
+          <Show when={status()}>
+            <div class="p-3 rounded-lg bg-gray-50 dark:bg-dark-200 text-xs">
+              <p>
+                <span class="text-secondary">最近测试：</span>
+                <span class={status()!.configured && !status()!.error ? 'text-success' : 'text-danger'}>
+                  {status()!.configured && !status()!.error ? '连接成功' : '连接失败'}
+                </span>
+                <Show when={status()!.accountName}>
+                  <span class="ml-2 text-secondary">账号 {status()!.accountName}</span>
+                </Show>
+                <Show when={status()!.zonesCount !== null && status()!.zonesCount !== undefined}>
+                  <span class="ml-2 text-secondary">{status()!.zonesCount} 个 zone</span>
+                </Show>
+              </p>
+              <Show when={status()!.error}>
+                <p class="text-danger mt-1 break-all">{status()!.error}</p>
+              </Show>
+            </div>
+          </Show>
+
+          <div class="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-dark-200">
+            <button class="btn btn-secondary" disabled={testing()} onClick={handleTest}>
+              <Show when={testing()} fallback={<FaSolidCheck class="mr-2" />}>
+                <FaSolidSpinner class="mr-2 animate-spin" />
+              </Show>
+              {testing() ? '测试中...' : '测试连接'}
+            </button>
+            <button class="btn btn-primary" disabled={saving()} onClick={handleSave}>
+              <FaSolidSave class="mr-2" />
+              {saving() ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

@@ -91,6 +91,13 @@ export const api = {
 
   // Cloudflare 接入通道
   getConnections: () => request<import('../types').ConnectionSummary[]>('/connections'),
+  getCloudflareSettings: () =>
+    request<import('../types').CloudflareSettings>('/cloudflare/settings'),
+  saveCloudflareSettings: (data: { apiToken: string; accountId: string; timeoutSeconds: number }) =>
+    request<import('../types').CloudflareSettings>('/cloudflare/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   getCloudflareStatus: () => request<import('../types').CloudflareStatus>('/cloudflare/status'),
   getCloudflareZones: () => request<import('../types').CloudflareZone[]>('/cloudflare/zones'),
   getCloudflareTunnels: () => request<import('../types').CloudflareTunnel[]>('/cloudflare/tunnels'),
