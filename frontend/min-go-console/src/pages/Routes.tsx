@@ -1,7 +1,7 @@
 import { createSignal, onMount, For, Show, createMemo } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
-import type { RouteConfig, ClusterConfig, TransformSchema, TransformFieldSchema } from '../types';
+import type { RouteConfig, ClusterConfig, TransformSchema, TransformFieldSchema, ConnectionSummary, RouteSaveResponse } from '../types';
 import { FaSolidPlus, FaSolidSearch, FaSolidChevronDown, FaSolidChevronRight, FaSolidTrash } from 'solid-icons/fa';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
@@ -9,6 +9,7 @@ import Table from '../components/shared/Table';
 export default function RoutesPage() {
   const [routes, setRoutes] = createSignal<RouteConfig[]>([]);
   const [clusters, setClusters] = createSignal<ClusterConfig[]>([]);
+  const [connections, setConnections] = createSignal<ConnectionSummary[]>([]);
   const [search, setSearch] = createSignal('');
   const [filterEnabled, setFilterEnabled] = createSignal<string>('all');
   const [editingRoute, setEditingRoute] = createSignal<RouteConfig | null>(null);
@@ -16,16 +17,24 @@ export default function RoutesPage() {
   const [loading, setLoading] = createSignal(true);
   const [schemas, setSchemas] = createSignal<TransformSchema[]>([]);
 
+  const connectionName = (id?: string) => {
+    if (!id || id === 'local') return '本地';
+    const conn = connections().find((c) => c.id === id);
+    return conn?.name || id.slice(0, 8);
+  };
+
   onMount(async () => {
     try {
-      const [r, c, s] = await Promise.all([
+      const [r, c, s, conns] = await Promise.all([
         api.get<RouteConfig[]>('/apimanagement/routes'),
         api.get<ClusterConfig[]>('/apimanagement/clusters'),
         api.getTransformSchemas(),
+        api.getConnections(),
       ]);
       setRoutes(r);
       setClusters(c);
       setSchemas(s);
+      setConnections(conns);
     } catch (err) {
       addToast('error', '加载路由、集群或 Schema 失败');
     } finally {
@@ -46,13 +55,23 @@ export default function RoutesPage() {
 
   const handleSave = async (route: RouteConfig) => {
     try {
-      if (route.id) {
-        await api.put(`/apimanagement/routes/${route.id}`, route);
-        addToast('success', '路由已更新');
+      const res: RouteSaveResponse = route.id
+        ? await api.put(`/apimanagement/routes/${route.id}`, route)
+        : await api.post('/apimanagement/routes', route);
+
+      const publish = res.publish;
+      if (publish) {
+        if (publish.conflicts.length > 0) {
+          addToast('warning', `路由已保存，但发布存在冲突：${publish.conflicts.join('；')}`);
+        } else if (publish.dnsCreated.length > 0) {
+          addToast('success', `路由已保存并发布：新增 CNAME ${publish.dnsCreated.join(', ')}`);
+        } else {
+          addToast('success', '路由已保存，发布状态已同步');
+        }
       } else {
-        await api.post('/apimanagement/routes', route);
-        addToast('success', '路由已创建');
+        addToast('success', route.id ? '路由已更新' : '路由已创建');
       }
+
       setRoutes(await api.get<RouteConfig[]>('/apimanagement/routes'));
       setShowModal(false);
     } catch (err) {
@@ -92,6 +111,15 @@ export default function RoutesPage() {
       key: 'clusterId',
       title: '集群',
       cell: (route) => route.clusterId,
+    },
+    {
+      key: 'connectionId',
+      title: '接入通道',
+      cell: (route) => (
+        route.connectionId && route.connectionId !== 'local'
+          ? <span class="badge badge-warning">{connectionName(route.connectionId)}</span>
+          : <span class="badge badge-success">本地</span>
+      ),
     },
     {
       key: 'enabled',
@@ -169,6 +197,7 @@ export default function RoutesPage() {
           route={editingRoute()}
           clusters={clusters()}
           schemas={schemas()}
+          connections={connections()}
           onSave={handleSave}
           onClose={() => setShowModal(false)}
         />
@@ -246,6 +275,7 @@ function RouteFormModal(props: {
   route: RouteConfig | null;
   clusters: ClusterConfig[];
   schemas: TransformSchema[];
+  connections: ConnectionSummary[];
   onSave: (r: RouteConfig) => void;
   onClose: () => void;
 }) {
@@ -253,9 +283,13 @@ function RouteFormModal(props: {
   const [path, setPath] = createSignal(props.route?.match?.path || '');
   const [host, setHost] = createSignal(props.route?.match?.host || '');
   const [clusterId, setClusterId] = createSignal(props.route?.clusterId || '');
+  const [connectionId, setConnectionId] = createSignal(props.route?.connectionId || 'local');
   const [enabled, setEnabled] = createSignal(props.route?.enabled ?? true);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
   const [showTransforms, setShowTransforms] = createSignal(false);
+
+  const tunnelConnections = () => props.connections.filter((c) => c.kind === 'cloudflare-tunnel');
+  const isTunnel = () => connectionId() !== 'local';
 
   // Transforms 状态
   const [transforms, setTransforms] = createSignal<Record<string, string>[]>(props.route?.transforms ?? []);
@@ -268,6 +302,7 @@ function RouteFormModal(props: {
     const errs: Record<string, string> = {};
     if (!name().trim()) errs.name = '路由名称不能为空';
     if (!path().trim()) errs.path = '匹配路径不能为空';
+    if (isTunnel() && !host().trim()) errs.host = '发布到隧道的路由必须配置匹配域名';
     if (!clusterId()) errs.clusterId = '请选择目标集群';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -281,6 +316,7 @@ function RouteFormModal(props: {
       id: props.route?.id || '',
       name: name(),
       clusterId: clusterId(),
+      connectionId: connectionId(),
       match: { path: path(), host: host() || undefined },
       enabled: enabled(),
       transforms: t.length > 0 ? t : null,
@@ -402,6 +438,23 @@ function RouteFormModal(props: {
           <div>
             <label class="block text-sm font-medium mb-1">匹配域名</label>
             <input class="input font-mono text-sm" value={host()} onInput={(e) => setHost(e.currentTarget.value)} placeholder="例如：api.example.com" />
+            {errors().host && <p class="text-danger text-xs mt-1">{errors().host}</p>}
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">接入通道</label>
+            <select
+              class="input"
+              value={connectionId()}
+              onChange={(e) => setConnectionId(e.currentTarget.value)}
+            >
+              <option value="local">本地数据面（data-plane）</option>
+              <For each={tunnelConnections()}>{(conn) => (
+                <option value={conn.id}>Cloudflare 隧道：{conn.name}</option>
+              )}</For>
+            </select>
+            <Show when={tunnelConnections().length === 0}>
+              <p class="text-secondary text-xs mt-1">未发现可用隧道，请先在「接入通道」页面创建</p>
+            </Show>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">目标集群</label>

@@ -88,4 +88,32 @@ export const api = {
     request<import('../types').PortainerStatus>(`/portainer/${encodeURIComponent(instanceId)}/status`),
   getPortainerDiscovery: (instanceId: string) =>
     request<import('../types').PortainerDiscovery>(`/portainer/${encodeURIComponent(instanceId)}/discovery`),
+
+  // Cloudflare 接入通道
+  getConnections: () => request<import('../types').ConnectionSummary[]>('/connections'),
+  getCloudflareStatus: () => request<import('../types').CloudflareStatus>('/cloudflare/status'),
+  getCloudflareZones: () => request<import('../types').CloudflareZone[]>('/cloudflare/zones'),
+  getCloudflareTunnels: () => request<import('../types').CloudflareTunnel[]>('/cloudflare/tunnels'),
+  createCloudflareTunnel: (name: string) =>
+    request<import('../types').CloudflareTunnel>('/cloudflare/tunnels', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  updateCloudflareTunnel: (id: string, name: string) =>
+    request<import('../types').CloudflareTunnel>(`/cloudflare/tunnels/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
+  deleteCloudflareTunnel: (id: string) =>
+    request<void>(`/cloudflare/tunnels/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getTunnelConnections: (id: string) =>
+    request<import('../types').TunnelConnection[]>(
+      `/cloudflare/tunnels/${encodeURIComponent(id)}/connections`,
+    ),
+  getTunnelIngress: (id: string) =>
+    request<import('../types').TunnelIngressView>(`/cloudflare/tunnels/${encodeURIComponent(id)}/ingress`),
+  reconcileTunnel: (id: string) =>
+    request<import('../types').ReconcileReport>(`/cloudflare/tunnels/${encodeURIComponent(id)}/reconcile`, {
+      method: 'POST',
+    }),
 };

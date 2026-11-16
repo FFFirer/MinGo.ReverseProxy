@@ -10,6 +10,7 @@ import CertificatesPage from './pages/Certificates';
 import MonitoringPage from './pages/Monitoring';
 import LogsPage from './pages/Logs';
 import InstancesPage from './pages/Instances';
+import ConnectionsPage from './pages/Connections';
 import SettingsPage from './pages/Settings';
 import SecurityPage from './pages/Security';
 import Toast from './components/shared/Toast';
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/monitoring" component={() => <ProtectedLayout><MonitoringPage /></ProtectedLayout>} />
         <Route path="/logs" component={() => <ProtectedLayout><LogsPage /></ProtectedLayout>} />
         <Route path="/instances" component={() => <ProtectedLayout><InstancesPage /></ProtectedLayout>} />
+        <Route path="/connections" component={() => <ProtectedLayout><ConnectionsPage /></ProtectedLayout>} />
         <Route path="/settings" component={() => <ProtectedLayout><SettingsPage /></ProtectedLayout>} />
         <Route path="/security" component={() => <ProtectedLayout><SecurityPage /></ProtectedLayout>} />
       </Router>

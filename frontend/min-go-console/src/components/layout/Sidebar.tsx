@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from '@solidjs/router';
 import { type Component } from 'solid-js';
-import { FaSolidTachometer, FaSolidRandom, FaSolidServer, FaSolidShield, FaSolidLock, FaSolidLineChart, FaSolidListAlt, FaSolidCubes, FaSolidCog } from 'solid-icons/fa';
+import { FaSolidTachometer, FaSolidRandom, FaSolidServer, FaSolidShield, FaSolidLock, FaSolidLineChart, FaSolidListAlt, FaSolidCubes, FaSolidPlug, FaSolidCog } from 'solid-icons/fa';
 import { isOpen, closeSidebar } from '../../store/sidebar';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/monitoring', icon: 'fa-line-chart', label: '监控' },
   { path: '/logs', icon: 'fa-list-alt', label: '日志管理' },
   { path: '/instances', icon: 'fa-cubes', label: '实例管理' },
+  { path: '/connections', icon: 'fa-plug', label: '接入通道' },
   { path: '/settings', icon: 'fa-cog', label: '设置' },
 ];
 
@@ -24,6 +25,7 @@ const iconMap: Record<string, Component> = {
   'fa-line-chart': FaSolidLineChart,
   'fa-list-alt': FaSolidListAlt,
   'fa-cubes': FaSolidCubes,
+  'fa-plug': FaSolidPlug,
   'fa-cog': FaSolidCog,
 };
 

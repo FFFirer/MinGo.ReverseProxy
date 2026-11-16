@@ -2,6 +2,8 @@ export interface RouteConfig {
   id: string;
   name: string;
   clusterId: string;
+  /** 接入通道：'local' 或 Cloudflare 隧道 ID */
+  connectionId?: string;
   match: RouteMatch;
   transforms?: Record<string, string>[] | null;
   enabled: boolean;
@@ -285,6 +287,91 @@ export interface UserInfo {
   email: string;
   userName: string;
   emailConfirmed: boolean;
+}
+
+// ── Cloudflare Tunnels 接入通道 ──
+
+export interface CloudflareStatus {
+  configured: boolean;
+  accountId?: string | null;
+  accountName?: string | null;
+  zonesCount?: number | null;
+  error?: string | null;
+}
+
+export interface CloudflareZone {
+  id: string;
+  name: string;
+  status: string;
+}
+
+export interface CloudflareTunnel {
+  id: string;
+  name: string;
+  status?: string | null;
+  configSrc?: string | null;
+  createdAt?: string | null;
+  connsActiveAt?: string | null;
+  connsInactiveAt?: string | null;
+}
+
+export interface TunnelConnection {
+  id: string;
+  coloName?: string | null;
+  openedAt?: string | null;
+  originIp?: string | null;
+  clientVersion?: string | null;
+}
+
+export interface IngressRule {
+  hostname: string;
+  service: string;
+  path?: string | null;
+}
+
+export interface TunnelIngressBinding {
+  routeId: string;
+  routeName: string;
+  host: string;
+  enabled: boolean;
+}
+
+export interface TunnelIngressView {
+  tunnel: CloudflareTunnel;
+  rules: IngressRule[];
+  localBindings: TunnelIngressBinding[];
+  missingHosts: string[];
+  unmanagedHosts: string[];
+}
+
+export interface ReconcileReport {
+  tunnelId: string;
+  ingressUpdated: boolean;
+  dnsCreated: string[];
+  dnsDeleted: string[];
+  dnsKept: string[];
+  conflicts: string[];
+}
+
+export interface ConnectionSummary {
+  id: string;
+  name: string;
+  kind: 'local' | 'cloudflare-tunnel' | string;
+  status?: string | null;
+}
+
+export interface RoutePublishInfo {
+  connectionId: string;
+  published: boolean;
+  error?: string | null;
+  dnsCreated: string[];
+  dnsDeleted: string[];
+  conflicts: string[];
+}
+
+export interface RouteSaveResponse {
+  route: RouteConfig;
+  publish?: RoutePublishInfo | null;
 }
 
 // 实例配置查询
