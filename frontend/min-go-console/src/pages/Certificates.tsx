@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onMount, Show, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { CertificateConfig, CertificateParseResult } from '../types';
