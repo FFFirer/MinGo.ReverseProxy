@@ -412,3 +412,59 @@ export interface InstanceDestinationInfo {
   address: string;
   healthy: boolean;
 }
+
+// ── 网络拓扑（GET /api/topology） ──
+
+export type TopologyNodeKind = 'connection' | 'route' | 'cluster' | 'destination';
+export type TopologyNodeStatus = 'ok' | 'warning' | 'danger' | 'disabled';
+export type TopologySeverity = 'info' | 'warning' | 'danger';
+
+/** 详情面板的一条键值，后端按展示顺序返回数组 */
+export interface TopologyDetailItem {
+  label: string;
+  value: string | null;
+}
+
+export interface TopologyNode {
+  /** conn:{id} / route:{id} / cluster:{id} / dest:{clusterId}:{destId} */
+  id: string;
+  kind: TopologyNodeKind;
+  label: string;
+  subLabel?: string | null;
+  status: TopologyNodeStatus;
+  details: TopologyDetailItem[];
+  issueCodes: string[];
+}
+
+/** 有向边，方向即流量方向 */
+export interface TopologyEdge {
+  source: string;
+  target: string;
+  kind: string;
+}
+
+/** 配置一致性问题，nodeIds 为需要着色的节点 */
+export interface TopologyIssue {
+  code: string;
+  severity: TopologySeverity;
+  message: string;
+  nodeIds: string[];
+}
+
+export interface TopologySummary {
+  connectionCount: number;
+  routeCount: number;
+  enabledRouteCount: number;
+  clusterCount: number;
+  destinationCount: number;
+  unhealthyDestinationCount: number;
+  issueCount: number;
+}
+
+export interface TopologyResponse {
+  generatedAt: string;
+  summary: TopologySummary;
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+  issues: TopologyIssue[];
+}

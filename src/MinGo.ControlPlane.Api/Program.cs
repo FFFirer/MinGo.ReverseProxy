@@ -129,6 +129,9 @@ builder.Services.AddScoped<CloudflareConfigProvider>();
 builder.Services.AddScoped<CloudflareClient>();
 builder.Services.AddScoped<CloudflareSyncService>();
 
+// 网络拓扑聚合（只读：图 + 配置一致性体检）
+builder.Services.AddScoped<TopologyService>();
+
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");
 if (otelSection.GetValue<bool>("Enabled", true))

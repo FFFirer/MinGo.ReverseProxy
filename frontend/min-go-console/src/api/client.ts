@@ -91,6 +91,7 @@ export const api = {
 
   // Cloudflare 接入通道
   getConnections: () => request<import('../types').ConnectionSummary[]>('/connections'),
+  getTopology: () => request<import('../types').TopologyResponse>('/topology'),
   getCloudflareSettings: () =>
     request<import('../types').CloudflareSettings>('/cloudflare/settings'),
   saveCloudflareSettings: (data: { apiToken: string; accountId: string; timeoutSeconds: number }) =>

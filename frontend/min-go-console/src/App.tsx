@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import RoutesPage from './pages/Routes';
 import ClustersPage from './pages/Clusters';
+import TopologyPage from './pages/Topology';
 import CertificatesPage from './pages/Certificates';
 import MonitoringPage from './pages/Monitoring';
 import LogsPage from './pages/Logs';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/dashboard" component={() => <ProtectedLayout><Dashboard /></ProtectedLayout>} />
         <Route path="/routes" component={() => <ProtectedLayout><RoutesPage /></ProtectedLayout>} />
         <Route path="/clusters" component={() => <ProtectedLayout><ClustersPage /></ProtectedLayout>} />
+        <Route path="/topology" component={() => <ProtectedLayout><TopologyPage /></ProtectedLayout>} />
         <Route path="/certificates" component={() => <ProtectedLayout><CertificatesPage /></ProtectedLayout>} />
         <Route path="/monitoring" component={() => <ProtectedLayout><MonitoringPage /></ProtectedLayout>} />
         <Route path="/logs" component={() => <ProtectedLayout><LogsPage /></ProtectedLayout>} />
