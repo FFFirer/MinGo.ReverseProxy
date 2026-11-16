@@ -117,6 +117,16 @@ builder.Services.AddSingleton<PortainerClientFactory>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<PortainerDiscoveryService>();
 
+// Cloudflare Tunnels（凭据配置驱动，隧道资源经 CF API 管理）
+builder.Services.Configure<CloudflareOptions>(builder.Configuration.GetSection(CloudflareOptions.SectionName));
+builder.Services.AddHttpClient("Cloudflare", client =>
+{
+    client.BaseAddress = new Uri("https://api.cloudflare.com/client/v4/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<CloudflareClient>();
+builder.Services.AddScoped<CloudflareSyncService>();
+
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");
 if (otelSection.GetValue<bool>("Enabled", true))

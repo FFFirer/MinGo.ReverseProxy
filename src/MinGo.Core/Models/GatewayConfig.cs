@@ -2,6 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MinGo.Core.Models;
 
+/// <summary>
+/// 接入通道标识。local 为内置的本地数据面，其余为外部通道（如 Cloudflare 隧道）的 ID。
+/// </summary>
+public static class ConnectionIds
+{
+    public const string Local = "local";
+
+    public static bool IsLocal(string? connectionId) =>
+        string.IsNullOrWhiteSpace(connectionId) || string.Equals(connectionId, Local, StringComparison.OrdinalIgnoreCase);
+}
+
 public class GatewayConfig
 {
     public string Id { get; set; } = string.Empty;
@@ -25,6 +36,11 @@ public class RouteConfig
     [Required]
     [StringLength(200)]
     public string ClusterId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 路由发布到的接入通道：<see cref="ConnectionIds.Local"/> 或 Cloudflare 隧道 ID。
+    /// </summary>
+    public string ConnectionId { get; set; } = ConnectionIds.Local;
 
     [Required]
     public RouteMatch Match { get; set; } = new();

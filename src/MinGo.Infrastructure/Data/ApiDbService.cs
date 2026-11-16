@@ -87,6 +87,7 @@ public class ApiDbService : IApiDbService
 
         existing.Name = route.Name;
         existing.ClusterId = route.ClusterId;
+        existing.ConnectionId = ConnectionIds.IsLocal(route.ConnectionId) ? ConnectionIds.Local : route.ConnectionId;
         existing.MatchJson = JsonSerializer.Serialize(route.Match);
         existing.TransformsJson = JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>());
         existing.Enabled = route.Enabled;
@@ -563,6 +564,7 @@ public class ApiDbService : IApiDbService
             Id = entity.Id,
             Name = entity.Name,
             ClusterId = entity.ClusterId,
+            ConnectionId = string.IsNullOrWhiteSpace(entity.ConnectionId) ? ConnectionIds.Local : entity.ConnectionId,
             Match = JsonSerializer.Deserialize<RouteMatch>(entity.MatchJson) ?? new RouteMatch(),
             Transforms = entity.GetTransforms(),
             Enabled = entity.Enabled
@@ -581,6 +583,7 @@ public class ApiDbService : IApiDbService
             Id = model.Id,
             Name = model.Name,
             ClusterId = model.ClusterId,
+            ConnectionId = ConnectionIds.IsLocal(model.ConnectionId) ? ConnectionIds.Local : model.ConnectionId,
             MatchJson = JsonSerializer.Serialize(model.Match),
             TransformsJson = JsonSerializer.Serialize(model.Transforms ?? new List<Dictionary<string, string>>()),
             Enabled = model.Enabled

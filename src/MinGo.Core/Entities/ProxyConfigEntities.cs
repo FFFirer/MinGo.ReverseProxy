@@ -8,6 +8,11 @@ public class ApiRouteEntity
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string ClusterId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 路由发布到的接入通道：local 或 Cloudflare 隧道 ID。
+    /// </summary>
+    public string ConnectionId { get; set; } = ConnectionIds.Local;
     public string MatchJson { get; set; } = "{}";
     public string TransformsJson { get; set; } = "[]";
     public bool Enabled { get; set; } = true;
