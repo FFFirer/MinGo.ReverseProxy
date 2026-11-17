@@ -26,8 +26,8 @@ public sealed record TunnelConnection(
     string? ClientVersion);
 
 public sealed record IngressRule(
-    string Hostname,
-    string Service,
+    string? Hostname,
+    string? Service,
     string? Path,
     OriginRequestConfig? OriginRequest);
 
@@ -40,7 +40,10 @@ public sealed record OriginRequestConfig(
     int? KeepAliveConnections,
     string? OriginServerName);
 
-public sealed record TunnelConfiguration(IngressRule[] Ingress, string? Source, int Version);
+// CF 的 configurations 响应把 ingress 嵌套在 result.config 内，不能直接映射到 result
+public sealed record TunnelConfig(IngressRule[]? Ingress);
+
+public sealed record TunnelConfiguration(TunnelConfig? Config, string? Source, int Version);
 
 public sealed record DnsRecord(string Id, string Type, string Name, string Content, bool Proxied);
 
@@ -107,7 +110,7 @@ public sealed class CloudflareClient
 
         if (string.IsNullOrWhiteSpace(payload))
         {
-            return default!;
+            throw new CloudflareException("Cloudflare 返回空响应");
         }
 
         using var doc = JsonDocument.Parse(payload);
@@ -126,7 +129,13 @@ public sealed class CloudflareClient
         var result = root.TryGetProperty("result", out var resultNode)
             ? resultNode.Deserialize<T>(JsonOpts)
             : default;
-        return result!;
+
+        if (result is null)
+        {
+            throw new CloudflareException("Cloudflare 响应缺少 result");
+        }
+
+        return result;
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
@@ -175,7 +184,8 @@ public sealed class CloudflareClient
         if (accounts.Length == 1)
             return accounts[0].Id;
         if (accounts.Length == 0)
-            throw new CloudflareException("Cloudflare 账号下没有可用账户");
+            throw new CloudflareException(
+                "Cloudflare 账号下没有可用账户（API Token 可能缺少账户读取权限，请在设置页手动填写 AccountId）");
 
         throw new CloudflareException(
             $"存在多个 Cloudflare 账号（{string.Join(", ", accounts.Select(a => a.Name))}），请在设置页配置 AccountId");

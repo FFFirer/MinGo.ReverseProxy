@@ -230,7 +230,7 @@ public sealed class CloudflareSyncService
         var config = await _client.GetConfigurationAsync(tunnelId, ct);
         var options = await _config.GetAsync(ct);
         var merge = IngressReconciler.Merge(
-            config.Ingress,
+            config.Config?.Ingress ?? [],
             managedHosts,
             options.DataPlaneOrigin,
             options.DefaultCatchAll);
@@ -310,6 +310,7 @@ public sealed class CloudflareSyncService
     {
         var tunnel = await _client.GetTunnelAsync(tunnelId, ct);
         var config = await _client.GetConfigurationAsync(tunnelId, ct);
+        var ingress = config.Config?.Ingress ?? [];
 
         var routes = await GetRoutesBoundToAsync(tunnelId);
         var bindings = routes
@@ -323,7 +324,7 @@ public sealed class CloudflareSyncService
             .Select(b => b.Host)
             .ToHashSet(StringComparer.Ordinal);
 
-        var ingressHosts = config.Ingress
+        var ingressHosts = ingress
             .Where(r => IngressReconciler.NormalizeHost(r.Hostname).Length > 0)
             .Select(r => IngressReconciler.NormalizeHost(r.Hostname))
             .ToHashSet(StringComparer.Ordinal);
@@ -334,6 +335,6 @@ public sealed class CloudflareSyncService
             .OrderBy(h => h, StringComparer.Ordinal)
             .ToArray();
 
-        return new TunnelIngressView(tunnel, config.Ingress, bindings, missing, unmanaged);
+        return new TunnelIngressView(tunnel, ingress, bindings, missing, unmanaged);
     }
 }

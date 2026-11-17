@@ -58,6 +58,9 @@ public static class IngressReconciler
         string origin,
         string defaultCatchAll)
     {
+        current ??= [];
+        managedHostnames ??= [];
+
         var managed = managedHostnames
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .Select(NormalizeHost)
