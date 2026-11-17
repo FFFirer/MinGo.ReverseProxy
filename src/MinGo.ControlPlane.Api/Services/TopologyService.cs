@@ -1,6 +1,7 @@
 using MinGo.ControlPlane.Api.Models.Topology;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Models;
+using MinGo.Core.Routing;
 
 namespace MinGo.ControlPlane.Api.Services;
 
@@ -149,6 +150,16 @@ public class TopologyService
                     nodeId);
             }
 
+            // 隧道路由不直连后端：ingress 一律回源到本地数据面，再由数据面的同一条规则转成后端集群。
+            // 图上必须把这跳中转画出来，否则 "隧道 → 路由 → 集群" 看起来就是隧道自己找到了后端。
+            var connectionName = connectionById.TryGetValue(connectionKey, out var conn)
+                ? conn.Name
+                : connectionKey;
+            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey);
+            var forwardPath = isTunnelRoute
+                ? $"{connectionName} → 本地数据面 → 集群"
+                : "本地数据面 → 集群";
+
             drafts.Add(new NodeDraft(nodeId, TopologyNodeKind.Route, RouteLabel(route),
                 $"{host} {path}", !route.Enabled,
                 [
@@ -156,22 +167,21 @@ public class TopologyService
                     new TopologyDetailItem("匹配域名", host),
                     new TopologyDetailItem("匹配路径", path),
                     new TopologyDetailItem("启用状态", route.Enabled ? "启用" : "停用"),
-                    new TopologyDetailItem("接入通道",
-                        connectionById.TryGetValue(connectionKey, out var conn) ? conn.Name : connectionKey),
+                    new TopologyDetailItem("接入通道", connectionName),
+                    new TopologyDetailItem("转发路径", forwardPath),
                     new TopologyDetailItem("目标集群", string.IsNullOrWhiteSpace(route.ClusterId) ? null : route.ClusterId),
                     new TopologyDetailItem("转换规则", (route.Transforms?.Count ?? 0).ToString()),
                 ]));
         }
 
-        // ── 重复匹配：仅统计启用路由，停用路由不产生歧义 ──
+        // ── 重复匹配：与保存期去重闸门（RouteUniquenessPolicy）同一把尺子，仅统计启用路由 ──
         foreach (var group in routeList.Where(r => r.Enabled)
-                     .GroupBy(r => (Host: IngressReconciler.NormalizeHost(MatchHost(r)), Path: MatchPath(r)))
+                     .GroupBy(r => RouteMatchKey.Of(r.Match?.Host, r.Match?.Path))
                      .Where(g => g.Count() > 1))
         {
             var names = string.Join("、", group.Select(RouteLabel));
-            var hostText = string.IsNullOrEmpty(group.Key.Host) ? "*" : group.Key.Host;
             AddIssue("duplicate-match", TopologySeverity.Warning,
-                $"路由 {names} 的匹配条件重复（{hostText} {group.Key.Path}），实际命中顺序不确定",
+                $"路由 {names} 的匹配条件重复（{group.Key}），底层只生效一条（按路由 ID 字典序取先者），实际命中不可预期",
                 group.Select(r => RouteNodeId(r.Id)).ToArray());
         }
 
@@ -258,13 +268,28 @@ public class TopologyService
         }
 
         // ── 连线：只在两端节点都存在时建立 ──
+        // 转发规则一律装在数据面，所以 ingress 边恒从 conn:local 出发；
+        // 外部通道多一条 origin 边指向数据面，表示 "隧道的下一跳是数据面，不是后端"。
         var edges = new List<TopologyEdge>();
+        var hasLocalConnection = connectionById.ContainsKey(ConnectionIds.Local);
         foreach (var route in routeList)
         {
             var routeNodeId = RouteNodeId(route.Id);
             var connectionKey = ConnectionKeyOf(route);
-            if (connectionById.ContainsKey(connectionKey))
-                edges.Add(new TopologyEdge(ConnectionNodeId(connectionKey), routeNodeId, "ingress"));
+            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey);
+
+            if (isTunnelRoute && connectionById.ContainsKey(connectionKey))
+            {
+                if (hasLocalConnection)
+                    edges.Add(new TopologyEdge(ConnectionNodeId(connectionKey),
+                        ConnectionNodeId(ConnectionIds.Local), "origin"));
+            }
+
+            // 数据面节点缺失（老版本通道清单）时退回通道直连，避免路由在图上悬空
+            var ingressKey = isTunnelRoute && !hasLocalConnection ? connectionKey : ConnectionIds.Local;
+            if (connectionById.ContainsKey(ingressKey))
+                edges.Add(new TopologyEdge(ConnectionNodeId(ingressKey), routeNodeId, "ingress"));
+
             if (!string.IsNullOrWhiteSpace(route.ClusterId) && clusterById.ContainsKey(route.ClusterId))
                 edges.Add(new TopologyEdge(routeNodeId, ClusterNodeId(route.ClusterId), "forward"));
         }
