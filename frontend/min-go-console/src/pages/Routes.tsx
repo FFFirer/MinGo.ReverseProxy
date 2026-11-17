@@ -117,7 +117,12 @@ export default function RoutesPage() {
       title: '接入通道',
       cell: (route) => (
         route.connectionId && route.connectionId !== 'local'
-          ? <span class="badge badge-warning">{connectionName(route.connectionId)}</span>
+          ? (
+            <div class="flex flex-col items-start gap-0.5">
+              <span class="badge badge-warning">{connectionName(route.connectionId)}</span>
+              <span class="text-xs text-secondary">经数据面转发</span>
+            </div>
+          )
           : <span class="badge badge-success">本地</span>
       ),
     },
@@ -195,6 +200,7 @@ export default function RoutesPage() {
       {showModal() && (
         <RouteFormModal
           route={editingRoute()}
+          routes={routes()}
           clusters={clusters()}
           schemas={schemas()}
           connections={connections()}
@@ -207,6 +213,37 @@ export default function RoutesPage() {
 }
 
 // ─── Helper functions ───
+
+/**
+ * 归一化匹配域名：去空白与尾部点、转小写，空值即「不限域名」。
+ * 与后端 src/MinGo.Core/Routing/RouteMatchKey.cs 同一口径，改动必须同步，
+ * 否则前端预检会放行后端 400 的规则（或反之拦掉合法规则）。
+ */
+function normalizeHostKey(host?: string): string {
+  const value = (host ?? '').trim().replace(/\.+$/, '').toLowerCase();
+  return value || '*';
+}
+
+/** 归一化匹配路径：转小写、补前导斜杠，空值与 catch-all 写法都视为「任意路径」 */
+function normalizePathKey(path?: string): string {
+  const value = (path ?? '').trim().toLowerCase();
+  if (!value || ['/*', '/**', '/{**catch-all}', '/{**catchall}', '*', '{**catch-all}', '{**catchall}'].includes(value)) {
+    return '*';
+  }
+  return value.startsWith('/') ? value : `/${value}`;
+}
+
+/** 一条路由在底层生效的匹配键：域名 + 路径 */
+function matchKeyOf(host?: string, path?: string): string {
+  return `${normalizeHostKey(host)} ${normalizePathKey(path)}`;
+}
+
+/** 匹配键的可读描述，用于提示文案 */
+function describeMatchKey(host?: string, path?: string): string {
+  const h = normalizeHostKey(host);
+  const p = normalizePathKey(path);
+  return `${h === '*' ? '不限域名' : `域名 “${h}”`} + ${p === '*' ? '任意路径' : `路径 “${p}”`}`;
+}
 
 /** 从 transforms 列表中获取匹配某个 schema 的所有 entry */
 function entriesForSchema(transforms: Record<string, string>[], schemaTypeKey: string): Record<string, string>[] {
@@ -273,6 +310,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function RouteFormModal(props: {
   route: RouteConfig | null;
+  routes: RouteConfig[];
   clusters: ClusterConfig[];
   schemas: TransformSchema[];
   connections: ConnectionSummary[];
@@ -290,6 +328,20 @@ function RouteFormModal(props: {
 
   const tunnelConnections = () => props.connections.filter((c) => c.kind === 'cloudflare-tunnel');
   const isTunnel = () => connectionId() !== 'local';
+  const tunnelName = () =>
+    props.connections.find((c) => c.id === connectionId())?.name || '外部隧道';
+
+  // 后端 RouteUniquenessPolicy 的前端预检：同一「域名 + 路径」只允许一条启用路由。
+  // 命中就当场拦下，省一次 400 往返；停用路由不占键（它不进底层配置），所以只跟启用路由比。
+  // 后端的 400 仍然是最终闸门——这里只是把同样的口径提前说一遍。
+  const conflict = createMemo(() => {
+    const key = matchKeyOf(host(), path());
+    return props.routes.find((r) =>
+      r.id !== props.route?.id &&
+      r.enabled &&
+      matchKeyOf(r.match?.host, r.match?.path) === key,
+    );
+  });
 
   // Transforms 状态
   const [transforms, setTransforms] = createSignal<Record<string, string>[]>(props.route?.transforms ?? []);
@@ -303,6 +355,12 @@ function RouteFormModal(props: {
     if (!name().trim()) errs.name = '路由名称不能为空';
     if (!path().trim()) errs.path = '匹配路径不能为空';
     if (isTunnel() && !host().trim()) errs.host = '发布到隧道的路由必须配置匹配域名';
+    // 停用路由不占匹配键，与后端 RouteUniquenessPolicy 保持一致
+    if (!errs.host && enabled() && conflict()) {
+      errs.host =
+        `${describeMatchKey(host(), path())} 已被启用路由 “${conflict()!.name}” 占用，` +
+        '同一域名和路径只能有一条启用路由';
+    }
     if (!clusterId()) errs.clusterId = '请选择目标集群';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -439,6 +497,11 @@ function RouteFormModal(props: {
             <label class="block text-sm font-medium mb-1">匹配域名</label>
             <input class="input font-mono text-sm" value={host()} onInput={(e) => setHost(e.currentTarget.value)} placeholder="例如：api.example.com" />
             {errors().host && <p class="text-danger text-xs mt-1">{errors().host}</p>}
+            <Show when={enabled() && conflict()}>
+              <p class="text-amber-600 dark:text-amber-400 text-xs mt-1">
+                与启用路由 “{conflict()!.name}” 的域名和路径重复，保存会被拒绝
+              </p>
+            </Show>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">接入通道</label>
@@ -454,6 +517,26 @@ function RouteFormModal(props: {
             </select>
             <Show when={tunnelConnections().length === 0}>
               <p class="text-secondary text-xs mt-1">未发现可用隧道，请先在「接入通道」页面创建</p>
+            </Show>
+            <Show when={isTunnel()}>
+              <div class="mt-2 p-2.5 rounded-lg bg-blue-50 dark:bg-dark-200 border border-blue-200 dark:border-dark-300 text-xs space-y-1">
+                <p class="font-medium">选择外部隧道后，保存时自动生成两条底层规则</p>
+                <ol class="list-decimal list-inside space-y-0.5 text-secondary">
+                  <li>
+                    隧道 ingress：<span class="font-mono">{normalizeHostKey(host())}</span> → 网关回源地址
+                    （隧道不直连后端服务）
+                  </li>
+                  <li>
+                    数据面规则：<span class="font-mono">{normalizeHostKey(host())}</span>
+                    {' '}<span class="font-mono">{normalizePathKey(path())}</span> → 集群{' '}
+                    <span class="font-mono">{clusterId() || '待选择'}</span>
+                  </li>
+                </ol>
+                <p class="text-secondary">
+                  外部隧道的流量一律经 {tunnelName()} → 本地数据面 → 后端服务，
+                  {tunnelName()} 侧只会看到回源到数据面的那条规则
+                </p>
+              </div>
             </Show>
           </div>
           <div>
