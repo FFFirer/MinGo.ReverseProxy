@@ -49,6 +49,12 @@ public class ApiManagementController : ControllerBase
             return BadRequest(new { message = validation.Error });
         }
 
+        var uniqueness = RouteUniquenessPolicy.Check(route, await _apiManagementService.GetRoutesAsync());
+        if (!uniqueness.IsValid)
+        {
+            return BadRequest(new { message = uniqueness.Error });
+        }
+
         var created = await _apiManagementService.CreateRouteAsync(route);
         var publish = await PublishAsync(created, null, ct);
         return CreatedAtAction(nameof(GetRoute), new { id = created.Id },
@@ -66,6 +72,13 @@ public class ApiManagementController : ControllerBase
 
         var previous = await _apiManagementService.GetRouteAsync(id);
         if (previous == null) return NotFound();
+
+        // 去重口径要在写库前判：启用一条路由（包括将停用改为启用）同样可能撞上别人的域名+路径
+        var uniqueness = RouteUniquenessPolicy.Check(route, await _apiManagementService.GetRoutesAsync(), id);
+        if (!uniqueness.IsValid)
+        {
+            return BadRequest(new { message = uniqueness.Error });
+        }
 
         var updated = await _apiManagementService.UpdateRouteAsync(id, route);
         if (updated == null) return NotFound();
