@@ -350,7 +350,11 @@ export interface TunnelIngressView {
   rules: IngressRule[];
   localBindings: TunnelIngressBinding[];
   missingHosts: string[];
+  staleHosts: string[];
   unmanagedHosts: string[];
+  driftedHosts: string[];
+  origin: string;
+  originSource: 'default' | 'tunnel-override';
 }
 
 export interface ReconcileReport {

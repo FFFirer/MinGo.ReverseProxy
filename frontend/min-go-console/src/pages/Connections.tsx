@@ -353,7 +353,10 @@ function TunnelDetailModal(props: { tunnel: CloudflareTunnel; onClose: () => voi
     }
   };
 
-  const ruleColumns: Column<{ hostname: string; service: string; managed: boolean }>[] = [
+  type RuleOwnership = 'managed' | 'stale' | 'foreign' | 'catchall';
+  type RuleRow = { hostname: string; service: string; ownership: RuleOwnership };
+
+  const ruleColumns: Column<RuleRow>[] = [
     {
       key: 'hostname',
       title: '域名',
@@ -366,15 +369,20 @@ function TunnelDetailModal(props: { tunnel: CloudflareTunnel; onClose: () => voi
       cell: (r) => <span class="font-mono text-xs break-all">{r.service}</span>,
     },
     {
-      key: 'managed',
+      key: 'ownership',
       title: '归属',
-      cell: (r) => (
-        r.hostname
-          ? (r.managed
-              ? <span class="badge badge-success text-xs">MinGo 托管</span>
-              : <span class="badge badge-warning text-xs">CF 面板手工</span>)
-          : <span class="badge bg-gray-100 text-gray-500 dark:bg-dark-200 dark:text-gray-400 text-xs">兜底规则</span>
-      ),
+      cell: (r) => {
+        switch (r.ownership) {
+          case 'managed':
+            return <span class="badge badge-success text-xs">MinGo 托管</span>;
+          case 'stale':
+            return <span class="badge badge-warning text-xs">MinGo 已停用</span>;
+          case 'foreign':
+            return <span class="badge badge-warning text-xs">CF 面板手工</span>;
+          default:
+            return <span class="badge bg-gray-100 text-gray-500 dark:bg-dark-200 dark:text-gray-400 text-xs">兜底规则</span>;
+        }
+      },
     },
   ];
 
@@ -434,6 +442,35 @@ function TunnelDetailModal(props: { tunnel: CloudflareTunnel; onClose: () => voi
                 </button>
               </div>
 
+              <div class="mb-2 p-2.5 rounded-lg bg-gray-50 dark:bg-dark-200 text-xs">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-secondary">生效回源地址</span>
+                  <span class="font-mono">{view()!.origin}</span>
+                  <span class={`badge text-xs ${view()!.originSource === 'tunnel-override' ? 'badge-success' : 'badge-warning'}`}>
+                    {view()!.originSource === 'tunnel-override' ? '隧道级覆盖' : '全局默认'}
+                  </span>
+                </div>
+                <p class="text-secondary mt-1">
+                  该地址由 cloudflared 在连接器自己的网络里解析，必须是连接器可达的地址：
+                  容器名只在连接器加入同一 Docker 网络时成立，否则应写宿主地址 + 发布端口。
+                  按隧道名覆盖：<span class="font-mono">Cloudflare__TunnelOrigins__0__TunnelName / __Origin</span>
+                </p>
+              </div>
+
+              <Show when={view()!.driftedHosts.length > 0}>
+                <div class="mb-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs">
+                  以下托管域名的回源地址与生效地址不一致（历史地址或换过连接器网络）：{view()!.driftedHosts.join(', ')}
+                  <span class="text-secondary"> —— 点击"重对账"统一</span>
+                </div>
+              </Show>
+
+              <Show when={view()!.staleHosts.length > 0}>
+                <div class="mb-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs">
+                  以下域名来自已停用的本地路由，仍占着 ingress：{view()!.staleHosts.join(', ')}
+                  <span class="text-secondary"> —— 重对账将摘除规则与 CNAME</span>
+                </div>
+              </Show>
+
               <Show when={view()!.missingHosts.length > 0}>
                 <div class="mb-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs">
                   以下域名绑定了本地路由但未出现在 ingress（漂移）：{view()!.missingHosts.join(', ')}
@@ -443,13 +480,13 @@ function TunnelDetailModal(props: { tunnel: CloudflareTunnel; onClose: () => voi
 
               <Table
                 columns={ruleColumns}
-                data={view()!.rules.map((r) => ({
-                  hostname: r.hostname,
-                  service: r.service,
-                  managed: view()!.localBindings.some(
-                    (b) => b.enabled && b.host.toLowerCase() === r.hostname.toLowerCase(),
-                  ),
-                }))}
+                data={view()!.rules.map((r): RuleRow => {
+                  const host = (r.hostname ?? '').toLowerCase();
+                  const binding = view()!.localBindings.find((b) => b.host.toLowerCase() === host);
+                  const ownership: RuleOwnership =
+                    !host ? 'catchall' : !binding ? 'foreign' : binding.enabled ? 'managed' : 'stale';
+                  return { hostname: r.hostname, service: r.service, ownership };
+                })}
                 rowKey={(r) => r.hostname || r.service}
                 emptyMessage="暂无 ingress 规则"
               />

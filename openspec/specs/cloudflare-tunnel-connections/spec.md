@@ -22,7 +22,7 @@
 
 ### Requirement: 接入配置 SHALL 在设置页管理且不回显
 
-Cloudflare 接入配置（API Token、AccountId、请求超时）SHALL 在「设置」页编辑并持久化到数据库（单行配置，仿 Portainer 实例管理模式）；`Cloudflare` 配置节（appsettings / 环境变量）SHALL 仅作为未保存时的默认值兜底。DataPlaneOrigin 与 DefaultCatchAll 为部署拓扑参数，SHALL 始终来自配置节。任何 API 响应与页面 SHALL NOT 回显 Token 明文（读取返回脱敏值，保存时空值或含 `***` 视为不修改）。未配置 Token 时，接入通道页面 SHALL 指引用户前往设置页，隧道接口 SHALL 返回 503 而不是报错泄漏内部细节。
+Cloudflare 接入配置（API Token、AccountId、请求超时）SHALL 在「设置」页编辑并持久化到数据库（单行配置，仿 Portainer 实例管理模式）；`Cloudflare` 配置节（appsettings / 环境变量）SHALL 仅作为未保存时的默认值兜底。DataPlaneOrigin、TunnelOrigins 与 DefaultCatchAll 为部署拓扑参数，SHALL 始终来自配置节。任何 API 响应与页面 SHALL NOT 回显 Token 明文（读取返回脱敏值，保存时空值或含 `***` 视为不修改）。未配置 Token 时，接入通道页面 SHALL 指引用户前往设置页，隧道接口 SHALL 返回 503 而不是报错泄漏内部细节。
 
 #### Scenario: 未配置凭据
 
@@ -68,19 +68,23 @@ Cloudflare 接入配置（API Token、AccountId、请求超时）SHALL 在「设
 - **WHEN** 路由 A（绑定隧道 T1）已占用 `api.example.com`，用户把路由 B 的 host 也设为 `api.example.com` 并绑定 T2
 - **THEN** 保存 SHALL 返回 `400`，说明域名已被 T1 占用
 
-### Requirement: 隧道 ingress SHALL 由对账统一为网关回源
+### Requirement: 隧道 ingress SHALL 按隧道生效回源地址对账
 
-控制面 SHALL 以「绑定该隧道的本地启用路由」为托管清单，通过以下规则合并到隧道 ingress：托管 hostname 的规则 SHALL 统一指向 `Cloudflare:DataPlaneOrigin`（默认 `http://data-plane:8080`）且不带路径；托管清单中缺失的 hostname SHALL 插入兜底规则之前；指向网关 origin 但已不在托管清单的规则 SHALL 视为陈旧托管规则并移除；其余规则（含用户手写的兜底规则内容）SHALL 原样保留；末尾无 hostname 的兜底规则缺失时 SHALL 追加 `Cloudflare:DefaultCatchAll`（默认 `http_status:404`）。合并无变化时 SHALL 不发起 PUT。
+回源地址由 cloudflared 在**连接器自身网络命名空间**解析，因此 SHALL 是连接器可达的地址：compose 服务名形态（默认 `http://data-plane:8080`）只在连接器加入同一 user-defined bridge/overlay 网络时成立，否则 SHALL 使用宿主地址 + 发布端口。
+
+控制面 SHALL 以「绑定该隧道的本地路由」为**所有权清单**（含停用路由），其中启用路由的 hostname 为**生效清单**，并按以下规则合并到隧道 ingress：生效清单内 hostname 的规则 SHALL 覆盖为该隧道的生效回源地址且不带路径，同 hostname 的重复条目 SHALL 合并为一条；生效清单中缺失的 hostname SHALL 插入兜底规则之前；属于所有权清单但已不生效的 hostname SHALL 移除；其余 hostname 中 service 恰等于生效回源地址的历史痕迹规则 SHALL 移除，其它用户规则（含用户手写的兜底规则内容）SHALL 原样保留；末尾无 hostname 的兜底规则缺失时 SHALL 追加 `Cloudflare:DefaultCatchAll`（默认 `http_status:404`）。合并无变化时 SHALL 不发起 PUT。
+
+生效回源地址 SHALL 取 `Cloudflare:TunnelOrigins` 中按隧道名（忽略大小写与首尾空白）命中且 Origin 非空的首个条目，未命中时 SHALL 回退 `Cloudflare:DataPlaneOrigin`；隧道名为空或覆盖列表缺失 SHALL 视为未命中而不是错误。
 
 #### Scenario: 绑定路由后对账新增 ingress 规则
 
 - **WHEN** 路由「api」以 `api.example.com` 绑定隧道 T 并启用，执行对账
-- **THEN** T 的 ingress SHALL 新增 `api.example.com → http://data-plane:8080`
+- **THEN** T 的 ingress SHALL 新增 `api.example.com → <T 的生效回源地址>`
 - **AND** 若原 ingress 无兜底规则，末尾 SHALL 追加 `http_status:404` 兜底
 
 #### Scenario: 用户手写的非托管规则不受影响
 
-- **WHEN** 用户已在 Cloudflare 侧为 `blog.example.com` 配置直连 origin 的规则，且该域名不在托管清单
+- **WHEN** 用户已在 Cloudflare 侧为 `blog.example.com` 配置直连 origin 的规则，且该域名不属于所有权清单
 - **THEN** 对账 SHALL 原样保留该规则
 
 #### Scenario: 解除绑定后移除陈旧托管规则
@@ -88,10 +92,40 @@ Cloudflare 接入配置（API Token、AccountId、请求超时）SHALL 在「设
 - **WHEN** 路由「api」改回 `local` 或删除，重新对账 T
 - **THEN** T 的 ingress 中指向网关 origin 且 host 为 `api.example.com` 的规则 SHALL 被移除
 
+#### Scenario: 路由停用后摘除指向外部地址的规则
+
+- **WHEN** `old.example.com` 的路由由启用改为停用，其在 ingress 中的规则 service 是连接器专用的宿主地址（与生效回源地址不同）
+- **THEN** 对账 SHALL 依据所有权清单移除该规则，而不是把它误判为用户手写规则永久保留
+
+#### Scenario: 更换回源地址不产生重复规则
+
+- **WHEN** 隧道 T 的生效回源地址由 `http://data-plane:8080` 改为 `http://192.168.88.134:8080`，`api.example.com` 仍在生效清单内
+- **THEN** 对账 SHALL 把该 hostname 的原位规则改写为新地址，且 ingress 中该 hostname SHALL 只有一条规则
+
+#### Scenario: 按隧道名覆盖回源地址
+
+- **WHEN** 配置节提供 `Cloudflare:TunnelOrigins = [{ TunnelName: "home", Origin: "http://192.168.88.134:8080" }]`，隧道名为 `Home`
+- **THEN** 该隧道的对账 SHALL 使用覆盖地址并在 ingress 视图中标记来源为隧道级覆盖
+- **AND** 其他未命中的隧道 SHALL 继续使用 `Cloudflare:DataPlaneOrigin`
+
 #### Scenario: 兜底规则已有用户内容
 
 - **WHEN** 隧道 ingress 末尾已存在 `http://fallback.example` 兜底规则
 - **THEN** 对账 SHALL 保留该兜底内容，不覆盖为 `http_status:404`
+
+### Requirement: 隧道详情 SHALL 说明生效回源地址及其来源
+
+隧道详情展开区 SHALL 展示该隧道的生效回源地址、来源（全局默认 / 隧道级覆盖）与归属分级的 ingress 表格，并分别列出「托管但缺失」「所有权内但已停用」「回源地址与生效地址不一致（漂移）」三类域名，使用户能判断地址是否可能为连接器不可达。归属为「CF 面板手工」的规则 SHALL 与 MinGo 托管规则视觉区分。
+
+#### Scenario: 展示隧道级覆盖
+
+- **WHEN** 隧道命中 `TunnelOrigins` 覆盖项
+- **THEN** 展开区 SHALL 显示该覆盖地址并标注「隧道级覆盖」
+
+#### Scenario: 漂移域名可见
+
+- **WHEN** 托管 hostname 在 ingress 中的 service 与生效回源地址不同
+- **THEN** 展开区 SHALL 列出该域名并提示可通过重对账统一
 
 ### Requirement: 隧道域名 SHALL 自动创建与清理 CNAME 记录
 

@@ -36,6 +36,7 @@ public sealed class CloudflareConfigProvider
                 AccountId = stored.AccountId,
                 TimeoutSeconds = stored.TimeoutSeconds,
                 DataPlaneOrigin = _defaults.DataPlaneOrigin,
+                TunnelOrigins = _defaults.TunnelOrigins,
                 DefaultCatchAll = _defaults.DefaultCatchAll,
             };
 

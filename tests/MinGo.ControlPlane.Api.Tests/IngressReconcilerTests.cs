@@ -54,13 +54,15 @@ public class IngressReconcilerTests
 
     // ── Merge ──
 
+    private const string CatchAll = "http_status:404";
+
     [Fact]
     public void Merge_AddsManagedHostsBeforeCatchAll_AndAppendsDefaultCatchAll()
     {
         var current = new[] { Rule("keep.example.com", "http://other:3000") };
         var managed = new[] { "api.example.com", "API.Example.COM" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.True(result.Changed);
         // 去重后只添加一条 api.example.com
@@ -74,7 +76,7 @@ public class IngressReconcilerTests
                     < Array.IndexOf(result.Rules, result.Rules.Last()));
         // 末尾追加兜底规则
         Assert.Equal(string.Empty, result.Rules[^1].Hostname);
-        Assert.Equal("http_status:404", result.Rules[^1].Service);
+        Assert.Equal(CatchAll, result.Rules[^1].Service);
     }
 
     [Fact]
@@ -83,7 +85,7 @@ public class IngressReconcilerTests
         var current = new[] { Rule("api.example.com", "http://legacy:9000") };
         var managed = new[] { "api.example.com" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.True(result.Changed);
         var rule = result.Rules.Single(r => r.Hostname == "api.example.com");
@@ -97,11 +99,11 @@ public class IngressReconcilerTests
         var current = new[]
         {
             Rule("api.example.com", Origin),
-            new IngressRule(string.Empty, "http_status:404", null, null),
+            new IngressRule(string.Empty, CatchAll, null, null),
         };
         var managed = new[] { "api.example.com" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.False(result.Changed);
         Assert.Equal(2, result.Rules.Length);
@@ -118,7 +120,8 @@ public class IngressReconcilerTests
         };
         var managed = new[] { "api.example.com" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        // owned 不含 old.example.com：靠 service == origin 的历史痕迹兜底摘除
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.True(result.Changed);
         Assert.Equal(new[] { "old.example.com" }, result.RemovedHosts);
@@ -130,12 +133,90 @@ public class IngressReconcilerTests
     }
 
     [Fact]
+    public void Merge_RemovesDisabledRouteRule_WhenServiceIsAForeignOrigin()
+    {
+        // 所有权以本地路由表为准：停用路由的 hostname 即使指向连接器专用地址，也必须摘除，
+        // 否则解绑后域名仍在隧道上生效
+        var current = new[]
+        {
+            Rule("old.example.com", "http://192.168.88.134:9180"),
+            new IngressRule(string.Empty, CatchAll, null, null),
+        };
+        var managed = Array.Empty<string>();
+        var owned = new[] { "old.example.com" };
+
+        var result = IngressReconciler.Merge(current, managed, owned, Origin, CatchAll);
+
+        Assert.True(result.Changed);
+        Assert.Equal(new[] { "old.example.com" }, result.RemovedHosts);
+        Assert.DoesNotContain(result.Rules, r => r.Hostname == "old.example.com");
+    }
+
+    [Fact]
+    public void Merge_RewritesInPlace_WhenOriginChanges_NoDuplicateRule()
+    {
+        // 换用连接器可达的地址后重对账：同一 hostname 只能留一条，且指向新 origin
+        var lanOrigin = "http://192.168.88.134:8080";
+        var current = new[]
+        {
+            Rule("api.example.com", Origin),
+            new IngressRule(string.Empty, CatchAll, null, null),
+        };
+        var managed = new[] { "api.example.com" };
+
+        var result = IngressReconciler.Merge(current, managed, managed, lanOrigin, CatchAll);
+
+        Assert.True(result.Changed);
+        Assert.Single(result.Rules, r => r.Hostname == "api.example.com");
+        Assert.Equal(lanOrigin, result.Rules.Single(r => r.Hostname == "api.example.com").Service);
+        Assert.Empty(result.AddedHosts);
+        Assert.Empty(result.RemovedHosts);
+    }
+
+    [Fact]
+    public void Merge_CollapsesDuplicateRules_ForSameManagedHost()
+    {
+        var current = new[]
+        {
+            Rule("api.example.com", Origin),
+            Rule("api.example.com", "http://192.168.88.134:9180"),
+            new IngressRule(string.Empty, CatchAll, null, null),
+        };
+        var managed = new[] { "api.example.com" };
+
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
+
+        Assert.True(result.Changed);
+        Assert.Single(result.Rules, r => r.Hostname == "api.example.com");
+        Assert.Equal(2, result.Rules.Length);
+    }
+
+    [Fact]
+    public void Merge_KeepsUserRule_WhenHostMatchesNoOwnedRoute()
+    {
+        // 用户手写、指向外部地址的域名不受影响
+        var current = new[]
+        {
+            Rule("blog.example.com", "http://192.168.88.134:3001"),
+            new IngressRule(string.Empty, CatchAll, null, null),
+        };
+        var managed = Array.Empty<string>();
+        var owned = new[] { "api.example.com" };
+
+        var result = IngressReconciler.Merge(current, managed, owned, Origin, CatchAll);
+
+        Assert.False(result.Changed);
+        Assert.Contains(result.Rules, r => r.Hostname == "blog.example.com"
+                                           && r.Service == "http://192.168.88.134:3001");
+    }
+
+    [Fact]
     public void Merge_PreservesUserCatchAllContent()
     {
         var current = new[] { new IngressRule(string.Empty, "http://fallback:8080", null, null) };
         var managed = new[] { "api.example.com" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.Contains(result.Rules, r => r.Hostname == string.Empty && r.Service == "http://fallback:8080");
         Assert.Equal(string.Empty, result.Rules[^1].Hostname);
@@ -144,10 +225,10 @@ public class IngressReconcilerTests
     [Fact]
     public void Merge_DoesNotDuplicateExistingCatchAll()
     {
-        var current = new[] { new IngressRule(string.Empty, "http_status:404", null, null) };
-        var managed = Array.Empty<string>();
+        var current = new[] { new IngressRule(string.Empty, CatchAll, null, null) };
+        var empty = Array.Empty<string>();
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, empty, empty, Origin, CatchAll);
 
         Assert.False(result.Changed);
         Assert.Single(result.Rules);
@@ -159,15 +240,15 @@ public class IngressReconcilerTests
         // CF 侧兜底不在末尾时（API 正常不会出现），插入托管规则后仍追加默认兜底收尾
         var current = new[]
         {
-            new IngressRule(string.Empty, "http_status:404", null, null),
+            new IngressRule(string.Empty, CatchAll, null, null),
             Rule("user.example.com", "http://direct:3000"),
         };
         var managed = new[] { "api.example.com" };
 
-        var result = IngressReconciler.Merge(current, managed, Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, managed, managed, Origin, CatchAll);
 
         Assert.Equal(string.Empty, result.Rules[^1].Hostname);
-        Assert.Equal("http_status:404", result.Rules[^1].Service);
+        Assert.Equal(CatchAll, result.Rules[^1].Service);
         Assert.Contains(result.Rules, r => r.Hostname == "api.example.com" && r.Service == Origin);
     }
 
@@ -177,10 +258,11 @@ public class IngressReconcilerTests
         var current = new[]
         {
             Rule("user.example.com", "http://direct:3000"),
-            new IngressRule(string.Empty, "http_status:404", null, null),
+            new IngressRule(string.Empty, CatchAll, null, null),
         };
+        var empty = Array.Empty<string>();
 
-        var result = IngressReconciler.Merge(current, Array.Empty<string>(), Origin, "http_status:404");
+        var result = IngressReconciler.Merge(current, empty, empty, Origin, CatchAll);
 
         Assert.False(result.Changed);
         Assert.Equal(current.Length, result.Rules.Length);

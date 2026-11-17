@@ -25,7 +25,11 @@ public sealed record TunnelIngressView(
     IngressRule[] Rules,
     TunnelIngressBinding[] LocalBindings,
     string[] MissingHosts,
-    string[] UnmanagedHosts);
+    string[] StaleHosts,
+    string[] UnmanagedHosts,
+    string[] DriftedHosts,
+    string Origin,
+    string OriginSource);
 
 /// <summary>
 /// 发布编排：本地 Route 表是 MinGo 托管发布的唯一事实来源。
@@ -221,18 +225,17 @@ public sealed class CloudflareSyncService
     public async Task<ReconcileReport> ReconcileTunnelAsync(string tunnelId, CancellationToken ct)
     {
         var routes = await GetRoutesBoundToAsync(tunnelId);
-        var managedHosts = routes
-            .Where(r => r.Enabled && !string.IsNullOrWhiteSpace(r.Match?.Host))
-            .Select(r => IngressReconciler.NormalizeHost(r.Match!.Host))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var managedHosts = HostsOf(routes, onlyEnabled: true);
+        var ownedHosts = HostsOf(routes, onlyEnabled: false);
 
         var config = await _client.GetConfigurationAsync(tunnelId, ct);
         var options = await _config.GetAsync(ct);
+        var origin = options.ResolveOrigin((await _client.GetTunnelAsync(tunnelId, ct)).Name);
         var merge = IngressReconciler.Merge(
             config.Config?.Ingress ?? [],
             managedHosts,
-            options.DataPlaneOrigin,
+            ownedHosts,
+            origin.Origin,
             options.DefaultCatchAll);
 
         var ingressUpdated = false;
@@ -311,6 +314,8 @@ public sealed class CloudflareSyncService
         var tunnel = await _client.GetTunnelAsync(tunnelId, ct);
         var config = await _client.GetConfigurationAsync(tunnelId, ct);
         var ingress = config.Config?.Ingress ?? [];
+        var options = await _config.GetAsync(ct);
+        var origin = options.ResolveOrigin(tunnel.Name);
 
         var routes = await GetRoutesBoundToAsync(tunnelId);
         var bindings = routes
@@ -324,17 +329,47 @@ public sealed class CloudflareSyncService
             .Select(b => b.Host)
             .ToHashSet(StringComparer.Ordinal);
 
-        var ingressHosts = ingress
-            .Where(r => IngressReconciler.NormalizeHost(r.Hostname).Length > 0)
-            .Select(r => IngressReconciler.NormalizeHost(r.Hostname))
-            .ToHashSet(StringComparer.Ordinal);
+        // 停用路由的 hostname 仍属 MinGo 托管范围：它解释了「CF 侧有规则但本地不生效」的来源，
+        // 不能和用户手写规则混为一谈
+        var ownedHosts = bindings.Select(b => b.Host).ToHashSet(StringComparer.Ordinal);
+
+        // CF 按顺序匹配，同 hostname 只有首条生效
+        var serviceByHost = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var rule in ingress)
+        {
+            var host = IngressReconciler.NormalizeHost(rule.Hostname);
+            if (host.Length > 0) serviceByHost.TryAdd(host, rule.Service);
+        }
+
+        var ingressHosts = serviceByHost.Keys.ToHashSet(StringComparer.Ordinal);
 
         var missing = managedHosts.Where(h => !ingressHosts.Contains(h)).ToArray();
+        var stale = ownedHosts
+            .Where(h => !managedHosts.Contains(h) && ingressHosts.Contains(h))
+            .OrderBy(h => h, StringComparer.Ordinal)
+            .ToArray();
         var unmanaged = ingressHosts
-            .Where(h => !managedHosts.Contains(h))
+            .Where(h => !ownedHosts.Contains(h))
+            .OrderBy(h => h, StringComparer.Ordinal)
+            .ToArray();
+        var drifted = managedHosts
+            .Where(h => serviceByHost.TryGetValue(h, out var service)
+                        && !string.Equals(service, origin.Origin, StringComparison.Ordinal))
             .OrderBy(h => h, StringComparer.Ordinal)
             .ToArray();
 
-        return new TunnelIngressView(tunnel, ingress, bindings, missing, unmanaged);
+        return new TunnelIngressView(
+            tunnel, ingress, bindings, missing, stale, unmanaged, drifted,
+            origin.Origin, origin.Source);
     }
+
+    /// <summary>
+    /// 绑定该隧道的路由 hostname 清单。onlyEnabled 为 true 时是本轮应生效的托管清单，
+    /// 为 false 时是 MinGo 声明的所有权清单（含停用路由），后者用于识别陈旧托管规则。
+    /// </summary>
+    private static string[] HostsOf(List<RouteConfig> routes, bool onlyEnabled) => routes
+        .Where(r => (!onlyEnabled || r.Enabled) && !string.IsNullOrWhiteSpace(r.Match?.Host))
+        .Select(r => IngressReconciler.NormalizeHost(r.Match!.Host))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
 }

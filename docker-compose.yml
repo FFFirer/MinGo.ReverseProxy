@@ -36,6 +36,11 @@ services:
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
       - OpenTelemetry__Enabled=true
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
+      # 隧道回源地址：由 cloudflared 在它自己的网络命名空间解析，必须是连接器可达的地址。
+      # 容器名（默认 http://data-plane:8080）只在 cloudflared 加入本 compose 网络时成立；
+      # 连接器跑在宿主机或另一台机器时改用宿主地址 + 发布端口，按隧道名逐条覆盖：
+      #   Cloudflare__TunnelOrigins__0__TunnelName=home
+      #   Cloudflare__TunnelOrigins__0__Origin=http://192.168.88.134:8080
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
       interval: 15s
