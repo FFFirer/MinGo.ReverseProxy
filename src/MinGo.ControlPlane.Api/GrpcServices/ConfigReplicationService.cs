@@ -1,9 +1,11 @@
 using Grpc.Core;
 using MinGo.Core.Entities;
 using MinGo.Core.Interfaces;
+using MinGo.Core.Routing;
 using MinGo.DataPlane.Grpc;
 using MinGo.Infrastructure.Data;
 using CertificateSnapshotPolicy = MinGo.Core.Models.CertificateSnapshotPolicy;
+using ModelRoute = MinGo.Core.Models.RouteConfig;
 
 namespace MinGo.ControlPlane.Api.GrpcServices;
 
@@ -111,19 +113,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             Checksum = Guid.NewGuid().ToString("N")[..16]
         };
 
-        foreach (var route in routes)
-        {
-            snapshot.Routes.Add(new RouteConfig
-            {
-                Id = route.Id,
-                Name = route.Name,
-                ClusterId = route.ClusterId,
-                MatchPath = route.Match?.Path ?? "",
-                MatchHost = route.Match?.Host ?? "",
-                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>()),
-                Enabled = route.Enabled
-            });
-        }
+        AddRoutesToSnapshot(snapshot, routes);
 
         foreach (var cluster in clusters)
         {
@@ -154,6 +144,39 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         await AddCertificatesToSnapshotAsync(apiDbService, snapshot);
 
         return snapshot;
+    }
+
+    /// <summary>
+    /// 把路由表编译成下发给数据面的规则集（全量快照与增量广播共用一条口径）。
+    /// </summary>
+    /// <remarks>
+    /// 这里是「外部隧道不直连后端」契约的另一半：隧道 ingress 把所有托管域名统一回源到数据面，
+    /// 所以绑定隧道的启用路由必须同样产出一条「数据面 → 后端集群」规则，否则隧道流量落地即 404。
+    /// 编译刻意不读 <c>ConnectionId</c>——接入通道只决定流量从哪里进来，不决定规则装在哪个进程；
+    /// 想改成按通道过滤，先过 <c>DataPlaneRuleCompilerTests.Compile_KeepsTunnelBoundRoutes</c> 这一关。
+    /// </remarks>
+    private void AddRoutesToSnapshot(ConfigSnapshot snapshot, IEnumerable<ModelRoute> routes)
+    {
+        var plan = DataPlaneRuleCompiler.Compile(routes);
+
+        foreach (var warning in plan.Warnings)
+        {
+            _logger.LogWarning("数据面规则去重：{Warning}", warning);
+        }
+
+        foreach (var route in plan.Rules)
+        {
+            snapshot.Routes.Add(new RouteConfig
+            {
+                Id = route.Id,
+                Name = route.Name,
+                ClusterId = route.ClusterId,
+                MatchPath = route.Match?.Path ?? "",
+                MatchHost = route.Match?.Host ?? "",
+                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>()),
+                Enabled = route.Enabled
+            });
+        }
     }
 
     /// <summary>
@@ -205,19 +228,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             Checksum = Guid.NewGuid().ToString("N")[..16]
         };
 
-        foreach (var route in routes)
-        {
-            snapshot.Routes.Add(new RouteConfig
-            {
-                Id = route.Id,
-                Name = route.Name,
-                ClusterId = route.ClusterId,
-                MatchPath = route.Match?.Path ?? "",
-                MatchHost = route.Match?.Host ?? "",
-                TransformsJson = System.Text.Json.JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>()),
-                Enabled = route.Enabled
-            });
-        }
+        AddRoutesToSnapshot(snapshot, routes);
 
         foreach (var cluster in clusters)
         {
