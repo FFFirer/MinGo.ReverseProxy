@@ -238,6 +238,22 @@ function matchKeyOf(host?: string, path?: string): string {
   return `${normalizeHostKey(host)} ${normalizePathKey(path)}`;
 }
 
+/**
+ * 匹配路径的轻量语法预检：只拦两类必错写法——无前导斜杠、花括号不配对（如 /{**catch-all) 漏写 }）。
+ * 前端无法完整复刻后端的 RoutePatternFactory 解析器，完整校验由保存期 400 兜底。
+ */
+function pathSyntaxError(path: string): string | null {
+  const value = path.trim();
+  if (!value) return null;
+  if (!value.startsWith('/')) return '匹配路径必须以 / 开头';
+  let depth = 0;
+  for (const ch of value) {
+    if (ch === '{') depth++;
+    else if (ch === '}' && --depth < 0) return '匹配路径存在多余的 “}”';
+  }
+  return depth > 0 ? '匹配路径存在未闭合的 “{”（如 /{**catch-all)）' : null;
+}
+
 /** 匹配键的可读描述，用于提示文案 */
 function describeMatchKey(host?: string, path?: string): string {
   const h = normalizeHostKey(host);
@@ -354,6 +370,10 @@ function RouteFormModal(props: {
     const errs: Record<string, string> = {};
     if (!name().trim()) errs.name = '路由名称不能为空';
     if (!path().trim()) errs.path = '匹配路径不能为空';
+    else {
+      const syntax = pathSyntaxError(path());
+      if (syntax) errs.path = syntax;
+    }
     if (isTunnel() && !host().trim()) errs.host = '发布到隧道的路由必须配置匹配域名';
     // 停用路由不占匹配键，与后端 RouteUniquenessPolicy 保持一致
     if (!errs.host && enabled() && conflict()) {
