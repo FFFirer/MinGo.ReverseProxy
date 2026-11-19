@@ -117,6 +117,7 @@ function containerNameUnavailableReason(
   network: PortainerNetwork,
 ): string {
   if (network.isDefaultBridge) return "默认 bridge 不支持容器名解析";
+  if (network.isHost) return "宿主网络不支持容器名解析";
   if (!network.dataPlaneAttached) return "data-plane 未接入此网络";
   if (!network.supportsContainerName) {
     return `网络驱动 ${network.driver ?? "未知"} 不支持容器名解析`;
@@ -739,7 +740,7 @@ export default function PortainerImportModal(props: Props) {
                               </Show>
                               <Show
                                 when={
-                                  !network.isDefaultBridge &&
+                                  !network.supportsContainerName ||
                                   !network.dataPlaneAttached
                                 }
                               >

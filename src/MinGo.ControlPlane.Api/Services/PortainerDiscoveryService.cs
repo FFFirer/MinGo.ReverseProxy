@@ -223,9 +223,12 @@ public sealed class PortainerDiscoveryService
                 .GroupBy(n => n.Name, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Driver, StringComparer.Ordinal);
 
+            var containers = MapContainers(await containersTask);
+            containers = await EnrichHostNetworkPortsAsync(client, endpoint.Id, containers, ct);
+
             return new EndpointResult(
                 endpoint,
-                MapContainers(await containersTask),
+                containers,
                 drivers,
                 null);
         }
@@ -249,6 +252,53 @@ public sealed class PortainerDiscoveryService
         }
     }
 
+    /// <summary>
+    /// host 模式容器在列表接口中没有端口数据；逐个 inspect 用镜像 ExposedPorts 合成。
+    /// 单个容器失败只降级为空端口，不影响整个 endpoint 的发现。
+    /// </summary>
+    private async Task<List<ContainerSnapshot>> EnrichHostNetworkPortsAsync(
+        PortainerClient client,
+        int endpointId,
+        List<ContainerSnapshot> containers,
+        CancellationToken ct)
+    {
+        var hostContainers = containers
+            .Where(c => HostNetworkPorts.IsHostMode(c.NetworkMode))
+            .ToList();
+
+        if (hostContainers.Count == 0)
+        {
+            return containers;
+        }
+
+        var inspected = await Task.WhenAll(hostContainers.Select(async container =>
+        {
+            try
+            {
+                var inspect = await client.GetContainerInspectAsync(endpointId, container.Id, ct);
+                var ports = HostNetworkPorts.FromExposedPorts(inspect.Config?.ExposedPorts?.Keys);
+                return (container.Id, Ports: ports);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Portainer [{InstanceId}] 获取 host 模式容器 {Container} 的 ExposedPorts 失败",
+                    client.InstanceId, container.Name);
+                return (container.Id, Ports: (IReadOnlyList<PortBinding>)[]);
+            }
+        }));
+
+        var portMap = inspected.ToDictionary(r => r.Id, r => r.Ports, StringComparer.Ordinal);
+
+        return containers
+            .Select(c => portMap.TryGetValue(c.Id, out var ports) ? c with { Ports = ports } : c)
+            .ToList();
+    }
+
     private IReadOnlyList<PortainerNetworkView> BuildNetworks(
         PortainerInstanceEntity instance,
         EndpointResult result,
@@ -266,6 +316,10 @@ public sealed class PortainerDiscoveryService
         foreach (var networkName in networkNames)
         {
             result.NetworkDrivers.TryGetValue(networkName, out var driver);
+            if (driver is null && HostNetworkPorts.IsHostNetwork(networkName))
+            {
+                driver = "host";
+            }
             var dataPlaneAttached = DataPlaneDetector.IsAttached(
                 result.Containers, networkName, self, instance.DataPlaneService);
             var supportsContainerName = DestinationAddressResolver.SupportsContainerName(networkName, driver);
@@ -319,6 +373,7 @@ public sealed class PortainerDiscoveryService
                 networkName,
                 driver,
                 string.Equals(networkName, DestinationAddressResolver.DefaultBridgeName, StringComparison.OrdinalIgnoreCase),
+                HostNetworkPorts.IsHostNetwork(networkName),
                 dataPlaneAttached,
                 supportsContainerName,
                 groups));
@@ -347,6 +402,12 @@ public sealed class PortainerDiscoveryService
                 name = dto.Id.Length > 12 ? dto.Id[..12] : dto.Id;
             }
 
+            var networks = dto.NetworkSettings?.Networks?.Keys.ToList() ?? [];
+            if (HostNetworkPorts.IsHostMode(dto.HostConfig?.NetworkMode))
+            {
+                networks.Insert(0, HostNetworkPorts.HostNetworkName);
+            }
+
             result.Add(new ContainerSnapshot
             {
                 Id = dto.Id,
@@ -355,7 +416,8 @@ public sealed class PortainerDiscoveryService
                 Image = dto.Image ?? string.Empty,
                 Stack = Label(labels, "com.docker.compose.project"),
                 Service = Label(labels, "com.docker.compose.service"),
-                Networks = dto.NetworkSettings?.Networks?.Keys.ToList() ?? [],
+                NetworkMode = dto.HostConfig?.NetworkMode,
+                Networks = networks,
                 Ports = MapPorts(dto.Ports),
                 IsPortainerSystem =
                     IsTrue(Label(labels, "io.portainer.server")) ||

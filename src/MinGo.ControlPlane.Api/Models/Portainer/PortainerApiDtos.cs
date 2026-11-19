@@ -24,8 +24,27 @@ public sealed class PortainerContainerDto
     public string[]? Names { get; set; }
     public string? State { get; set; }
     public Dictionary<string, string>? Labels { get; set; }
+    public PortainerContainerHostConfigDto? HostConfig { get; set; }
     public PortainerContainerNetworkSettingsDto? NetworkSettings { get; set; }
     public List<PortainerPortDto>? Ports { get; set; }
+}
+
+public sealed class PortainerContainerHostConfigDto
+{
+    public string? NetworkMode { get; set; }
+}
+
+/// <summary>
+/// GET /containers/{id}/json 的局部投影：仅取 Config.ExposedPorts。
+/// </summary>
+public sealed class PortainerContainerInspectDto
+{
+    public PortainerContainerInspectConfigDto? Config { get; set; }
+}
+
+public sealed class PortainerContainerInspectConfigDto
+{
+    public Dictionary<string, JsonElement>? ExposedPorts { get; set; }
 }
 
 public sealed class PortainerContainerNetworkSettingsDto

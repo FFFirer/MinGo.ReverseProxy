@@ -47,6 +47,7 @@ public sealed record PortainerNetworkView(
     string Name,
     string? Driver,
     bool IsDefaultBridge,
+    bool IsHost,
     bool DataPlaneAttached,
     bool SupportsContainerName,
     IReadOnlyList<PortainerGroupView> Groups);

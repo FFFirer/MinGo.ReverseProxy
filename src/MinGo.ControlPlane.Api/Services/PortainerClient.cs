@@ -100,6 +100,11 @@ public sealed class PortainerClient
         return networks;
     }
 
+    public Task<PortainerContainerInspectDto> GetContainerInspectAsync(
+        int endpointId, string containerId, CancellationToken ct) =>
+        GetJsonAsync<PortainerContainerInspectDto>(
+            $"api/endpoints/{endpointId}/docker/containers/{Uri.EscapeDataString(containerId)}/json", ct);
+
     private async Task<T> GetJsonAsync<T>(string path, CancellationToken ct)
     {
         string body;

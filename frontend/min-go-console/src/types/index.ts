@@ -130,6 +130,7 @@ export interface PortainerNetwork {
   name: string;
   driver?: string | null;
   isDefaultBridge: boolean;
+  isHost: boolean;
   dataPlaneAttached: boolean;
   supportsContainerName: boolean;
   groups: PortainerGroup[];

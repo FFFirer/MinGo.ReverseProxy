@@ -19,6 +19,7 @@ public sealed record ContainerSnapshot
     public required string Image { get; init; }
     public string? Stack { get; init; }
     public string? Service { get; init; }
+    public string? NetworkMode { get; init; }
     public IReadOnlyList<string> Networks { get; init; } = [];
     public IReadOnlyList<PortBinding> Ports { get; init; } = [];
     public bool IsPortainerSystem { get; init; }
