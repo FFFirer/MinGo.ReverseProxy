@@ -109,6 +109,32 @@ public class TopologyServiceTests
     }
 
     [Fact]
+    public void Build_MalformedPath_ReportsDanger()
+    {
+        var response = Build(
+            [Route("r1", "c1", "api.example.com", "/{**catch-all)")],
+            [Cluster("c1", Dest("d1", "http://10.0.0.1:8080"))]);
+
+        var issue = Issue(response, "invalid-path");
+        Assert.Equal(TopologySeverity.Danger, issue.Severity);
+        Assert.Equal(new[] { "route:r1" }, issue.NodeIds);
+        Assert.Equal(TopologyNodeStatus.Danger, Node(response, "route:r1").Status);
+    }
+
+    [Fact]
+    public void Build_MalformedPath_OnDisabledRoute_IsInfoOnly()
+    {
+        // 停用路由不进底层配置，只提示不染红
+        var response = Build(
+            [Route("r1", "c1", "api.example.com", "/{**catch-all)", enabled: false)],
+            [Cluster("c1", Dest("d1", "http://10.0.0.1:8080"))]);
+
+        var issue = Issue(response, "invalid-path");
+        Assert.Equal(TopologySeverity.Info, issue.Severity);
+        Assert.Equal(TopologyNodeStatus.Disabled, Node(response, "route:r1").Status);
+    }
+
+    [Fact]
     public void Build_RouteOnDeletedTunnel_ReportsDangerOnlyForThatRoute()
     {
         var response = Build(

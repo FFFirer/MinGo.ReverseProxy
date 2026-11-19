@@ -227,6 +227,19 @@ public class DataPlaneConfigProviderTests
     }
 
     [Fact]
+    public void ValidateSnapshot_MalformedMatchPath_Rejected()
+    {
+        // 缺右括号的 catch-all：YARP 会因此拒绝整份配置，必须在快照校验就拦下
+        var snapshot = CreateValidSnapshot();
+        snapshot.Routes[0].MatchPath = "/{**catch-all)";
+
+        var (isValid, errors) = DataPlaneConfigProvider.ValidateSnapshot(snapshot);
+
+        Assert.False(isValid);
+        Assert.Contains(errors, e => e.Contains("invalid MatchPath"));
+    }
+
+    [Fact]
     public void ValidateSnapshot_ValidConfig_Passes()
     {
         var snapshot = CreateValidSnapshot();

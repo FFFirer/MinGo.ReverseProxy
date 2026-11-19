@@ -47,6 +47,27 @@ public class RouteUniquenessPolicyTests
     }
 
     [Theory]
+    [InlineData("/{**catch-all)")]   // 右括号写成圆括号：会让 YARP 拒绝整份配置
+    [InlineData("/{id")]             // 参数未闭合
+    [InlineData("no-leading-slash")]
+    public void Check_MalformedPath_IsRejectedRegardlessOfConflicts(string path)
+    {
+        var verdict = Check(Route("new", "api.example.com", path));
+
+        Assert.False(verdict.IsValid);
+        Assert.Contains("语法无效", verdict.Error);
+    }
+
+    [Fact]
+    public void Check_DisabledRoute_WithMalformedPath_IsAllowedUntilEnabled()
+    {
+        // 停用路由不进底层配置，允许暂存；启用时会再次经过本校验
+        var verdict = Check(Route("new", "api.example.com", "/{**catch-all)", enabled: false));
+
+        Assert.True(verdict.IsValid);
+    }
+
+    [Theory]
     [InlineData("API.EXAMPLE.COM", "/v1/*")]
     [InlineData("api.example.com.", "/v1/*")]
     [InlineData("  api.example.com", "/V1/*")]

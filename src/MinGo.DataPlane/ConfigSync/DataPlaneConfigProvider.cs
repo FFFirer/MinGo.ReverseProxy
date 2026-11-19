@@ -185,6 +185,14 @@ public class DataPlaneConfigProvider
             {
                 errors.Add($"Route '{route.Id}' references non-existent Cluster '{route.ClusterId}'");
             }
+
+            // 路径语法非法会让 YARP 拒绝整份配置（所有路由 404），必须挡在应用之前。
+            // 拦在这里会让快照整体被拒，/healthz/ready 转 503，问题可见而不是静默全 404。
+            if (!string.IsNullOrEmpty(route.MatchPath)
+                && !MinGo.Core.Routing.RoutePathSyntax.IsValid(route.MatchPath, out var pathError))
+            {
+                errors.Add($"Route '{route.Id}' has invalid MatchPath '{route.MatchPath}': {pathError}");
+            }
         }
 
         return (errors.Count == 0, errors);

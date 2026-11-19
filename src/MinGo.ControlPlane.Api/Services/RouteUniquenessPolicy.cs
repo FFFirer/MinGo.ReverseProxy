@@ -32,6 +32,12 @@ public static class RouteUniquenessPolicy
             return new Verdict(true, null);
         }
 
+        if (!RoutePathSyntax.IsValid(candidate.Match?.Path, out var pathError))
+        {
+            return new Verdict(false,
+                $"匹配路径语法无效：{pathError}。非法路径会让数据面拒绝整份配置，全部路由 404");
+        }
+
         var key = RouteMatchKey.Of(candidate.Match?.Host, candidate.Match?.Path);
 
         foreach (var other in (existing ?? Array.Empty<RouteConfig>()).OrderBy(r => r.Id, StringComparer.Ordinal))

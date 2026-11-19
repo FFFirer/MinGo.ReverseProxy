@@ -12,4 +12,9 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 路径模板校验（RoutePathSyntax）复用 ASP.NET Core 路由解析器，与 YARP 同一套语法 -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 </Project>

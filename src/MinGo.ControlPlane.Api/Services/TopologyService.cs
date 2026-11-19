@@ -143,6 +143,16 @@ public class TopologyService
                     nodeId);
             }
 
+            if (!RoutePathSyntax.IsValid(path, out var pathError))
+            {
+                // 停用路由不进底层配置，不会击穿 YARP，但启用前必须先修正
+                AddIssue("invalid-path", route.Enabled ? TopologySeverity.Danger : TopologySeverity.Info,
+                    route.Enabled
+                        ? $"路由 “{RouteLabel(route)}” 的匹配路径 “{path}” 语法无效（{pathError}），数据面会拒绝整份配置导致全部路由 404"
+                        : $"路由 “{RouteLabel(route)}” 的匹配路径 “{path}” 语法无效（{pathError}），启用前必须先修正",
+                    nodeId);
+            }
+
             if (!ConnectionIds.IsLocal(connectionKey) && !connectionById.ContainsKey(connectionKey))
             {
                 AddIssue("connection-missing", TopologySeverity.Danger,
