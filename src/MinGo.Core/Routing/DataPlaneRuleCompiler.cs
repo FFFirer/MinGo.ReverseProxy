@@ -4,7 +4,7 @@ namespace MinGo.Core.Routing;
 
 /// <summary>
 /// 底层配置编译器：把控制面的路由表编译成数据面真正生效的转发规则集。
-/// 控制面下发快照（gRPC）和进程内直连数据库两种加载方式都走这里，保证两条路产出同一份规则。
+/// 唯一调用方是控制面的快照编译（ConfigReplicationService），数据面只消费编译结果。
 /// </summary>
 /// <remarks>
 /// 这里锁住三条契约：
