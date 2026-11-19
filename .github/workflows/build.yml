@@ -15,8 +15,36 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build:
+  # 版本与镜像命名空间只算一次，供各矩阵 job 复用；
+  # 若各 job 独立取时间戳，dispatch 场景下 per-arch 镜像与最终合并 tag 会对不上
+  meta:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.VERSION }}
+      owner: ${{ steps.namespace.outputs.owner }}
+    steps:
+      - name: Resolve image namespace
+        id: namespace
+        # ghcr 的镜像路径必须全小写，而 github.repository_owner 会保留账号大小写
+        # （FFFirer -> fffirer），转换放在这里而不是硬编码，改名时不会悄悄指错仓库
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract version from tag
+        id: extract
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "VERSION=${TAG#v}" >> "$GITHUB_OUTPUT"
+          else
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "VERSION=dev-${GITHUB_SHA:0:7}-${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: meta
+    # arm64 用 GitHub 原生 ARM 公共 runner 原生构建，无需 QEMU 模拟；
+    # amd64 固定 24.04，避开 ubuntu-latest 标签在切换期（2026-11 切 26.04）的不稳定
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       matrix:
         component:
@@ -28,6 +56,9 @@ jobs:
             dockerfile: DataPlane.Dockerfile
             context: .
             image: reverseproxy-dp
+        arch:
+          - amd64
+          - arm64
 
     steps:
       - name: Checkout code
@@ -36,11 +67,41 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Resolve image namespace
-        id: namespace
-        # ghcr 的镜像路径必须全小写，而 github.repository_owner 会保留账号大小写
-        # （FFFirer -> fffirer），转换放在这里而不是硬编码，改名时不会悄悄指错仓库
-        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push per-arch image
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.component.context }}
+          file: ${{ matrix.component.dockerfile }}
+          push: true
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ needs.meta.outputs.owner }}/${{ matrix.component.image }}:${{ needs.meta.outputs.version }}-linux-${{ matrix.arch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 把各架构单平台镜像合并为多架构 manifest，覆盖正式 tag 与 latest
+  merge-manifests:
+    needs: [meta, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - name: cp
+            image: reverseproxy-cp
+          - name: dp
+            image: reverseproxy-dp
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
@@ -49,27 +110,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: extract_version
+      - name: Create and push multi-arch manifest
         run: |
-          if [ "${{ github.ref_type }}" == "tag" ]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            echo "VERSION=${TAG#v}" >> $GITHUB_ENV
-          else
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            echo "VERSION=dev-${GITHUB_SHA:0:7}-${TIMESTAMP}" >> $GITHUB_ENV
-          fi
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: ${{ matrix.component.context }}
-          file: ${{ matrix.component.dockerfile }}
-          push: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.namespace.outputs.owner }}/${{ matrix.component.image }}:${{ env.VERSION }}
-            ${{ env.REGISTRY }}/${{ steps.namespace.outputs.owner }}/${{ matrix.component.image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          IMAGE="${{ env.REGISTRY }}/${{ needs.meta.outputs.owner }}/${{ matrix.component.image }}"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${{ needs.meta.outputs.version }}" \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}:${{ needs.meta.outputs.version }}-linux-amd64" \
+            "${IMAGE}:${{ needs.meta.outputs.version }}-linux-arm64"

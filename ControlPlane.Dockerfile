@@ -1,6 +1,7 @@
 # ControlPlane.Dockerfile
 # Stage 1: 前端构建
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:22-alpine AS frontend-build
+# 需保持多架构 manifest，否则 arm64 构建会失败（官方镜像含 amd64/arm64）
+FROM node:22-alpine AS frontend-build
 
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
@@ -9,7 +10,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 
 RUN npm install -g corepack@latest && \
     corepack enable && corepack prepare pnpm@latest --activate && \
-    pnpm config set registry https://registry.npmmirror.com
+    pnpm config set registry ${NPM_REGISTRY}
 
 WORKDIR /app
 
