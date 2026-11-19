@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -11,6 +12,7 @@ using MinGo.ControlPlane.Api.Configuration;
 using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
 using MinGo.ControlPlane.Api.Services;
+using MinGo.IdentityKit;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -37,14 +39,27 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services
     .AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+    .AddDefaultTokenProviders()
+    .AddPasswordResetAdministration(options =>
+        options.AuthorizationPolicy = "ManageAccountPasswords");
 
-builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
-    Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme, options =>
+// 部署方显式指定账号 ID，空列表默认拒绝全部账号。
+var passwordAdministrators = builder.Configuration
+    .GetSection("AccountAdministration:UserIds").Get<string[]>() ?? [];
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("ManageAccountPasswords", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireAssertion(context => passwordAdministrators.Contains(
+            context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)));
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
+
+builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "MinGo.Auth";
     options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
     options.Cookie.HttpOnly = true;
+    // 保留现有 HTTP 开发入口和 HTTPS 请求的 Cookie 行为。
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     options.LoginPath = "/api/auth/login";
     options.LogoutPath = "/api/auth/logout";
     options.AccessDeniedPath = "/api/auth/denied";
@@ -61,8 +76,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Identity.IdentityOptions>(option
     options.Password.RequiredLength = 8;
     options.User.RequireUniqueEmail = true;
 });
-
-builder.Services.AddAuthorization();
 
 // 健康检查（就绪检查：EF Core DbContext）
 builder.Services.AddHealthChecks()
