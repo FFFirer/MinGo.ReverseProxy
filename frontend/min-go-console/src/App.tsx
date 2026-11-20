@@ -50,7 +50,8 @@ export default function App() {
     fetchUser();
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') fetchUser();
+      // 静默刷新：置 loading 会导致整页卸载重挂，关闭正在使用的模态框
+      if (document.visibilityState === 'visible') fetchUser({ silent: true });
     };
     document.addEventListener('visibilitychange', onVisibility);
     onCleanup(() => document.removeEventListener('visibilitychange', onVisibility));

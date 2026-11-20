@@ -4,16 +4,17 @@ import type { UserInfo } from '../types';
 
 export { user, loading, setUser };
 
-export async function fetchUser() {
-  setLoading(true);
+export async function fetchUser(options?: { silent?: boolean }) {
+  if (!options?.silent) setLoading(true);
   try {
     const userData = await api.get<UserInfo>('/auth/me');
     setUser(userData);
   } catch (err) {
     console.error('[fetchUser] failed:', err);
-    setUser(null);
+    // 静默刷新失败（如网络抖动）时保留既有会话；401 已由 api client 统一登出
+    if (!options?.silent) setUser(null);
   } finally {
-    setLoading(false);
+    if (!options?.silent) setLoading(false);
   }
 }
 
