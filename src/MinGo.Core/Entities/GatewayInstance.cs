@@ -71,7 +71,7 @@ public class GatewayInstance
     public double CpuUsage { get; set; }
 
     /// <summary>
-    /// 内存使用率
+    /// 内存占用（MB，数据面进程工作集）
     /// </summary>
     public double MemoryUsage { get; set; }
 
@@ -179,7 +179,7 @@ public class GatewayInstanceHeartbeatRequest
     public double CpuUsage { get; set; }
 
     /// <summary>
-    /// 内存使用率
+    /// 内存占用（MB，数据面进程工作集）
     /// </summary>
     public double MemoryUsage { get; set; }
 
@@ -266,7 +266,7 @@ public class GatewayInstanceResponse
     public double CpuUsage { get; set; }
 
     /// <summary>
-    /// 内存使用率
+    /// 内存占用（MB，数据面进程工作集）
     /// </summary>
     public double MemoryUsage { get; set; }
 

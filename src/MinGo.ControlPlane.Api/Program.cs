@@ -18,6 +18,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using System.Text.Json.Serialization;
 
 Console.WriteLine("Starting MinGo Control Plane...");
 
@@ -93,7 +94,9 @@ builder.Services.AddCors(options =>
 });
 
 // Controllers
-builder.Services.AddControllers();
+// 枚举按字符串序列化：前端按 'Online'/'HeartbeatTimeout' 等字符串消费实例状态，数字会把所有状态打进 default
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // gRPC
 builder.Services.AddGrpc();

@@ -117,7 +117,7 @@ export default function InstancesPage() {
     {
       key: 'memory',
       title: '内存',
-      cell: (inst) => <span class="text-sm">{formatMetric(inst.memoryUsage)}%</span>,
+      cell: (inst) => <span class="text-sm">{formatMetric(inst.memoryUsage)} MB</span>,
     },
     {
       key: 'requests',
