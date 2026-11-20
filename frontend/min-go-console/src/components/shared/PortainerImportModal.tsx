@@ -29,6 +29,7 @@ const HOST_NETWORK_OPTION = "__host__";
 
 interface Selection {
   key: string;
+  portKey: string;
   instanceId: string;
   endpointId: number;
   endpointName: string;
@@ -38,11 +39,9 @@ interface Selection {
   containerName: string;
   privatePort: number;
   publicPort: number | null;
-  addressesByNetwork: Record<string, PortainerAddressCandidates>;
-  networkName: string | null;
-  form: "containerName" | "host" | null;
+  networkName: string;
+  form: "containerName" | "host";
   address: string;
-  unavailable: boolean;
 }
 
 interface PortEntry {
@@ -73,7 +72,7 @@ interface NetworkOption {
   meta: PortainerNetwork | null;
 }
 
-const STEPS = ["Portainer 实例", "Endpoint", "容器与端口", "网络", "目标与确认"];
+const STEPS = ["Portainer 实例", "Endpoint", "容器", "端口与网络", "目标与确认"];
 
 function portKey(
   instanceId: string,
@@ -82,6 +81,35 @@ function portKey(
   port: PortainerPort,
 ): string {
   return `${instanceId}|${endpointId}|${containerId}|${port.private}|${port.public ?? "x"}`;
+}
+
+function networkLabel(name: string): string {
+  return name === HOST_NETWORK_OPTION ? "宿主网络" : name;
+}
+
+function resolveForNetwork(
+  portEntry: PortEntry,
+  networkName: string,
+): { form: "containerName" | "host"; address: string } | null {
+  const candidates = portEntry.addressesByNetwork[networkName];
+  if (!candidates) return null;
+  if (candidates.containerName) {
+    return { form: "containerName", address: candidates.containerName };
+  }
+  if (candidates.host) {
+    return { form: "host", address: candidates.host };
+  }
+  return null;
+}
+
+function hasCandidates(portEntry: PortEntry, networkName: string): boolean {
+  return resolveForNetwork(portEntry, networkName) !== null;
+}
+
+function portSelectable(portEntry: PortEntry): boolean {
+  return (
+    portEntry.containerNameNetworks.length > 0 || Boolean(portEntry.hostAddress)
+  );
 }
 
 function slugify(value: string | null | undefined, fallback: string): string {
@@ -153,8 +181,14 @@ export default function PortainerImportModal(props: Props) {
   const [step, setStep] = createSignal(1);
   const [selectedInstanceId, setSelectedInstanceId] = createSignal<string | null>(null);
   const [selectedEndpointId, setSelectedEndpointId] = createSignal<number | null>(null);
-  const [networkChoice, setNetworkChoice] = createSignal<string | null>(null);
-  const [selectionMap, setSelectionMap] = createSignal<Record<string, Selection>>({});
+  const [selectedContainerIds, setSelectedContainerIds] = createSignal<
+    Record<string, true>
+  >({});
+  const [selectedNetworks, setSelectedNetworks] = createSignal<string[]>([]);
+  const [checkedPorts, setCheckedPorts] = createSignal<
+    Record<string, { portEntry: PortEntry; networks: string[] }>
+  >({});
+  const [addressOverrides, setAddressOverrides] = createSignal<Record<string, string>>({});
 
   const [targetMode, setTargetMode] = createSignal<"new" | "append">(
     props.defaultTargetClusterId ? "append" : "new",
@@ -170,8 +204,6 @@ export default function PortainerImportModal(props: Props) {
   const [showExcluded, setShowExcluded] = createSignal(false);
 
   let nameInput: HTMLInputElement | undefined;
-
-  const selectedList = () => Object.values(selectionMap());
 
   const selectedInstance = () =>
     instances().find((i) => i.id === selectedInstanceId()) ?? null;
@@ -267,18 +299,31 @@ export default function PortainerImportModal(props: Props) {
       });
   });
 
+  const selectedContainerEntries = createMemo(() => {
+    const ids = selectedContainerIds();
+    const out: ContainerEntry[] = [];
+    for (const group of catalog()) {
+      for (const entry of group.containers) {
+        if (ids[entry.container.id]) out.push(entry);
+      }
+    }
+    return out;
+  });
+
   const networkOptions = createMemo(() => {
     const endpoint = selectedEndpoint();
     if (!endpoint) return [] as NetworkOption[];
 
     const names = new Set<string>();
     let hasHost = false;
-    for (const selection of selectedList()) {
-      for (const name of Object.keys(selection.addressesByNetwork)) {
-        if (name === HOST_NETWORK_OPTION) {
-          hasHost = true;
-        } else {
-          names.add(name);
+    for (const entry of selectedContainerEntries()) {
+      for (const portEntry of entry.ports) {
+        for (const name of Object.keys(portEntry.addressesByNetwork)) {
+          if (name === HOST_NETWORK_OPTION) {
+            hasHost = true;
+          } else {
+            names.add(name);
+          }
         }
       }
     }
@@ -291,6 +336,48 @@ export default function PortainerImportModal(props: Props) {
     }
     return options;
   });
+
+  const selectionList = createMemo(() => {
+    const instanceId = selectedInstanceId();
+    const endpoint = selectedEndpoint();
+    if (!instanceId || !endpoint) return [] as Selection[];
+
+    const ports = checkedPorts();
+    const out: Selection[] = [];
+    for (const group of catalog()) {
+      for (const entry of group.containers) {
+        for (const portEntry of entry.ports) {
+          const pk = portKey(instanceId, endpoint.id, entry.container.id, portEntry.port);
+          const item = ports[pk];
+          if (!item) continue;
+          for (const networkName of item.networks) {
+            const resolved = resolveForNetwork(portEntry, networkName);
+            if (!resolved) continue;
+            out.push({
+              key: `${pk}|${networkName}`,
+              portKey: pk,
+              instanceId,
+              endpointId: endpoint.id,
+              endpointName: endpoint.name,
+              groupName: entry.groupName,
+              standalone: entry.groupSource === "standalone",
+              containerId: entry.container.id,
+              containerName: entry.container.name,
+              privatePort: portEntry.port.private,
+              publicPort: portEntry.port.public ?? null,
+              networkName,
+              form: resolved.form,
+              address: resolved.address,
+            });
+          }
+        }
+      }
+    }
+    return out;
+  });
+
+  const effectiveAddress = (selection: Selection) =>
+    addressOverrides()[selection.key] ?? selection.address;
 
   const loadInstances = async () => {
     setInstancesLoading(true);
@@ -323,13 +410,17 @@ export default function PortainerImportModal(props: Props) {
 
   onMount(loadInstances);
 
-  const clearSelections = () => setSelectionMap({});
+  const clearSelections = () => {
+    setSelectedContainerIds({});
+    setCheckedPorts({});
+    setSelectedNetworks([]);
+    setAddressOverrides({});
+  };
 
   const selectInstance = (id: string) => {
     if (selectedInstanceId() === id) return;
     setSelectedInstanceId(id);
     setSelectedEndpointId(null);
-    setNetworkChoice(null);
     setDiscovery(null);
     clearSelections();
     void loadDiscovery(id);
@@ -338,143 +429,113 @@ export default function PortainerImportModal(props: Props) {
   const selectEndpoint = (id: number) => {
     if (selectedEndpointId() === id) return;
     setSelectedEndpointId(id);
-    setNetworkChoice(null);
     clearSelections();
   };
 
-  const resolveForNetwork = (selection: Selection, networkName: string): Selection => {
-    const candidates = selection.addressesByNetwork[networkName];
-    if (!candidates) {
-      return { ...selection, networkName, form: null, address: "", unavailable: true };
-    }
-
-    const form: Selection["form"] = candidates.containerName
-      ? "containerName"
-      : candidates.host
-        ? "host"
-        : null;
-    const address =
-      form === "containerName"
-        ? candidates.containerName!
-        : form === "host"
-          ? candidates.host!
-          : "";
-    return { ...selection, networkName, form, address, unavailable: form === null };
+  const pruneSelectedNetworks = () => {
+    const valid = new Set(networkOptions().map((option) => option.name));
+    setSelectedNetworks((prev) => prev.filter((name) => valid.has(name)));
   };
 
-  const applyNetworkChoice = (name: string) => {
-    if (networkChoice() === name) return;
-    setNetworkChoice(name);
-    const current = selectionMap();
-    const next: Record<string, Selection> = {};
-    for (const key of Object.keys(current)) {
-      next[key] = resolveForNetwork(current[key], name);
-    }
-    setSelectionMap(next);
-  };
+  const toggleContainer = (entry: ContainerEntry) => {
+    const id = entry.container.id;
+    const current = selectedContainerIds();
+    if (current[id]) {
+      const next = { ...current };
+      delete next[id];
+      setSelectedContainerIds(next);
 
-  // 已选网络不再覆盖任何剩余勾选项时，清空网络选择并复位地址解析。
-  const pruneNetworkChoice = (next: Record<string, Selection>) => {
-    const choice = networkChoice();
-    if (choice !== null && !Object.values(next).some((s) => s.addressesByNetwork[choice])) {
-      setNetworkChoice(null);
-      for (const key of Object.keys(next)) {
-        next[key] = {
-          ...next[key],
-          networkName: null,
-          form: null,
-          address: "",
-          unavailable: false,
-        };
+      const prefix = `${selectedInstanceId()}|${selectedEndpointId()}|${id}|`;
+      const ports = checkedPorts();
+      const nextPorts: typeof ports = {};
+      for (const key of Object.keys(ports)) {
+        if (!key.startsWith(prefix)) nextPorts[key] = ports[key];
       }
+      setCheckedPorts(nextPorts);
+      pruneSelectedNetworks();
+    } else {
+      setSelectedContainerIds({ ...current, [id]: true });
     }
   };
 
-  const selectionFor = (entry: ContainerEntry, portEntry: PortEntry) =>
-    selectionMap()[
-      portKey(
-        selectedInstanceId()!,
-        selectedEndpoint()!.id,
-        entry.container.id,
-        portEntry.port,
-      )
-    ];
+  const networksForPortWith = (
+    portEntry: PortEntry,
+    selected: string[],
+  ): string[] =>
+    networkOptions()
+      .map((option) => option.name)
+      .filter((name) => selected.includes(name) && hasCandidates(portEntry, name));
+
+  const portKeyFor = (entry: ContainerEntry, portEntry: PortEntry) =>
+    portKey(
+      selectedInstanceId()!,
+      selectedEndpoint()!.id,
+      entry.container.id,
+      portEntry.port,
+    );
 
   const togglePort = (entry: ContainerEntry, portEntry: PortEntry) => {
-    const instanceId = selectedInstanceId()!;
-    const endpoint = selectedEndpoint()!;
-    const key = portKey(instanceId, endpoint.id, entry.container.id, portEntry.port);
-    const current = selectionMap();
-
-    if (current[key]) {
-      const next = { ...current };
-      delete next[key];
-      pruneNetworkChoice(next);
-      setSelectionMap(next);
-      return;
+    const pk = portKeyFor(entry, portEntry);
+    const ports = checkedPorts();
+    const next = { ...ports };
+    if (next[pk]) {
+      delete next[pk];
+    } else {
+      next[pk] = {
+        portEntry,
+        networks: networksForPortWith(portEntry, selectedNetworks()),
+      };
     }
+    setCheckedPorts(next);
+  };
 
-    const selection: Selection = {
-      key,
-      instanceId,
-      endpointId: endpoint.id,
-      endpointName: endpoint.name,
-      groupName: entry.groupName,
-      standalone: entry.groupSource === "standalone",
-      containerId: entry.container.id,
-      containerName: entry.container.name,
-      privatePort: portEntry.port.private,
-      publicPort: portEntry.port.public ?? null,
-      addressesByNetwork: portEntry.addressesByNetwork,
-      networkName: null,
-      form: null,
-      address: "",
-      unavailable: false,
-    };
+  const toggleNetwork = (name: string) => {
+    const selected = selectedNetworks();
+    const nextSelected = selected.includes(name)
+      ? selected.filter((n) => n !== name)
+      : [...selected, name];
+    setSelectedNetworks(nextSelected);
 
-    const choice = networkChoice();
-    setSelectionMap({
-      ...current,
-      [key]: choice ? resolveForNetwork(selection, choice) : selection,
-    });
+    const ports = checkedPorts();
+    const nextPorts: typeof ports = {};
+    for (const key of Object.keys(ports)) {
+      nextPorts[key] = {
+        portEntry: ports[key].portEntry,
+        networks: networksForPortWith(ports[key].portEntry, nextSelected),
+      };
+    }
+    setCheckedPorts(nextPorts);
   };
 
   const updateSelectionAddress = (key: string, address: string) => {
-    const current = selectionMap();
-    const selection = current[key];
-    if (!selection) return;
-
-    setSelectionMap({
-      ...current,
-      [key]: { ...selection, address },
-    });
+    setAddressOverrides({ ...addressOverrides(), [key]: address });
   };
 
-  const removeSelection = (key: string) => {
-    const current = selectionMap();
-    if (!current[key]) return;
-    const next = { ...current };
-    delete next[key];
-    pruneNetworkChoice(next);
-    setSelectionMap(next);
+  const removeSelection = (selection: Selection) => {
+    const ports = checkedPorts();
+    const item = ports[selection.portKey];
+    if (!item) return;
+    const networks = item.networks.filter((n) => n !== selection.networkName);
+    const next = { ...ports };
+    if (networks.length > 0) {
+      next[selection.portKey] = { ...item, networks };
+    } else {
+      delete next[selection.portKey];
+    }
+    setCheckedPorts(next);
+
+    const overrides = { ...addressOverrides() };
+    delete overrides[selection.key];
+    setAddressOverrides(overrides);
   };
+
+  const selectedContainerCount = () => Object.keys(selectedContainerIds()).length;
 
   const groupSelectedCount = (group: CatalogGroup) =>
-    selectedList().filter(
-      (s) =>
-        s.instanceId === selectedInstanceId() &&
-        s.endpointId === selectedEndpointId() &&
-        s.groupName === group.name,
-    ).length;
-
-  const optionAvailableCount = (name: string) =>
-    selectedList().filter((s) => {
-      const candidates = s.addressesByNetwork[name];
-      return Boolean(candidates && (candidates.containerName || candidates.host));
-    }).length;
+    group.containers.filter((c) => selectedContainerIds()[c.container.id]).length;
 
   const suggestClusterName = () => {
-    const first = selectedList()[0];
+    const first = selectionList()[0];
     if (!first) return "";
     const fallback = `stack-${first.endpointId}`;
     return slugify(first.standalone ? "" : first.groupName, fallback);
@@ -487,22 +548,16 @@ export default function PortainerImportModal(props: Props) {
       case 2:
         return selectedEndpoint() !== null;
       case 3:
-        return selectedList().length > 0;
+        return selectedContainerCount() > 0;
       case 4:
-        return networkChoice() !== null;
+        return selectionList().length > 0;
       default:
-        return selectedList().length > 0;
+        return selectionList().length > 0;
     }
   };
 
   const goNext = () => {
     if (!canNext() || step() >= 5) return;
-    if (step() === 3) {
-      const options = networkOptions();
-      if (options.length === 1 && networkChoice() !== options[0].name) {
-        applyNetworkChoice(options[0].name);
-      }
-    }
     if (step() === 4 && !clusterNameTouched()) {
       setClusterName(suggestClusterName());
     }
@@ -517,8 +572,8 @@ export default function PortainerImportModal(props: Props) {
     if (submitting()) return;
     setSubmitError(null);
 
-    const destinations = selectedList()
-      .map((s) => s.address.trim())
+    const destinations = selectionList()
+      .map((s) => effectiveAddress(s).trim())
       .filter((address) => address.length > 0);
 
     if (destinations.length === 0) {
@@ -667,7 +722,7 @@ export default function PortainerImportModal(props: Props) {
         </div>
 
         <div class="flex-1 overflow-y-auto px-6 pb-4">
-          {/* Step 0: instance selection (step === 1) */}
+          {/* Step 1: instance selection */}
           <Show when={step() === 1}>
             <Show when={instancesLoading()}>
               <div class="flex items-center justify-center py-16 text-secondary text-sm">
@@ -749,7 +804,7 @@ export default function PortainerImportModal(props: Props) {
             </Show>
           </Show>
 
-          {/* Step 1: endpoint (step === 2) */}
+          {/* Step 2: endpoint selection */}
           <Show when={step() === 2}>
             <Show when={loading()}>
               <div class="flex items-center justify-center py-16 text-secondary text-sm">
@@ -819,11 +874,6 @@ export default function PortainerImportModal(props: Props) {
                               {endpoint.error}
                             </p>
                           </Show>
-                          <Show when={!endpoint.error}>
-                            <p class="text-xs text-secondary mt-1">
-                              {endpoint.networks.length} 个可导入网络
-                            </p>
-                          </Show>
                         </div>
                       </label>
                     )}
@@ -833,164 +883,7 @@ export default function PortainerImportModal(props: Props) {
             </Show>
           </Show>
 
-          {/* Step 3: network (step === 4) */}
-          <Show when={step() === 4}>
-            <Show
-              when={selectedList().length > 0}
-              fallback={<EmptyHint text="请先在上一步勾选端口" />}
-            >
-              <div class="flex items-center justify-between mb-3">
-                <div class="text-sm text-secondary">
-                  为已选
-                  <span class="font-medium text-gray-800 dark:text-gray-200 mx-1">
-                    {selectedList().length}
-                  </span>
-                  个目标选择访问网络
-                </div>
-                <span class="badge badge-success text-xs">
-                  已选 {selectedList().length} 个目标
-                </span>
-              </div>
-
-              <Show
-                when={networkOptions().length > 0}
-                fallback={
-                  <EmptyHint text="已选端口没有可用的网络或宿主地址，请返回上一步调整" />
-                }
-              >
-                <div class="space-y-3">
-                  <For each={networkOptions()}>
-                    {(option) => {
-                      const available = () => optionAvailableCount(option.name);
-                      const disabled = () => available() === 0;
-                      return (
-                        <label
-                          class={`flex items-start gap-3 p-4 rounded-lg border transition ${
-                            disabled()
-                              ? "opacity-60 border-gray-200 dark:border-dark-200"
-                              : networkChoice() === option.name
-                                ? "border-primary bg-primary/5 cursor-pointer"
-                                : "border-gray-200 dark:border-dark-200 hover:border-primary/50 cursor-pointer"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="portainer-network"
-                            class="mt-1"
-                            checked={networkChoice() === option.name}
-                            disabled={disabled()}
-                            onChange={() => applyNetworkChoice(option.name)}
-                          />
-                          <div class="flex-1 min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <Show when={option.kind === "host"}>
-                                <span class="font-medium text-sm">宿主网络</span>
-                                <span class="text-xs text-secondary">
-                                  使用宿主地址访问已发布端口
-                                </span>
-                              </Show>
-                              <Show when={option.kind === "network"}>
-                                <span class="font-medium font-mono text-sm">
-                                  {option.name}
-                                </span>
-                                <Show when={option.meta!.driver}>
-                                  <span class="text-xs text-secondary">
-                                    {option.meta!.driver}
-                                  </span>
-                                </Show>
-                                <Show when={option.meta!.isDefaultBridge}>
-                                  <span class="badge badge-warning text-xs">
-                                    默认 bridge
-                                  </span>
-                                </Show>
-                                <Show when={option.meta!.dataPlaneAttached}>
-                                  <span class="badge badge-success text-xs">
-                                    data-plane 已接入
-                                  </span>
-                                </Show>
-                                <Show
-                                  when={
-                                    !option.meta!.supportsContainerName ||
-                                    !option.meta!.dataPlaneAttached
-                                  }
-                                >
-                                  <span class="badge badge-warning text-xs">
-                                    容器名不可用
-                                  </span>
-                                </Show>
-                              </Show>
-                              <span
-                                class={`badge text-xs ${
-                                  available() === selectedList().length
-                                    ? "badge-success"
-                                    : "badge-warning"
-                                }`}
-                              >
-                                {available()}/{selectedList().length} 个已选端口可用
-                              </span>
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    }}
-                  </For>
-                </div>
-                <p class="text-xs text-secondary mt-3">
-                  容器名形态只在 user-defined 网络上、且 data-plane
-                  与该网络同网时可用；选择宿主网络时全部使用宿主地址。
-                </p>
-              </Show>
-
-              <Show when={networkChoice()}>
-                <div class="mt-4">
-                  <h4 class="text-sm font-semibold mb-2">已选端口地址</h4>
-                  <div class="space-y-1">
-                    <For each={selectedList()}>
-                      {(selection) => (
-                        <div class="flex items-start justify-between gap-2 rounded-lg border border-gray-200 dark:border-dark-200 px-3 py-2">
-                          <div class="min-w-0">
-                            <p class="text-sm truncate">
-                              <span class="font-medium">
-                                {selection.containerName}
-                              </span>
-                              <span class="text-secondary font-mono">
-                                :{selection.privatePort}
-                              </span>
-                              {selection.publicPort
-                                ? ` → ${selection.publicPort}`
-                                : ""}
-                            </p>
-                            <Show
-                              when={!selection.unavailable}
-                              fallback={
-                                <p class="text-[11px] text-warning mt-0.5">
-                                  该端口在所选网络下无可用地址，请在预览中手改或返回换网络
-                                </p>
-                              }
-                            >
-                              <p class="text-[11px] font-mono text-primary break-all mt-0.5">
-                                {selection.address}
-                              </p>
-                            </Show>
-                          </div>
-                          <button
-                            type="button"
-                            class="btn-icon btn-icon-danger shrink-0"
-                            title="移除"
-                            onClick={() => removeSelection(selection.key)}
-                          >
-                            <FaSolidTimes />
-                          </button>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              </Show>
-            </Show>
-          </Show>
-
-          {/* Step 2: containers × ports (step === 3) */}
+          {/* Step 3: container selection */}
           <Show when={step() === 3}>
             <Show
               when={selectedEndpoint()}
@@ -999,19 +892,9 @@ export default function PortainerImportModal(props: Props) {
               <Show
                 when={catalog().length > 0}
                 fallback={
-                  <EmptyHint text="该 Endpoint 没有可导入的容器（可能全部被排除或未运行）" />
+                  <EmptyHint text="该 Endpoint 没有可导入的容器" />
                 }
               >
-                <div class="flex items-center justify-between mb-3">
-                  <div class="text-sm">
-                    <span class="text-secondary">Endpoint：</span>
-                    <span class="font-mono">{selectedEndpoint()!.name}</span>
-                  </div>
-                  <span class="badge badge-success text-xs">
-                    已选 {selectedList().length} 个目标
-                  </span>
-                </div>
-
                 <div class="space-y-3">
                   <For each={catalog()}>
                     {(group) => (
@@ -1029,42 +912,47 @@ export default function PortainerImportModal(props: Props) {
                         </div>
 
                         <For each={group.containers}>
-                          {(entry) => (
-                            <div class="py-2 border-t border-gray-100 dark:border-dark-200 first:border-t-0">
-                              <div class="flex flex-wrap items-baseline gap-2">
-                                <span class="font-medium text-sm">
-                                  {entry.container.name}
-                                </span>
-                                <Show when={entry.container.service}>
-                                  <span class="text-xs text-secondary font-mono">
-                                    {entry.container.service}
-                                  </span>
-                                </Show>
-                                <Show when={entry.networks.length > 0}>
-                                  <span class="text-xs text-secondary font-mono">
-                                    {entry.networks.join(", ")}
-                                  </span>
-                                </Show>
-                              </div>
-                              <p class="text-[11px] text-secondary break-all">
-                                {entry.container.image}
-                              </p>
-
-                              <div class="mt-1 space-y-1">
-                                <For each={entry.ports}>
-                                  {(portEntry) => (
-                                    <PortChoice
-                                      portEntry={portEntry}
-                                      selected={
-                                        selectionFor(entry, portEntry) !== undefined
-                                      }
-                                      onToggle={() => togglePort(entry, portEntry)}
-                                    />
-                                  )}
-                                </For>
-                              </div>
-                            </div>
-                          )}
+                          {(entry) => {
+                            const selectable = () =>
+                              entry.ports.some(portSelectable);
+                            return (
+                              <label
+                                class={`flex items-start gap-2 py-2 border-t border-gray-100 dark:border-dark-200 first:border-t-0 ${
+                                  selectable()
+                                    ? "cursor-pointer"
+                                    : "opacity-60 cursor-not-allowed"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  class="mt-0.5"
+                                  checked={Boolean(selectedContainerIds()[entry.container.id])}
+                                  disabled={!selectable()}
+                                  onChange={() => toggleContainer(entry)}
+                                />
+                                <div class="flex-1 min-w-0">
+                                  <div class="flex flex-wrap items-baseline gap-2">
+                                    <span class="font-medium text-sm">
+                                      {entry.container.name}
+                                    </span>
+                                    <Show when={entry.container.service}>
+                                      <span class="text-xs text-secondary font-mono">
+                                        {entry.container.service}
+                                      </span>
+                                    </Show>
+                                    <Show when={entry.networks.length > 0}>
+                                      <span class="text-xs text-secondary font-mono">
+                                        {entry.networks.join(", ")}
+                                      </span>
+                                    </Show>
+                                  </div>
+                                  <p class="text-[11px] text-secondary break-all">
+                                    {entry.container.image}
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          }}
                         </For>
                       </div>
                     )}
@@ -1102,7 +990,189 @@ export default function PortainerImportModal(props: Props) {
             </Show>
           </Show>
 
-          {/* Step 4: target and preview (step === 5) */}
+          {/* Step 4: ports × networks */}
+          <Show when={step() === 4}>
+            <Show
+              when={selectedContainerEntries().length > 0}
+              fallback={<EmptyHint text="请先在上一步选择容器" />}
+            >
+              <Show
+                when={networkOptions().length > 0}
+                fallback={
+                  <EmptyHint text="所选容器没有可用的网络或宿主地址，请返回上一步调整" />
+                }
+              >
+                <div class="space-y-3 mb-4">
+                  <For each={networkOptions()}>
+                    {(option) => {
+                      const checked = () => selectedNetworks().includes(option.name);
+                      const total = () => Object.keys(checkedPorts()).length;
+                      const available = () =>
+                        Object.values(checkedPorts()).filter((item) =>
+                          hasCandidates(item.portEntry, option.name),
+                        ).length;
+                      return (
+                        <label
+                          class={`flex items-start gap-3 p-4 rounded-lg border transition cursor-pointer ${
+                            checked()
+                              ? "border-primary bg-primary/5"
+                              : "border-gray-200 dark:border-dark-200 hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            class="mt-1"
+                            checked={checked()}
+                            onChange={() => toggleNetwork(option.name)}
+                          />
+                          <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <Show when={option.kind === "host"}>
+                                <span class="font-medium text-sm">宿主网络</span>
+                              </Show>
+                              <Show when={option.kind === "network"}>
+                                <span class="font-medium font-mono text-sm">
+                                  {option.name}
+                                </span>
+                                <Show when={option.meta!.driver}>
+                                  <span class="text-xs text-secondary">
+                                    {option.meta!.driver}
+                                  </span>
+                                </Show>
+                                <Show when={option.meta!.isDefaultBridge}>
+                                  <span class="badge badge-warning text-xs">
+                                    默认 bridge
+                                  </span>
+                                </Show>
+                                <Show when={option.meta!.dataPlaneAttached}>
+                                  <span class="badge badge-success text-xs">
+                                    data-plane 已接入
+                                  </span>
+                                </Show>
+                                <Show
+                                  when={
+                                    !option.meta!.supportsContainerName ||
+                                    !option.meta!.dataPlaneAttached
+                                  }
+                                >
+                                  <span class="badge badge-warning text-xs">
+                                    容器名不可用
+                                  </span>
+                                </Show>
+                              </Show>
+                              <span
+                                class={`badge text-xs ${
+                                  total() > 0 && available() === total()
+                                    ? "badge-success"
+                                    : "badge-warning"
+                                }`}
+                              >
+                                {available()}/{total()} 端口可用
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    }}
+                  </For>
+                </div>
+
+                <div class="space-y-3">
+                  <For each={selectedContainerEntries()}>
+                    {(entry) => (
+                      <div class="border border-gray-200 dark:border-dark-200 rounded-lg p-3">
+                        <div class="flex flex-wrap items-baseline gap-2 mb-1">
+                          <span class="font-medium text-sm">
+                            {entry.container.name}
+                          </span>
+                          <Show when={entry.container.service}>
+                            <span class="text-xs text-secondary font-mono">
+                              {entry.container.service}
+                            </span>
+                          </Show>
+                        </div>
+
+                        <div class="space-y-1">
+                          <For each={entry.ports}>
+                            {(portEntry) => {
+                              const item = () => checkedPorts()[portKeyFor(entry, portEntry)];
+                              const selected = () => item() !== undefined;
+                              const selectable = () => portSelectable(portEntry);
+                              return (
+                                <div
+                                  class={`rounded-lg px-2 py-1.5 ${
+                                    selected() ? "bg-primary/5" : ""
+                                  }`}
+                                >
+                                  <div class="flex items-start gap-2">
+                                    <input
+                                      type="checkbox"
+                                      class="mt-1"
+                                      checked={selected()}
+                                      disabled={!selectable()}
+                                      onChange={() => togglePort(entry, portEntry)}
+                                    />
+                                    <div class="flex-1 min-w-0">
+                                      <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-mono text-sm">
+                                          :{portEntry.port.private}
+                                          {portEntry.port.public
+                                            ? ` → ${portEntry.port.public}`
+                                            : ""}
+                                        </span>
+                                        <span class="text-[11px] text-secondary">
+                                          {portEntry.port.public ? "已发布" : "未发布"}
+                                          {portEntry.port.bindIp
+                                            ? ` · bind ${portEntry.port.bindIp}`
+                                            : ""}
+                                        </span>
+                                      </div>
+
+                                      <div class="text-[11px] font-mono text-secondary mt-0.5 space-y-0.5">
+                                        <Show when={!selectable()}>
+                                          <div class="text-warning">
+                                            无可用地址（端口未发布且无可用容器名形态）
+                                          </div>
+                                        </Show>
+                                        <Show
+                                          when={selected() && item()!.networks.length === 0}
+                                        >
+                                          <div class="text-warning">
+                                            所选网络无可用地址
+                                          </div>
+                                        </Show>
+                                        <For each={selected() ? item()!.networks : []}>
+                                          {(networkName) => {
+                                            const resolved = () =>
+                                              resolveForNetwork(portEntry, networkName)!;
+                                            return (
+                                              <div>
+                                                {networkLabel(networkName)} →{" "}
+                                                {resolved().form === "containerName"
+                                                  ? "容器名"
+                                                  : "宿主"}{" "}
+                                                {resolved().address}
+                                              </div>
+                                            );
+                                          }}
+                                        </For>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </Show>
+          </Show>
+
+          {/* Step 5: target and preview */}
           <Show when={step() === 5}>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div class="space-y-3">
@@ -1153,9 +1223,6 @@ export default function PortainerImportModal(props: Props) {
                         setClusterNameTouched(true);
                       }}
                     />
-                    <p class="text-xs text-secondary mt-1">
-                      预填为分组名 slug，可修改；重名时不会自动改名。
-                    </p>
                   </div>
                 </Show>
 
@@ -1185,22 +1252,18 @@ export default function PortainerImportModal(props: Props) {
                     </Show>
                   </div>
                 </Show>
-
-                <div class="text-xs text-secondary">
-                  本次将写入 {selectedList().length} 个目标；地址可在右侧逐条编辑或移除。
-                </div>
               </div>
 
               <div class="space-y-2">
                 <h4 class="text-sm font-semibold">
-                  目标地址预览（{selectedList().length}）
+                  目标地址预览（{selectionList().length}）
                 </h4>
                 <Show
-                  when={selectedList().length > 0}
+                  when={selectionList().length > 0}
                   fallback={<EmptyHint text="尚未勾选任何端口" />}
                 >
                   <div class="max-h-[46vh] overflow-y-auto space-y-2 pr-1">
-                    <Index each={selectedList()}>
+                    <Index each={selectionList()}>
                       {(selection) => (
                         <div class="p-3 rounded-lg border border-gray-200 dark:border-dark-200">
                           <div class="flex items-start justify-between gap-2">
@@ -1210,9 +1273,7 @@ export default function PortainerImportModal(props: Props) {
                               </p>
                               <p class="text-[11px] text-secondary">
                                 {selection().instanceId} · {selection().endpointName} ·{" "}
-                                {selection().networkName === HOST_NETWORK_OPTION
-                                  ? "宿主网络"
-                                  : selection().networkName}{" "}
+                                {networkLabel(selection().networkName)}{" "}
                                 · 端口{" "}
                                 {selection().privatePort}
                                 {selection().publicPort
@@ -1224,18 +1285,14 @@ export default function PortainerImportModal(props: Props) {
                               type="button"
                               class="btn-icon btn-icon-danger shrink-0"
                               title="移除"
-                              onClick={() => removeSelection(selection().key)}
+                              onClick={() => removeSelection(selection())}
                             >
                               <FaSolidTimes />
                             </button>
                           </div>
                           <input
-                            class={`input mt-2 font-mono text-sm ${
-                              selection().unavailable && !selection().address.trim()
-                                ? "border-warning/30"
-                                : ""
-                            }`}
-                            value={selection().address}
+                            class="input mt-2 font-mono text-sm"
+                            value={effectiveAddress(selection())}
                             onInput={(e) =>
                               updateSelectionAddress(
                                 selection().key,
@@ -1243,18 +1300,10 @@ export default function PortainerImportModal(props: Props) {
                               )
                             }
                           />
-                          <div
-                            class={`text-[11px] mt-1 ${
-                              selection().unavailable && !selection().address.trim()
-                                ? "text-warning"
-                                : "text-secondary"
-                            }`}
-                          >
-                            {selection().unavailable && !selection().address.trim()
-                              ? "所选网络下无可用地址，请手填或返回调整"
-                              : selection().form === "containerName"
-                                ? "容器名形态"
-                                : "宿主形态"}
+                          <div class="text-[11px] mt-1 text-secondary">
+                            {selection().form === "containerName"
+                              ? "容器名形态"
+                              : "宿主形态"}
                           </div>
                         </div>
                       )}
@@ -1275,8 +1324,11 @@ export default function PortainerImportModal(props: Props) {
         <div class="flex items-center justify-between gap-3 px-6 py-3 border-t border-gray-200 dark:border-dark-200">
           <div class="text-xs text-secondary">
             <Show when={!loading() && !loadError()}>
-              <Show when={step() === 3 || step() === 4}>
-                已选 {selectedList().length} 个目标
+              <Show when={step() === 3}>
+                已选 {selectedContainerCount()} 个容器
+              </Show>
+              <Show when={step() === 4}>
+                已选 {selectionList().length} 个目标
               </Show>
               <Show when={step() === 5}>
                 {targetMode() === "new" ? "新建集群" : "追加到已有集群"}
@@ -1315,13 +1367,13 @@ export default function PortainerImportModal(props: Props) {
               <button
                 class="btn btn-primary"
                 onClick={handleSubmit}
-                disabled={submitting() || selectedList().length === 0}
+                disabled={submitting() || selectionList().length === 0}
               >
                 {submitting()
                   ? "提交中..."
                   : targetMode() === "new"
                     ? "创建集群"
-                    : `追加 ${selectedList().length} 个目标`}
+                    : `追加 ${selectionList().length} 个目标`}
               </button>
             </Show>
           </div>
@@ -1335,64 +1387,6 @@ function EmptyHint(props: { text: string }) {
   return (
     <div class="text-center py-10 text-secondary text-sm border border-dashed border-gray-200 dark:border-dark-200 rounded-lg">
       {props.text}
-    </div>
-  );
-}
-
-function PortChoice(props: {
-  portEntry: PortEntry;
-  selected: boolean;
-  onToggle: () => void;
-}) {
-  const selectable = () =>
-    props.portEntry.containerNameNetworks.length > 0 ||
-    Boolean(props.portEntry.hostAddress);
-
-  return (
-    <div
-      class={`flex items-start gap-2 rounded-lg px-2 py-1.5 ${
-        props.selected ? "bg-primary/5" : ""
-      }`}
-    >
-      <input
-        type="checkbox"
-        class="mt-1"
-        checked={props.selected}
-        disabled={!selectable()}
-        onChange={() => props.onToggle()}
-      />
-      <div class="flex-1 min-w-0">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="font-mono text-sm">
-            :{props.portEntry.port.private}
-            {props.portEntry.port.public
-              ? ` → ${props.portEntry.port.public}`
-              : ""}
-          </span>
-          <span class="text-[11px] text-secondary">
-            {props.portEntry.port.public ? "已发布" : "未发布"}
-            {props.portEntry.port.bindIp
-              ? ` · bind ${props.portEntry.port.bindIp}`
-              : ""}
-          </span>
-        </div>
-
-        <div class="text-[11px] font-mono text-secondary mt-0.5 space-y-0.5">
-          <Show when={props.portEntry.containerNameNetworks.length > 0}>
-            <div>
-              容器名（{props.portEntry.containerNameNetworks.join("、")}）
-            </div>
-          </Show>
-          <Show when={props.portEntry.hostAddress}>
-            <div>宿主 {props.portEntry.hostAddress}</div>
-          </Show>
-          <Show when={!selectable()}>
-            <div class="text-warning">
-              无可用地址（端口未发布且无可用容器名形态）
-            </div>
-          </Show>
-        </div>
-      </div>
     </div>
   );
 }
