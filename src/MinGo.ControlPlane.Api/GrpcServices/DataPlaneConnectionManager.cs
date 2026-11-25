@@ -88,6 +88,49 @@ public class DataPlaneConnectionManager
     }
 
     /// <summary>
+    /// 注册数据面心跳响应流（命令下发通道）
+    /// </summary>
+    public void RegisterHeartbeatWriter(string dataPlaneId, IServerStreamWriter<HeartbeatResponse> writer)
+    {
+        if (_connections.TryGetValue(dataPlaneId, out var conn))
+            conn.HeartbeatWriter = writer;
+    }
+
+    /// <summary>
+    /// 注销数据面心跳响应流（心跳连接断开后命令通道随之失效）
+    /// </summary>
+    public void UnregisterHeartbeatWriter(string dataPlaneId)
+    {
+        if (_connections.TryGetValue(dataPlaneId, out var conn))
+            conn.HeartbeatWriter = null;
+    }
+
+    /// <summary>
+    /// 通过心跳响应流向指定数据面下发控制命令
+    /// </summary>
+    public async Task<bool> SendCommandAsync(string dataPlaneId, CommandType type, string? payloadJson)
+    {
+        if (!_connections.TryGetValue(dataPlaneId, out var conn) || conn.HeartbeatWriter == null)
+            return false;
+
+        try
+        {
+            await conn.HeartbeatWriter.WriteAsync(new HeartbeatResponse
+            {
+                Ack = true,
+                Commands = { new ControlCommand { Type = type, PayloadJson = payloadJson ?? "" } }
+            });
+            _logger.LogInformation("Command {CommandType} sent to data plane {Id}", type, dataPlaneId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send command {CommandType} to data plane {Id}", type, dataPlaneId);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 获取指定数据面的状态
     /// </summary>
     public GatewayInstanceStatus? GetStatus(string dataPlaneId)
@@ -116,5 +159,6 @@ public class DataPlaneConnectionManager
         public required ServerCallContext Context { get; set; }
         public DateTimeOffset ConnectedAt { get; set; }
         public DateTimeOffset LastHeartbeat { get; set; }
+        public IServerStreamWriter<HeartbeatResponse>? HeartbeatWriter { get; set; }
     }
 }

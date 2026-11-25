@@ -1,9 +1,11 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MinGo.ControlPlane.Api.GrpcServices;
 using MinGo.ControlPlane.Api.Services;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Entities;
+using MinGo.DataPlane.Grpc;
 
 namespace MinGo.ControlPlane.Api.Controllers;
 
@@ -14,15 +16,18 @@ public class InstancesController : ControllerBase
 {
     private readonly IGatewayInstanceService _gatewayInstanceService;
     private readonly InstanceConfigQueryService _configQueryService;
+    private readonly DataPlaneConnectionManager _connectionManager;
     private readonly ILogger<InstancesController> _logger;
 
     public InstancesController(
         IGatewayInstanceService gatewayInstanceService,
         InstanceConfigQueryService configQueryService,
+        DataPlaneConnectionManager connectionManager,
         ILogger<InstancesController> logger)
     {
         _gatewayInstanceService = gatewayInstanceService;
         _configQueryService = configQueryService;
+        _connectionManager = connectionManager;
         _logger = logger;
     }
 
@@ -98,5 +103,49 @@ public class InstancesController : ControllerBase
             _logger.LogError(ex, "Failed to parse config JSON for instance {InstanceId}", id);
             return StatusCode(500, new { message = "Invalid config data received from instance" });
         }
+    }
+
+    /// <summary>
+    /// 通过心跳响应流向实例下发控制命令（reload-config / reload-certs / shutdown）。
+    /// 命令经数据面的心跳双向流送达，要求实例在线且心跳通道已建立。
+    /// </summary>
+    [HttpPost("{id}/commands")]
+    public async Task<IActionResult> SendCommand(string id, [FromBody] InstanceCommandRequest? request)
+    {
+        var commandType = request?.Type?.Trim().ToLowerInvariant() switch
+        {
+            "reload-config" or "reload_config" => CommandType.CmdReloadConfig,
+            "reload-certs" or "reload_certs" => CommandType.CmdReloadCerts,
+            "shutdown" => CommandType.CmdShutdown,
+            _ => (CommandType?)null
+        };
+
+        if (commandType == null)
+        {
+            return BadRequest(new
+            {
+                message = "Unsupported command type. Allowed: reload-config, reload-certs, shutdown"
+            });
+        }
+
+        var instance = await _gatewayInstanceService.GetInstanceAsync(id);
+        if (instance == null)
+            return NotFound(new { message = $"Instance {id} not found" });
+
+        var sent = await _connectionManager.SendCommandAsync(id, commandType.Value, null);
+        if (!sent)
+        {
+            return StatusCode(503, new
+            {
+                message = $"Instance {id} has no heartbeat channel (offline or never connected)"
+            });
+        }
+
+        return Accepted(new { instanceId = id, command = request!.Type });
+    }
+
+    public class InstanceCommandRequest
+    {
+        public string Type { get; set; } = string.Empty;
     }
 }

@@ -78,6 +78,16 @@ export default function InstancesPage() {
     }
   };
 
+  const handleCommand = async (inst: GatewayInstance, type: string, label: string) => {
+    if (type === 'shutdown' && !confirm(`确定要关停实例 "${inst.name}" 吗？`)) return;
+    try {
+      await api.post(`/instances/${inst.instanceId}/commands`, { type });
+      addToast('success', `已向实例 ${inst.name} 下发「${label}」`);
+    } catch (err) {
+      addToast('error', `下发命令失败: ${(err as Error).message}`);
+    }
+  };
+
   const onlineCount = () => instances().filter(i => i.status === 'Online').length;
   const offlineCount = () => instances().filter(i => i.status === 'Offline').length;
   const timeoutCount = () => instances().filter(i => i.status === 'HeartbeatTimeout').length;
@@ -159,25 +169,44 @@ export default function InstancesPage() {
       title: '操作',
       mobileVisible: true,
       mobileDetailVisible: false,
-      class: 'w-20',
-      cell: (inst) => (
-        <div class="flex gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); setConfigTarget(inst); }}
-            class="btn-text-primary text-sm"
-            title="查看实例配置"
-          >
-            查看
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleDelete(inst); }}
-            class="text-danger hover:text-red-400 text-sm"
-            title="删除实例"
-          >
-            删除
-          </button>
-        </div>
-      ),
+      class: 'w-48',
+      cell: (inst) => {
+        const online = inst.status === 'Online';
+        return (
+          <div class="flex gap-2 items-center">
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfigTarget(inst); }}
+              class="btn-text-primary text-sm"
+              title="查看实例运行时配置"
+            >
+              查看
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCommand(inst, 'reload-config', '重载配置'); }}
+              class="btn-text-primary text-sm disabled:opacity-40"
+              disabled={!online}
+              title="重载配置（配置已实时推送，此命令主要用于连接恢复后的全量重同步）"
+            >
+              重载
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCommand(inst, 'shutdown', '关停'); }}
+              class="text-warning hover:text-yellow-400 text-sm disabled:opacity-40"
+              disabled={!online}
+              title="下发 shutdown 命令；在 docker 重启策略下实例会被重新拉起"
+            >
+              关停
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDelete(inst); }}
+              class="text-danger hover:text-red-400 text-sm"
+              title="删除实例"
+            >
+              删除
+            </button>
+          </div>
+        );
+      },
     },
   ];
 

@@ -39,13 +39,19 @@ public class HeartbeatRequestBuilderTests
 
     private HeartbeatRequestBuilder NewBuilder(int maxPointsPerName = 2000, int maxAccessLogs = 200) => new(
         _store,
-        new GatewayIdentity(),
+        NewIdentity(),
         _sampler,
         _configProvider,
         () => _lifetimeTotals,
         maxPointsPerName,
         maxAccessLogs,
         NullLogger<HeartbeatRequestBuilder>.Instance);
+
+    private static GatewayIdentity NewIdentity() =>
+        new(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Agent:Id"] = "test-agent"
+        }).Build(), NullLogger<GatewayIdentity>.Instance);
 
     private void RecordRequests(int count)
     {
@@ -129,7 +135,7 @@ public class HeartbeatRequestBuilderTests
         var bounded = new TelemetryStore(maxPointsPerMetric: 10, maxAccessLogs: 5000);
         var builder = new HeartbeatRequestBuilder(
             bounded,
-            new GatewayIdentity(),
+            NewIdentity(),
             _sampler,
             _configProvider,
             () => _lifetimeTotals,

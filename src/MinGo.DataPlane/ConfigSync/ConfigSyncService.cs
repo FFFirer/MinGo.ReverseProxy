@@ -15,6 +15,7 @@ public class ConfigSyncService : BackgroundService
     private readonly DataPlaneConfigProvider _configProvider;
     private readonly DataPlaneCertificateSelector _certSelector;
     private readonly GatewayIdentity _identity;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<ConfigSyncService> _logger;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private bool _initialConfigReceived;
@@ -31,12 +32,14 @@ public class ConfigSyncService : BackgroundService
         DataPlaneConfigProvider configProvider,
         DataPlaneCertificateSelector certSelector,
         GatewayIdentity identity,
+        IConfiguration configuration,
         ILogger<ConfigSyncService> logger)
     {
         _client = client;
         _configProvider = configProvider;
         _certSelector = certSelector;
         _identity = identity;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -69,12 +72,7 @@ public class ConfigSyncService : BackgroundService
 
                 using var call = _client.ReplicateConfig(cancellationToken: stoppingToken);
 
-                await call.RequestStream.WriteAsync(new ConfigSubscription
-                {
-                    DataPlaneId = _identity.Id,
-                    CurrentConfigVersion = _configProvider.CurrentVersion,
-                    SubscribeCertificates = true
-                });
+                await call.RequestStream.WriteAsync(BuildSubscription());
 
                 _logger.LogInformation("Connected to control plane, waiting for config...");
                 retryIndex = 0;
@@ -97,6 +95,55 @@ public class ConfigSyncService : BackgroundService
                 retryIndex = Math.Min(retryIndex + 1, RetryDelays.Length - 1);
             }
         }
+    }
+
+    /// <summary>
+    /// 订阅请求携带 Agent 自描述（名称/版本/监听地址），控制面据此注册实例，
+    /// 不再伪造 "DataPlane-xxx" / "unknown"。
+    /// </summary>
+    private ConfigSubscription BuildSubscription()
+    {
+        var subscription = new ConfigSubscription
+        {
+            DataPlaneId = _identity.Id,
+            CurrentConfigVersion = _configProvider.CurrentVersion,
+            SubscribeCertificates = true
+        };
+
+        var name = _configuration["Agent:Name"] ?? _configuration["Agent:Id"];
+        if (!string.IsNullOrWhiteSpace(name))
+            subscription.Name = name.Trim();
+
+        var version = _configuration["Agent:Version"]
+            ?? System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
+        if (!string.IsNullOrWhiteSpace(version))
+            subscription.Version = version;
+
+        subscription.ListenerAddresses.AddRange(ResolveListenerAddresses());
+        return subscription;
+    }
+
+    private IReadOnlyList<string> ResolveListenerAddresses()
+    {
+        var urls = new List<string>();
+        foreach (var endpoint in _configuration.GetSection("Kestrel:Endpoints").GetChildren())
+        {
+            var url = endpoint["Url"];
+            if (!string.IsNullOrWhiteSpace(url))
+                urls.Add(url);
+        }
+
+        if (urls.Count == 0)
+        {
+            var aspnetUrls = _configuration["ASPNETCORE_URLS"];
+            if (!string.IsNullOrWhiteSpace(aspnetUrls))
+            {
+                urls.AddRange(aspnetUrls.Split(';',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+        }
+
+        return urls;
     }
 
     private async Task ApplyConfigSnapshotAsync(ConfigSnapshot snapshot)

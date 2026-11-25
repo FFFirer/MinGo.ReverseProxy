@@ -1,0 +1,41 @@
+# Agent 独立部署清单（对标 Portainer Agent 的加入方式）
+#
+# 远端主机上只跑数据面，主动外连控制面 gRPC——Agent 侧无需任何入站端口。
+# 前提：控制面 5001（gRPC）对 Agent 所在网络可达；若配置了 DataPlane:SharedSecrets，
+# Agent 必须携带匹配的 ControlPlane__SharedSecret，否则连接被拒。
+#
+# 用法（把 <CP_HOST> 换成控制面可达地址）：
+#   docker compose -f docker-compose.agent.yml up -d
+#
+# 或一行命令（等价）：
+#   docker run -d --name min-go-agent \
+#     -p 8080:8080 -p 8443:8443 \
+#     -e ControlPlane__GrpcUrl=http://<CP_HOST>:5001 \
+#     -e ControlPlane__SharedSecret=<secret> \
+#     -e Agent__Id=home-1 \
+#     -e Agent__Name=home-1 \
+#     -v min-go-agent-data:/app/data \
+#     --restart unless-stopped \
+#     ghcr.io/fffirer/reverseproxy-dp:latest
+
+services:
+  data-plane:
+    image: ghcr.io/fffirer/reverseproxy-dp:latest
+    container_name: min-go-data-plane
+    ports:
+      - "8080:8080"     # HTTP 代理端口
+      - "8443:8443"     # HTTPS 代理端口
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080;https://+:8443
+      - ControlPlane__GrpcUrl=http://192.168.1.10:5001   # 改成控制面实际地址
+      # - ControlPlane__SharedSecret=change-me            # 控制面 DataPlane:SharedSecrets 配置时必填
+      # - Agent__Id=home-1                                # 固定身份；不填则持久化到状态文件（推荐都填）
+      # - Agent__Name=home-1                              # 控制台显示名；不填则用 Agent__Id
+      # - OpenTelemetry__OtlpEndpoint=http://192.168.1.10:4317
+    volumes:
+      - agent-data:/app/data   # Agent 身份状态文件持久化，重启身份不变
+    restart: unless-stopped
+
+volumes:
+  agent-data:

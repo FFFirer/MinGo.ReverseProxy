@@ -43,8 +43,9 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
             {
                 dataPlaneId = request.DataPlaneId;
 
-                // 更新连接管理器心跳
+                // 更新连接管理器心跳，并登记命令下发通道（幂等，重复登记覆盖同一条流）
                 _connectionManager.UpdateHeartbeat(request.DataPlaneId);
+                _connectionManager.RegisterHeartbeatWriter(request.DataPlaneId, responseStream);
 
                 // 更新实例服务（内存存储）
                 await _instanceService.UpdateHeartbeatAsync(new GatewayInstanceHeartbeatRequest
@@ -132,6 +133,11 @@ public class HeartbeatCollectService : HeartbeatCollect.HeartbeatCollectBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Heartbeat connection lost for data plane {DataPlaneId}", dataPlaneId);
+        }
+        finally
+        {
+            if (dataPlaneId != null)
+                _connectionManager.UnregisterHeartbeatWriter(dataPlaneId);
         }
     }
 

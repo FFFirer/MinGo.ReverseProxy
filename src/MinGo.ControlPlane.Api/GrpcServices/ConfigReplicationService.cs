@@ -48,13 +48,18 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         // 注册 gRPC 连接
         _connectionManager.Register(subscription.DataPlaneId, responseStream, context);
 
-        // 自动注册实例（仅内存）
-        var name = $"DataPlane-{subscription.DataPlaneId[..Math.Min(subscription.DataPlaneId.Length, 8)]}";
+        // 自动注册实例（仅内存）。名称/版本/监听地址来自 Agent 订阅自描述，
+        // 老数据面不填则回退到占位值；IP 取 gRPC 连接对端。
+        var remoteIp = context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString();
         await _instanceService.RegisterInstanceAsync(new GatewayInstanceRegisterRequest
         {
             InstanceId = subscription.DataPlaneId,
-            Name = name,
-            Version = "unknown"
+            Name = string.IsNullOrWhiteSpace(subscription.Name)
+                ? $"DataPlane-{subscription.DataPlaneId[..Math.Min(subscription.DataPlaneId.Length, 8)]}"
+                : subscription.Name,
+            Version = string.IsNullOrWhiteSpace(subscription.Version) ? "unknown" : subscription.Version,
+            IpAddress = remoteIp ?? string.Empty,
+            ListenerAddresses = subscription.ListenerAddresses.Count > 0 ? subscription.ListenerAddresses.ToList() : null
         });
 
         try

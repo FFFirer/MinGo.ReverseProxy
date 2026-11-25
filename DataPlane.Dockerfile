@@ -26,6 +26,7 @@ RUN apt-get update && \
 WORKDIR /app
 COPY --from=build /app/publish .
 EXPOSE 8080
+EXPOSE 8443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -fsS http://localhost:8080/healthz/live || exit 1

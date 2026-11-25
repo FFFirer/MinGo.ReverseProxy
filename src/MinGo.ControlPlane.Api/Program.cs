@@ -99,7 +99,10 @@ builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // gRPC
-builder.Services.AddGrpc();
+// DataPlaneAuthInterceptor：配置 DataPlane:SharedSecrets 后校验所有数据面 gRPC 连接，
+// 未配置时直通（本地/单机部署行为不变）
+builder.Services.AddSingleton<DataPlaneAuthInterceptor>();
+builder.Services.AddGrpc(o => o.Interceptors.Add<DataPlaneAuthInterceptor>());
 
 // 业务服务
 builder.Services.AddScoped<IApiDbService, ApiDbService>();

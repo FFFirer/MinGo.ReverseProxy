@@ -24,12 +24,18 @@ builder.Host.UseSerilog(SerilogSetup.ConfigureSharedSerilog());
 
 // gRPC 客户端 - 连接控制面
 var controlPlaneGrpcUrl = builder.Configuration["ControlPlane:GrpcUrl"] ?? "http://localhost:5001";
+// SharedSecretInterceptor：配置 ControlPlane:SharedSecret 时向控制面证明身份，
+// 未配置时直通，本地/单机部署行为不变
+builder.Services.AddSingleton<SharedSecretInterceptor>();
 builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.ConfigReplication.ConfigReplicationClient>(o =>
-    o.Address = new Uri(controlPlaneGrpcUrl));
+    o.Address = new Uri(controlPlaneGrpcUrl))
+    .AddInterceptor<SharedSecretInterceptor>();
 builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.HeartbeatCollect.HeartbeatCollectClient>(o =>
-    o.Address = new Uri(controlPlaneGrpcUrl));
+    o.Address = new Uri(controlPlaneGrpcUrl))
+    .AddInterceptor<SharedSecretInterceptor>();
 builder.Services.AddGrpcClient<MinGo.DataPlane.Grpc.EventSubscription.EventSubscriptionClient>(o =>
-    o.Address = new Uri(controlPlaneGrpcUrl));
+    o.Address = new Uri(controlPlaneGrpcUrl))
+    .AddInterceptor<SharedSecretInterceptor>();
 
 // 遥测存储：每指标点数上限可配置，把标签基数带来的内存风险约束在有界范围内
 var maxMetricPoints = builder.Configuration.GetValue(

@@ -45,3 +45,26 @@ The `ConfigSnapshot` message SHALL include a `checksum` field computed from the 
 - **WHEN** the data plane receives a `ConfigSnapshot` whose checksum matches its current config
 - **THEN** it SHALL NOT trigger a YARP reload
 
+### Requirement: Subscription carries agent self-description
+
+The `ConfigSubscription` SHALL carry agent self-description fields `name`, `version`, and `listener_addresses` (proto fields appended with new numbers; older data planes leave them empty). The control plane SHALL use these values when registering the instance and SHALL derive the instance IP from the gRPC connection peer. Empty `name` SHALL fall back to `DataPlane-{id prefix}`; empty `version` SHALL fall back to `unknown`.
+
+#### Scenario: Instance registered with subscription self-description
+
+- **WHEN** a data plane subscribes with `name: "home-1"`, `version: "1.2.3"`, `listener_addresses: ["http://+:8080"]`
+- **THEN** the control plane SHALL register the instance with those values and the gRPC peer IP, not fabricated placeholders
+
+### Requirement: Data plane gRPC connections authenticated by shared secret
+
+When the control plane has `DataPlane:SharedSecrets` configured (non-empty list), it SHALL reject any data plane gRPC connection — `ConfigReplication`, `HeartbeatCollect`, `EventSubscription` — whose `x-dp-secret` metadata does not match one of the configured secrets, failing closed with `PermissionDenied`. When no secrets are configured, connections SHALL be accepted unchanged (local/single-host default). The data plane SHALL attach `x-dp-secret` from `ControlPlane:SharedSecret` to all control-plane gRPC calls when configured.
+
+#### Scenario: Connection without secret rejected when auth enabled
+
+- **WHEN** `DataPlane:SharedSecrets` is non-empty and a data plane connects without a matching `x-dp-secret` metadata
+- **THEN** the control plane SHALL reject the connection with `PermissionDenied` before any config snapshot is sent
+
+#### Scenario: No secrets configured means no auth
+
+- **WHEN** `DataPlane:SharedSecrets` is empty
+- **THEN** data plane connections SHALL be accepted without `x-dp-secret`, preserving single-host behavior
+

@@ -18,6 +18,10 @@ message ConfigSubscription {
     string data_plane_id = 1;
     int32 current_config_version = 2;
     bool subscribe_certificates = 3;
+    // Agent 自描述（追加编号，老数据面留空即"未传输"）
+    string name = 4;
+    string version = 5;
+    repeated string listener_addresses = 6;
 }
 
 message ConfigSnapshot {

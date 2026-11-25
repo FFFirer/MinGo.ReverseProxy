@@ -13,6 +13,7 @@ public class HeartbeatReporter : BackgroundService
 {
     private readonly HeartbeatCollect.HeartbeatCollectClient _client;
     private readonly HeartbeatRequestBuilder _builder;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<HeartbeatReporter> _logger;
 
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
@@ -20,10 +21,12 @@ public class HeartbeatReporter : BackgroundService
     public HeartbeatReporter(
         HeartbeatCollect.HeartbeatCollectClient client,
         HeartbeatRequestBuilder builder,
+        IHostApplicationLifetime lifetime,
         ILogger<HeartbeatReporter> logger)
     {
         _client = client;
         _builder = builder;
+        _lifetime = lifetime;
         _logger = logger;
     }
 
@@ -83,16 +86,19 @@ public class HeartbeatReporter : BackgroundService
             switch (cmd.Type)
             {
                 case CommandType.CmdReloadConfig:
-                    // ConfigSyncService 会自动处理重连获取新配置
+                    // 配置走 ConfigReplication 推送通道实时生效，重载命令仅作确认；
+                    // 若流已断，重连时按当前版本号重新全量同步
                     _logger.LogInformation("Config reload requested by control plane");
                     break;
 
                 case CommandType.CmdReloadCerts:
+                    // 证书同样随配置快照推送，此命令留给后续手动物理重载场景
                     _logger.LogInformation("Certificate reload requested by control plane");
                     break;
 
                 case CommandType.CmdShutdown:
                     _logger.LogWarning("Shutdown requested by control plane");
+                    _lifetime.StopApplication();
                     break;
             }
         }

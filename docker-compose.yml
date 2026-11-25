@@ -36,6 +36,9 @@ services:
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
       - OpenTelemetry__Enabled=true
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
+      # 数据面接入认证（可选）：配置后所有数据面 gRPC 连接必须携带匹配密钥，
+      # 5001 端口对外暴露时强烈建议启用。数据面侧对应 ControlPlane__SharedSecret。
+      #   DataPlane__SharedSecrets__0=change-me
       # 隧道回源地址：由 cloudflared 在它自己的网络命名空间解析，必须是连接器可达的地址。
       # 容器名（默认 http://data-plane:8080）只在 cloudflared 加入本 compose 网络时成立；
       # 连接器跑在宿主机或另一台机器时改用宿主地址 + 发布端口，按隧道名逐条覆盖：
@@ -71,6 +74,11 @@ services:
       - ASPNETCORE_URLS=http://+:8080;https://+:8443
       - ControlPlane__GrpcUrl=http://control-plane:5001
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
+      # 与控制面 DataPlane__SharedSecrets 配套（控制面配置后必填）：
+      #   ControlPlane__SharedSecret=change-me
+      # Agent 固定身份（不填则持久化到 /app/data/agent-id，重启不变）：
+      #   Agent__Id=local-1
+      #   Agent__Name=local-1
       # ForwardedHeaders: 前置 TLS 终结层（Cloudflare Tunnel 等）场景
       # KnownProxies/KnownNetworks 为空 = 信任所有来源的转发头
       # 若需限制来源，配置具体 IP 或网段，如：
@@ -81,6 +89,9 @@ services:
         condition: service_healthy
       aspire-dashboard:
         condition: service_started
+    volumes:
+      # Agent 身份状态文件（agent-id）与 CP 的 mingocp.db 同目录不同文件，共用挂载即可
+      - ./data:/app/data
     restart: unless-stopped
 
   aspire-dashboard:

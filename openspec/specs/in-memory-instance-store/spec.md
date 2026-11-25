@@ -23,6 +23,14 @@ Each instance SHALL have a unique `InstanceId`. If not provided by the client, t
 - **WHEN** a data plane connects with a `data_plane_id` that already exists
 - **THEN** the system SHALL update the existing instance's status to `Online` and refresh its heartbeat
 
+### Requirement: Registration uses agent self-description
+
+When a data plane registers via gRPC `ConfigReplication`, the system SHALL populate `Name`, `Version`, and `ListenerAddresses` from the subscription's `name`/`version`/`listener_addresses` fields, and `IpAddress` from the gRPC connection peer. Empty subscription fields SHALL fall back to `DataPlane-{id prefix}` (name) and `unknown` (version).
+
+#### Scenario: Instance shows real agent metadata
+- **WHEN** a data plane subscribes with `name: "home-1"`, `version: "1.2.3"`, `listener_addresses: ["http://+:8080"]`
+- **THEN** the registered instance SHALL have those values instead of fabricated placeholders
+
 ### Requirement: In-memory heartbeat update
 
 The system SHALL update instance metrics when receiving heartbeats via:
