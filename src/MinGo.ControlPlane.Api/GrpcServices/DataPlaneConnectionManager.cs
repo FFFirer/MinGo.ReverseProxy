@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Grpc.Core;
 using MinGo.Core.Entities;
+using MinGo.Core.Models;
 using MinGo.DataPlane.Grpc;
 
 namespace MinGo.ControlPlane.Api.GrpcServices;
@@ -61,29 +62,37 @@ public class DataPlaneConnectionManager
     }
 
     /// <summary>
-    /// 向所有已连接数据面广播配置更新
+    /// 更新连接的分组归属（分配变更后调用，下一次快照按新分组组装）。
+    /// 取消分配回退启动默认组 local。
     /// </summary>
-    public async Task BroadcastConfigAsync(ConfigSnapshot snapshot)
+    public bool SetGroup(string dataPlaneId, string? groupId)
     {
-        var disconnected = new List<string>();
+        if (!_connections.TryGetValue(dataPlaneId, out var conn))
+            return false;
 
-        foreach (var (id, conn) in _connections)
+        conn.GroupId = string.IsNullOrEmpty(groupId) ? ConnectionIds.Local : groupId;
+        return true;
+    }
+
+    /// <summary>
+    /// 向指定数据面连接发送配置快照；连接不存在或写入失败（含断开）返回 false。
+    /// </summary>
+    public async Task<bool> SendConfigAsync(string dataPlaneId, ConfigSnapshot snapshot)
+    {
+        if (!_connections.TryGetValue(dataPlaneId, out var conn))
+            return false;
+
+        try
         {
-            try
-            {
-                await conn.ConfigWriter.WriteAsync(snapshot);
-                _logger.LogDebug("Config snapshot version {Version} sent to data plane {Id}", snapshot.Version, id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send config to data plane {Id}, marking disconnected", id);
-                disconnected.Add(id);
-            }
+            await conn.ConfigWriter.WriteAsync(snapshot);
+            _logger.LogDebug("Config snapshot version {Version} sent to data plane {Id}", snapshot.Version, dataPlaneId);
+            return true;
         }
-
-        foreach (var id in disconnected)
+        catch (Exception ex)
         {
-            Unregister(id);
+            _logger.LogWarning(ex, "Failed to send config to data plane {Id}, marking disconnected", dataPlaneId);
+            Unregister(dataPlaneId);
+            return false;
         }
     }
 
@@ -160,5 +169,11 @@ public class DataPlaneConnectionManager
         public DateTimeOffset ConnectedAt { get; set; }
         public DateTimeOffset LastHeartbeat { get; set; }
         public IServerStreamWriter<HeartbeatResponse>? HeartbeatWriter { get; set; }
+
+        /// <summary>
+        /// 该连接所属数据面的接入分组 Id（注册时从分配表解析；未分配为启动默认组 local）。
+        /// 快照组装与广播都按它过滤分组路由。
+        /// </summary>
+        public string GroupId { get; set; } = ConnectionIds.Local;
     }
 }

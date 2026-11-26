@@ -15,19 +15,25 @@ namespace MinGo.ControlPlane.Api.Controllers;
 public class InstancesController : ControllerBase
 {
     private readonly IGatewayInstanceService _gatewayInstanceService;
+    private readonly IApiDbService _apiDbService;
     private readonly InstanceConfigQueryService _configQueryService;
     private readonly DataPlaneConnectionManager _connectionManager;
+    private readonly ConfigReplicationService _configReplication;
     private readonly ILogger<InstancesController> _logger;
 
     public InstancesController(
         IGatewayInstanceService gatewayInstanceService,
+        IApiDbService apiDbService,
         InstanceConfigQueryService configQueryService,
         DataPlaneConnectionManager connectionManager,
+        ConfigReplicationService configReplication,
         ILogger<InstancesController> logger)
     {
         _gatewayInstanceService = gatewayInstanceService;
+        _apiDbService = apiDbService;
         _configQueryService = configQueryService;
         _connectionManager = connectionManager;
+        _configReplication = configReplication;
         _logger = logger;
     }
 
@@ -50,7 +56,50 @@ public class InstancesController : ControllerBase
     public async Task<ActionResult<GatewayInstance>> RegisterInstance([FromBody] GatewayInstanceRegisterRequest request)
     {
         var instance = await _gatewayInstanceService.RegisterInstanceAsync(request);
+
+        // 从落库的分配表解析分组归属（控制面重启后分配依然有效）
+        var assignment = await _apiDbService.GetInstanceGroupAsync(instance.InstanceId);
+        if (assignment != null)
+            await _gatewayInstanceService.UpdateInstanceGroupAsync(instance.InstanceId, assignment.GroupId, assignment.GroupName);
+
         return CreatedAtAction(nameof(GetInstance), new { id = instance.InstanceId }, instance);
+    }
+
+    /// <summary>
+    /// 分配实例到分组（groupId 为 null 表示取消分配）。
+    /// 分配落库并同步内存态；实例在线时立即按新分组重推快照。
+    /// </summary>
+    [HttpPut("{id}/group")]
+    public async Task<ActionResult<GatewayInstance>> SetInstanceGroup(string id, [FromBody] SetInstanceGroupRequest? request)
+    {
+        var instance = await _gatewayInstanceService.GetInstanceAsync(id);
+        if (instance == null)
+            return NotFound(new { message = $"实例 {id} 不存在" });
+
+        var groupId = string.IsNullOrWhiteSpace(request?.GroupId) ? null : request.GroupId.Trim();
+        string? groupName = null;
+        if (groupId != null)
+        {
+            var group = await _apiDbService.GetGroupAsync(groupId);
+            if (group == null)
+                return BadRequest(new { message = $"分组 {groupId} 不存在" });
+            groupName = group.Name;
+        }
+
+        await _apiDbService.SetInstanceGroupAsync(id, groupId);
+        await _gatewayInstanceService.UpdateInstanceGroupAsync(id, groupId, groupName);
+        _connectionManager.SetGroup(id, groupId);
+
+        // 在线实例立即按新分组重推快照；离线实例在下次注册时按新分配组装
+        await _configReplication.BroadcastConfigToDataPlaneAsync(id);
+
+        var updated = await _gatewayInstanceService.GetInstanceAsync(id);
+        return Ok(updated);
+    }
+
+    public class SetInstanceGroupRequest
+    {
+        public string? GroupId { get; set; }
     }
 
     [HttpPost("heartbeat")]

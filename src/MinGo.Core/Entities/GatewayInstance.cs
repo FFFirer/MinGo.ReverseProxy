@@ -84,6 +84,16 @@ public class GatewayInstance
     /// 错误请求数
     /// </summary>
     public long ErrorRequests { get; set; }
+
+    /// <summary>
+    /// 接入分组 Id（来自落库的分配表，注册时解析；未分配为空字符串，等同启动默认组 local）
+    /// </summary>
+    public string GroupId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 接入分组名称（展示用，与 GroupId 同步解析）
+    /// </summary>
+    public string GroupName { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -289,6 +299,16 @@ public class GatewayInstanceResponse
     /// 实例元数据
     /// </summary>
     public Dictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// 接入分组 Id（未分配为空字符串，等同启动默认组 local）
+    /// </summary>
+    public string GroupId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 接入分组名称
+    /// </summary>
+    public string GroupName { get; set; } = string.Empty;
 }
 
 /// <summary>

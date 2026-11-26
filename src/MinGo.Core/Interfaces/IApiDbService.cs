@@ -126,6 +126,42 @@ public interface IApiDbService
     Task DeleteCertificateAsync(string id);
 
     /// <summary>
+    /// 获取所有数据面分组（含实例数与引用路由数）
+    /// </summary>
+    Task<IReadOnlyList<DataPlaneGroup>> GetGroupsAsync();
+
+    /// <summary>
+    /// 根据ID获取分组
+    /// </summary>
+    Task<DataPlaneGroup?> GetGroupAsync(string id);
+
+    /// <summary>
+    /// 创建分组（ID 由后端生成）
+    /// </summary>
+    Task<DataPlaneGroup> CreateGroupAsync(string name);
+
+    /// <summary>
+    /// 重命名分组；不存在返回 null
+    /// </summary>
+    Task<DataPlaneGroup?> RenameGroupAsync(string id, string name);
+
+    /// <summary>
+    /// 删除分组。被路由引用时拒绝（Deleted=false 并列出引用路由名）；分组不存在返回 null。
+    /// 删除会同时清除该分组下的实例分配（实例回到未分配）。
+    /// </summary>
+    Task<GroupDeleteResult?> DeleteGroupAsync(string id);
+
+    /// <summary>
+    /// 获取实例的分组归属（未分配返回 null）
+    /// </summary>
+    Task<InstanceGroupAssignment?> GetInstanceGroupAsync(string instanceId);
+
+    /// <summary>
+    /// 设置实例分组（groupId 为 null/空白表示取消分配）
+    /// </summary>
+    Task SetInstanceGroupAsync(string instanceId, string? groupId);
+
+    /// <summary>
     /// 初始化示例数据
     /// </summary>
     Task InitializeSampleDataAsync();

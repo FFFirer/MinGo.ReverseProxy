@@ -352,6 +352,38 @@ public class TopologyServiceTests
         Assert.True(HasEdge(response, "conn:tun-1", "route:r1"));
     }
 
+    // ── 数据面分组通道 ──
+
+    [Fact]
+    public void Build_GroupChannel_IsNotTreatedAsTunnel()
+    {
+        var group = new ConnectionSummary("group:g1", "华东", "data-plane-group", null);
+        var response = Build(
+            [Route("r1", "c1", connectionId: "group:g1")],
+            [Cluster("c1", Dest("d1", "http://a:80"))],
+            [Local, group]);
+
+        var node = Node(response, "conn:group:g1");
+        Assert.Equal("数据面分组", node.SubLabel);
+        Assert.Equal("data-plane-group", Detail(node, "类型"));
+        Assert.DoesNotContain(response.Issues, i => i.Code == "tunnel-down");
+        Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
+    }
+
+    [Fact]
+    public void Build_GroupRoute_EntersFromGroupNode_AndSkipsLocal()
+    {
+        var response = Build(
+            [Route("r1", "c1", connectionId: "group:g1")],
+            [Cluster("c1", Dest("d1", "http://a:80"))],
+            [Local, new ConnectionSummary("group:g1", "华东", "data-plane-group", null)]);
+
+        // 分组路由的规则装在分组数据面上：ingress 边从分组节点出发，不经过本地数据面
+        Assert.True(HasEdge(response, "conn:group:g1", "route:r1"));
+        Assert.DoesNotContain(response.Edges, e => e.Source == "conn:local" && e.Target == "route:r1");
+        Assert.Equal("分组数据面 → 集群", Detail(Node(response, "route:r1"), "转发路径"));
+    }
+
     // ── 状态与摘要 ──
 
     [Fact]

@@ -12,15 +12,18 @@ namespace MinGo.ControlPlane.Api.Controllers;
 public class ApiManagementController : ControllerBase
 {
     private readonly IApiManagementService _apiManagementService;
+    private readonly IApiDbService _apiDbService;
     private readonly CloudflareSyncService _cloudflareSyncService;
     private readonly ILogger<ApiManagementController> _logger;
 
     public ApiManagementController(
         IApiManagementService apiManagementService,
+        IApiDbService apiDbService,
         CloudflareSyncService cloudflareSyncService,
         ILogger<ApiManagementController> logger)
     {
         _apiManagementService = apiManagementService;
+        _apiDbService = apiDbService;
         _cloudflareSyncService = cloudflareSyncService;
         _logger = logger;
     }
@@ -43,6 +46,9 @@ public class ApiManagementController : ControllerBase
     [HttpPost("routes")]
     public async Task<ActionResult<RouteSaveResponse>> CreateRoute([FromBody] RouteConfig route, CancellationToken ct)
     {
+        var channelError = await ValidateGroupChannelAsync(route);
+        if (channelError != null) return BadRequest(new { message = channelError });
+
         var validation = await _cloudflareSyncService.ValidateRouteAsync(route, null, ct);
         if (!validation.IsValid)
         {
@@ -64,6 +70,9 @@ public class ApiManagementController : ControllerBase
     [HttpPut("routes/{id}")]
     public async Task<ActionResult<RouteSaveResponse>> UpdateRoute(string id, [FromBody] RouteConfig route, CancellationToken ct)
     {
+        var channelError = await ValidateGroupChannelAsync(route);
+        if (channelError != null) return BadRequest(new { message = channelError });
+
         var validation = await _cloudflareSyncService.ValidateRouteAsync(route, id, ct);
         if (!validation.IsValid)
         {
@@ -99,25 +108,41 @@ public class ApiManagementController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// 分组通道校验：路由的接入通道为 <c>group:&lt;GroupId&gt;</c> 时分组必须存在。
+    /// </summary>
+    private async Task<string?> ValidateGroupChannelAsync(RouteConfig route)
+    {
+        var groupId = ConnectionIds.GetGroupId(route.ConnectionId);
+        if (groupId == null) return null;
+
+        var group = await _apiDbService.GetGroupAsync(groupId);
+        return group == null ? $"接入通道分组不存在：{groupId}" : null;
+    }
+
     private async Task<RoutePublishInfo?> PublishAsync(
         RouteConfig route, string? previousConnectionId, CancellationToken ct)
     {
-        if (ConnectionIds.IsLocal(route.ConnectionId) && ConnectionIds.IsLocal(previousConnectionId))
+        // 只对 Cloudflare 隧道做发布对账；local 与分组通道不涉及隧道 ingress
+        var tunnelIds = new[] { previousConnectionId, route.ConnectionId }
+            .Where(id => !string.IsNullOrEmpty(id) && !ConnectionIds.IsLocal(id) && !ConnectionIds.IsGroup(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (tunnelIds.Count == 0)
         {
             return null;
         }
 
-        // 新旧通道都可能需要重对账（切换通道时旧隧道要摘除发布）
-        var target = ConnectionIds.IsLocal(route.ConnectionId) ? previousConnectionId : route.ConnectionId;
+        // 切换通道时旧隧道要摘除发布
+        var target = !ConnectionIds.IsLocal(route.ConnectionId) && !ConnectionIds.IsGroup(route.ConnectionId)
+            ? route.ConnectionId
+            : previousConnectionId;
         var results = new List<ReconcileReport>();
 
         try
         {
-            var tunnels = new[] { previousConnectionId, route.ConnectionId }
-                .Where(id => !ConnectionIds.IsLocal(id))
-                .Distinct(StringComparer.Ordinal);
-
-            foreach (var tunnelId in tunnels)
+            foreach (var tunnelId in tunnelIds)
             {
                 try
                 {

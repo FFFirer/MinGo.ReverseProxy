@@ -57,6 +57,36 @@ public class ApiCertificateEntityConfiguration : IEntityTypeConfiguration<ApiCer
 }
 
 /// <summary>
+/// 数据面分组实体配置
+/// </summary>
+public class DataPlaneGroupEntityConfiguration : IEntityTypeConfiguration<DataPlaneGroupEntity>
+{
+    public void Configure(EntityTypeBuilder<DataPlaneGroupEntity> builder)
+    {
+        builder.ToTable("DataPlaneGroups");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(64);
+        builder.Property(e => e.Name).HasMaxLength(128);
+    }
+}
+
+/// <summary>
+/// 实例分组分配实体配置（实例 Id 为主键）
+/// </summary>
+public class InstanceGroupAssignmentEntityConfiguration : IEntityTypeConfiguration<InstanceGroupAssignmentEntity>
+{
+    public void Configure(EntityTypeBuilder<InstanceGroupAssignmentEntity> builder)
+    {
+        builder.ToTable("InstanceGroupAssignments");
+        builder.HasKey(e => e.InstanceId);
+        builder.Property(e => e.InstanceId).HasMaxLength(128);
+        builder.HasOne(e => e.Group)
+            .WithMany()
+            .HasForeignKey(e => e.GroupId);
+    }
+}
+
+/// <summary>
 /// Portainer 实例实体配置
 /// </summary>
 public class PortainerInstanceEntityConfiguration : IEntityTypeConfiguration<PortainerInstanceEntity>

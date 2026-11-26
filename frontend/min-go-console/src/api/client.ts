@@ -92,6 +92,29 @@ export const api = {
   // Cloudflare 接入通道
   getConnections: () => request<import('../types').ConnectionSummary[]>('/connections'),
   getTopology: () => request<import('../types').TopologyResponse>('/topology'),
+
+  // 数据面分组（接入通道资产，与实例管理页双向维护）
+  getInstanceGroups: () => request<import('../types').DataPlaneGroup[]>('/instance-groups'),
+  createInstanceGroup: (name: string) =>
+    request<import('../types').DataPlaneGroup>('/instance-groups', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  renameInstanceGroup: (id: string, name: string) =>
+    request<import('../types').DataPlaneGroup>(`/instance-groups/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    }),
+  deleteInstanceGroup: (id: string) =>
+    request<void>(`/instance-groups/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // 实例分组分配（groupId 为 null 取消分配）
+  setInstanceGroup: (instanceId: string, groupId: string | null) =>
+    request<import('../types').GatewayInstance>(`/instances/${encodeURIComponent(instanceId)}/group`, {
+      method: 'PUT',
+      body: JSON.stringify({ groupId }),
+    }),
+
   getCloudflareSettings: () =>
     request<import('../types').CloudflareSettings>('/cloudflare/settings'),
   saveCloudflareSettings: (data: { apiToken: string; accountId: string; timeoutSeconds: number }) =>

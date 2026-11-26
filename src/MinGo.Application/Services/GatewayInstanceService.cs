@@ -125,7 +125,9 @@ public class GatewayInstanceService : IGatewayInstanceService
                 ErrorRate = inst.TotalRequests > 0
                     ? Math.Round((double)inst.ErrorRequests / inst.TotalRequests * 100, 2)
                     : 0,
-                Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(inst.MetadataJson)
+                Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(inst.MetadataJson),
+                GroupId = inst.GroupId,
+                GroupName = inst.GroupName
             }).ToList(),
             TotalCount = allInstances.Count,
             OnlineCount = allInstances.Count(i => i.Status == GatewayInstanceStatus.Online),
@@ -210,5 +212,26 @@ public class GatewayInstanceService : IGatewayInstanceService
             _logger.LogInformation("Cleaned up {Count} long-time offline instances", removed);
 
         return Task.FromResult(removed);
+    }
+
+    /// <summary>
+    /// 更新实例的内存分组归属（分配表由 IApiDbService 落库，这里只同步内存态）
+    /// </summary>
+    public Task<GatewayInstance?> UpdateInstanceGroupAsync(string instanceId, string? groupId, string? groupName)
+    {
+        if (!_instances.TryGetValue(instanceId, out var instance))
+            return Task.FromResult<GatewayInstance?>(null);
+
+        var newGroupId = groupId ?? string.Empty;
+        var newGroupName = groupName ?? string.Empty;
+
+        if (instance.GroupId == newGroupId && instance.GroupName == newGroupName)
+            return Task.FromResult<GatewayInstance?>(instance);
+
+        instance.GroupId = newGroupId;
+        instance.GroupName = newGroupName;
+        _logger.LogInformation("Instance {InstanceId} group changed to {GroupId} ({GroupName})",
+            instanceId, newGroupId, newGroupName);
+        return Task.FromResult<GatewayInstance?>(instance);
     }
 }

@@ -62,16 +62,33 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             ListenerAddresses = subscription.ListenerAddresses.Count > 0 ? subscription.ListenerAddresses.ToList() : null
         });
 
+        // 从落库的分配表解析分组归属，同步到连接与内存实例。
+        // 未分配实例归入启动默认组 local：只收 local/隧道路由，不收任何自定义分组路由。
+        string? groupId = null;
+        string? groupName = null;
+        using (var resolveScope = _scopeFactory.CreateScope())
+        {
+            var apiDbService = resolveScope.ServiceProvider.GetRequiredService<IApiDbService>();
+            var assignment = await apiDbService.GetInstanceGroupAsync(subscription.DataPlaneId);
+            if (assignment != null)
+            {
+                groupId = assignment.GroupId;
+                groupName = assignment.GroupName;
+            }
+        }
+        _connectionManager.SetGroup(subscription.DataPlaneId, groupId);
+        await _instanceService.UpdateInstanceGroupAsync(subscription.DataPlaneId, groupId, groupName);
+
         try
         {
             // 发送全量初始化配置
-            var fullSnapshot = await BuildConfigSnapshotAsync(subscription.DataPlaneId);
+            var fullSnapshot = await BuildConfigSnapshotAsync(groupId);
             await responseStream.WriteAsync(fullSnapshot);
             _logger.LogInformation("Sent full config snapshot (version {Version}) to {DataPlaneId}",
                 fullSnapshot.Version, subscription.DataPlaneId);
 
             // 保持连接，等待后续推送
-            // 当服务端有配置变更时，通过 BroadcastConfigAsync 推送
+            // 当服务端有配置变更时，通过 BroadcastConfigUpdateAsync 按分组逐连接推送
             // 客户端断开时，MoveNext 会返回 false 或抛出异常
             try
             {
@@ -101,13 +118,25 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     }
 
     /// <summary>
-    /// 从数据库构建全量配置快照
+    /// 从数据库构建全量配置快照。
     /// </summary>
-    private async Task<ConfigSnapshot> BuildConfigSnapshotAsync(string dataPlaneId)
+    /// <param name="targetGroupId">
+    /// 目标数据面的接入分组 Id（未分配 = 启动默认组 local）。分组路由只对匹配分组生效，
+    /// local 与隧道路由对所有数据面生效。
+    /// </param>
+    private async Task<ConfigSnapshot> BuildConfigSnapshotAsync(string? targetGroupId)
     {
         using var scope = _scopeFactory.CreateScope();
         var apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
+        return await BuildConfigSnapshotAsync(apiDbService, targetGroupId);
+    }
 
+    /// <summary>
+    /// 快照组装核心：路由按目标分组过滤，集群全量下发，证书按快照规则引用的域名过滤。
+    /// 全量初始化与逐连接广播共用这一条口径。
+    /// </summary>
+    private async Task<ConfigSnapshot> BuildConfigSnapshotAsync(IApiDbService apiDbService, string? targetGroupId)
+    {
         var routes = await apiDbService.GetRoutesAsync();
         var clusters = await apiDbService.GetClustersAsync();
 
@@ -118,7 +147,7 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             Checksum = Guid.NewGuid().ToString("N")[..16]
         };
 
-        AddRoutesToSnapshot(snapshot, routes);
+        var plan = AddRoutesToSnapshot(snapshot, routes, targetGroupId);
 
         foreach (var cluster in clusters)
         {
@@ -145,8 +174,10 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
             snapshot.Clusters.Add(clusterConfig);
         }
 
-        // 添加证书
-        await AddCertificatesToSnapshotAsync(apiDbService, snapshot);
+        // 证书只下发快照规则引用的域名（分组隔离下私钥不跨组）；空域名规则视为任意域名，
+        // 由 CertificateSnapshotPolicy 决定回退到全量下发。
+        var routeHosts = plan.Rules.Select(r => r.Match?.Host ?? string.Empty).ToList();
+        await AddCertificatesToSnapshotAsync(apiDbService, snapshot, routeHosts);
 
         return snapshot;
     }
@@ -157,12 +188,13 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     /// <remarks>
     /// 这里是「外部隧道不直连后端」契约的另一半：隧道 ingress 把所有托管域名统一回源到数据面，
     /// 所以绑定隧道的启用路由必须同样产出一条「数据面 → 后端集群」规则，否则隧道流量落地即 404。
-    /// 编译刻意不读 <c>ConnectionId</c>——接入通道只决定流量从哪里进来，不决定规则装在哪个进程；
-    /// 想改成按通道过滤，先过 <c>DataPlaneRuleCompilerTests.Compile_KeepsTunnelBoundRoutes</c> 这一关。
+    /// 编译只按 <c>group:&lt;GroupId&gt;</c> 过滤分组路由，隧道路由与 local 路由对所有数据面生效；
+    /// 想改动过滤口径，先过 <c>DataPlaneRuleCompilerTests</c> 的契约测试这一关。
     /// </remarks>
-    private void AddRoutesToSnapshot(ConfigSnapshot snapshot, IEnumerable<ModelRoute> routes)
+    private DataPlaneRuleCompiler.Result AddRoutesToSnapshot(
+        ConfigSnapshot snapshot, IEnumerable<ModelRoute> routes, string? targetGroupId)
     {
-        var plan = DataPlaneRuleCompiler.Compile(routes);
+        var plan = DataPlaneRuleCompiler.Compile(routes, targetGroupId);
 
         foreach (var warning in plan.Warnings)
         {
@@ -182,6 +214,8 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
                 Enabled = route.Enabled
             });
         }
+
+        return plan;
     }
 
     /// <summary>
@@ -190,11 +224,13 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     /// <remarks>
     /// 只剔除不可加载的记录（无字节、无域名），每个域名一张；过期证书照常下发，
     /// 否则 <c>enable-https-redirect</c> 的 fail-closed 会退化成明文回退。
+    /// <paramref name="routeHosts"/> 非空时只下发与快照规则域名有交集的证书（分组隔离，私钥不跨组）。
     /// </remarks>
-    private static async Task AddCertificatesToSnapshotAsync(IApiDbService apiDbService, ConfigSnapshot snapshot)
+    private static async Task AddCertificatesToSnapshotAsync(
+        IApiDbService apiDbService, ConfigSnapshot snapshot, IReadOnlyCollection<string>? routeHosts)
     {
         var certificates = await apiDbService.GetCertificatesAsync();
-        foreach (var cert in CertificateSnapshotPolicy.SelectForDelivery(certificates, DateTimeOffset.UtcNow))
+        foreach (var cert in CertificateSnapshotPolicy.SelectForDelivery(certificates, DateTimeOffset.UtcNow, routeHosts))
         {
             snapshot.Certificates.Add(new CertificateData
             {
@@ -210,11 +246,13 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
     }
 
     /// <summary>
-    /// 广播配置更新到所有已连接数据面
+    /// 广播配置更新到所有已连接数据面：同一分组的连接共享一份快照，
+    /// 未分组实例只收 local/隧道路由。
     /// </summary>
     public async Task BroadcastConfigUpdateAsync()
     {
-        if (_connectionManager.ConnectedCount == 0)
+        var connections = _connectionManager.GetAllConnections().ToList();
+        if (connections.Count == 0)
         {
             _logger.LogDebug("No connected data planes to broadcast config update");
             return;
@@ -223,46 +261,34 @@ public class ConfigReplicationService : ConfigReplication.ConfigReplicationBase
         using var scope = _scopeFactory.CreateScope();
         var apiDbService = scope.ServiceProvider.GetRequiredService<IApiDbService>();
 
-        var routes = await apiDbService.GetRoutesAsync();
-        var clusters = await apiDbService.GetClustersAsync();
-
-        var snapshot = new ConfigSnapshot
+        var sent = 0;
+        foreach (var group in connections.GroupBy(c => c.GroupId, StringComparer.Ordinal))
         {
-            Version = _versionCounter.Next(),
-            UpdateType = UpdateType.FullSync,
-            Checksum = Guid.NewGuid().ToString("N")[..16]
-        };
+            var targetGroupId = string.IsNullOrEmpty(group.Key) ? null : group.Key;
+            var snapshot = await BuildConfigSnapshotAsync(apiDbService, targetGroupId);
 
-        AddRoutesToSnapshot(snapshot, routes);
-
-        foreach (var cluster in clusters)
-        {
-            var cc = new ClusterConfig
+            foreach (var conn in group)
             {
-                Id = cluster.Id,
-                LoadBalancingPolicy = cluster.LoadBalancingPolicy
-            };
-            if (cluster.Destinations != null)
-            {
-                foreach (var dest in cluster.Destinations)
-                {
-                    cc.Destinations.Add(new DestinationConfig
-                    {
-                        Id = dest.Id,
-                        Address = dest.Address,
-                        Healthy = dest.Healthy
-                    });
-                }
+                if (await _connectionManager.SendConfigAsync(conn.DataPlaneId, snapshot))
+                    sent++;
             }
-            snapshot.Clusters.Add(cc);
         }
 
-        // 广播时也包含证书数据
-        await AddCertificatesToSnapshotAsync(apiDbService, snapshot);
+        _logger.LogInformation("Broadcast config update to {Count} data planes", sent);
+    }
 
-        await _connectionManager.BroadcastConfigAsync(snapshot);
-        _logger.LogInformation("Broadcast config update version {Version} to {Count} data planes",
-            snapshot.Version, _connectionManager.ConnectedCount);
+    /// <summary>
+    /// 向指定数据面重推配置（实例分组变更时调用）。实例未连接时返回 false。
+    /// </summary>
+    public async Task<bool> BroadcastConfigToDataPlaneAsync(string dataPlaneId)
+    {
+        var conn = _connectionManager.GetAllConnections().FirstOrDefault(c => c.DataPlaneId == dataPlaneId);
+        if (conn == null)
+            return false;
+
+        var targetGroupId = string.IsNullOrEmpty(conn.GroupId) ? null : conn.GroupId;
+        var snapshot = await BuildConfigSnapshotAsync(targetGroupId);
+        return await _connectionManager.SendConfigAsync(dataPlaneId, snapshot);
     }
 }
 

@@ -115,16 +115,25 @@ export default function RoutesPage() {
     {
       key: 'connectionId',
       title: '接入通道',
-      cell: (route) => (
-        route.connectionId && route.connectionId !== 'local'
+      cell: (route) => {
+        const conn = connections().find((c) => c.id === route.connectionId);
+        if (conn?.kind === 'data-plane-group') {
+          return (
+            <div class="flex flex-col items-start gap-0.5">
+              <span class="badge badge-success">{connectionName(route.connectionId)}</span>
+              <span class="text-xs text-secondary">仅该分组实例</span>
+            </div>
+          );
+        }
+        return route.connectionId && route.connectionId !== 'local'
           ? (
             <div class="flex flex-col items-start gap-0.5">
               <span class="badge badge-warning">{connectionName(route.connectionId)}</span>
               <span class="text-xs text-secondary">经数据面转发</span>
             </div>
           )
-          : <span class="badge badge-success">本地</span>
-      ),
+          : <span class="badge badge-success">本地（全局）</span>;
+      },
     },
     {
       key: 'enabled',
@@ -337,15 +346,25 @@ function RouteFormModal(props: {
   const [path, setPath] = createSignal(props.route?.match?.path || '');
   const [host, setHost] = createSignal(props.route?.match?.host || '');
   const [clusterId, setClusterId] = createSignal(props.route?.clusterId || '');
-  const [connectionId, setConnectionId] = createSignal(props.route?.connectionId || 'local');
+  const [connectionId, setConnectionId] = createSignal(props.route?.connectionId || '');
   const [enabled, setEnabled] = createSignal(props.route?.enabled ?? true);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
   const [showTransforms, setShowTransforms] = createSignal(false);
 
   const tunnelConnections = () => props.connections.filter((c) => c.kind === 'cloudflare-tunnel');
-  const isTunnel = () => connectionId() !== 'local';
-  const tunnelName = () =>
-    props.connections.find((c) => c.id === connectionId())?.name || '外部隧道';
+  const groupConnections = () => props.connections.filter((c) => c.kind === 'data-plane-group');
+  const connectionOf = () => props.connections.find((c) => c.id === connectionId());
+  const isTunnel = () => connectionOf()?.kind === 'cloudflare-tunnel';
+  const isGroup = () => connectionOf()?.kind === 'data-plane-group';
+  const tunnelName = () => connectionOf()?.name || '外部隧道';
+  // 编辑存量 local 路由时保留该选项；新建路由不提供 local（存量全局通道不再扩张）
+  const isLegacyLocal = () => props.route?.connectionId === 'local';
+
+  // 通道选项异步到达后才应用 select 的 value，否则浏览器会因无匹配选项把值重置为空
+  const channelValue = createMemo(() => {
+    void props.connections;
+    return connectionId();
+  });
 
   // 后端 RouteUniquenessPolicy 的前端预检：同一「域名 + 路径」只允许一条启用路由。
   // 命中就当场拦下，省一次 400 往返；停用路由不占键（它不进底层配置），所以只跟启用路由比。
@@ -374,6 +393,7 @@ function RouteFormModal(props: {
       const syntax = pathSyntaxError(path());
       if (syntax) errs.path = syntax;
     }
+    if (!connectionId()) errs.connectionId = '请选择接入通道';
     if (isTunnel() && !host().trim()) errs.host = '发布到隧道的路由必须配置匹配域名';
     // 停用路由不占匹配键，与后端 RouteUniquenessPolicy 保持一致
     if (!errs.host && enabled() && conflict()) {
@@ -527,16 +547,29 @@ function RouteFormModal(props: {
             <label class="block text-sm font-medium mb-1">接入通道</label>
             <select
               class="input"
-              value={connectionId()}
+              value={channelValue()}
               onChange={(e) => setConnectionId(e.currentTarget.value)}
             >
-              <option value="local">本地数据面（data-plane）</option>
+              <option value="">-- 请选择接入通道 --</option>
+              <Show when={isLegacyLocal()}>
+                <option value="local">本地数据面（全部，存量）</option>
+              </Show>
+              <For each={groupConnections()}>{(conn) => (
+                <option value={conn.id}>数据面分组：{conn.name}</option>
+              )}</For>
               <For each={tunnelConnections()}>{(conn) => (
                 <option value={conn.id}>Cloudflare 隧道：{conn.name}</option>
               )}</For>
             </select>
-            <Show when={tunnelConnections().length === 0}>
-              <p class="text-secondary text-xs mt-1">未发现可用隧道，请先在「接入通道」页面创建</p>
+            {errors().connectionId && <p class="text-danger text-xs mt-1">{errors().connectionId}</p>}
+            <Show when={groupConnections().length === 0 && tunnelConnections().length === 0}>
+              <p class="text-secondary text-xs mt-1">暂无可用通道，请先在「接入通道」页面创建分组或隧道</p>
+            </Show>
+            <Show when={isGroup()}>
+              <div class="mt-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
+                <p class="font-medium">分组通道：路由只下发给分配到「{tunnelName()}」的实例</p>
+                <p class="text-secondary">未分配实例不会安装此路由；实例归属在「实例管理」或「接入通道」页维护。</p>
+              </div>
             </Show>
             <Show when={isTunnel()}>
               <div class="mt-2 p-2.5 rounded-lg bg-blue-50 dark:bg-dark-200 border border-blue-200 dark:border-dark-300 text-xs space-y-1">

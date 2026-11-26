@@ -7,6 +7,7 @@ import type {
   TunnelConnection,
   TunnelIngressView,
   ReconcileReport,
+  DataPlaneGroup,
 } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
@@ -43,26 +44,49 @@ function tunnelStatusBadge(status?: string | null) {
 export default function ConnectionsPage() {
   const [status, setStatus] = createSignal<CloudflareStatus | null>(null);
   const [tunnels, setTunnels] = createSignal<CloudflareTunnel[]>([]);
+  const [groups, setGroups] = createSignal<DataPlaneGroup[]>([]);
   const [loading, setLoading] = createSignal(true);
 
   const [showCreate, setShowCreate] = createSignal(false);
   const [renaming, setRenaming] = createSignal<CloudflareTunnel | null>(null);
   const [detailTunnel, setDetailTunnel] = createSignal<CloudflareTunnel | null>(null);
+  const [showCreateGroup, setShowCreateGroup] = createSignal(false);
+  const [renamingGroup, setRenamingGroup] = createSignal<DataPlaneGroup | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [s, t] = await Promise.all([api.getCloudflareStatus(), api.getCloudflareTunnels()]);
+      const [s, t] = await Promise.all([
+        api.getCloudflareStatus(),
+        api.getCloudflareTunnels(),
+      ]);
       setStatus(s);
       setTunnels(t);
     } catch (err) {
       addToast('error', `加载 Cloudflare 信息失败: ${(err as Error).message}`);
+    }
+    // 分组与 Cloudflare 解耦：未配置 Cloudflare 时隧道接口返回 503，不能让分组卡跟着失效
+    try {
+      setGroups(await api.getInstanceGroups());
+    } catch (err) {
+      addToast('error', `加载数据面分组失败: ${(err as Error).message}`);
     } finally {
       setLoading(false);
     }
   };
 
   onMount(load);
+
+  const handleGroupDelete = async (group: DataPlaneGroup) => {
+    if (!confirm(`确定删除分组 "${group.name}"？被路由引用的分组无法删除。`)) return;
+    try {
+      await api.deleteInstanceGroup(group.id);
+      addToast('success', `已删除分组 "${group.name}"`);
+      await load();
+    } catch (err) {
+      addToast('error', `删除失败: ${(err as Error).message}`);
+    }
+  };
 
   const handleDelete = async (tunnel: CloudflareTunnel) => {
     if (!confirm(`确定删除隧道 "${tunnel.name}"？Cloudflare 侧将清理其全部 ingress 配置。`)) return;
@@ -135,6 +159,50 @@ export default function ConnectionsPage() {
     },
   ];
 
+  const groupColumns: Column<DataPlaneGroup>[] = [
+    {
+      key: 'name',
+      title: '名称',
+      mobileVisible: true,
+      cell: (g) => <span class="font-medium">{g.name}</span>,
+    },
+    {
+      key: 'instanceCount',
+      title: '实例数',
+      cell: (g) => <span class="text-sm">{g.onlineCount}/{g.instanceCount} 在线</span>,
+    },
+    {
+      key: 'routeCount',
+      title: '引用路由',
+      cell: (g) => <span class="text-sm">{g.routeCount}</span>,
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      mobileVisible: true,
+      mobileDetailVisible: false,
+      class: 'w-28',
+      cell: (g) => (
+        <div class="flex items-center justify-end gap-1">
+          <button
+            class="btn-icon btn-icon-primary"
+            title="重命名"
+            onClick={(e) => { e.stopPropagation(); setRenamingGroup(g); }}
+          >
+            <FaSolidEdit />
+          </button>
+          <button
+            class="btn-icon btn-icon-danger"
+            title="删除"
+            onClick={(e) => { e.stopPropagation(); handleGroupDelete(g); }}
+          >
+            <FaSolidTrash />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div class="mb-6">
@@ -142,7 +210,7 @@ export default function ConnectionsPage() {
         <p class="text-secondary">流量进入网关的通道：内置本地数据面与 Cloudflare 隧道并列，路由按需选择发布通道</p>
       </div>
 
-      {/* 本地数据面 */}
+      {/* 本地数据面（存量全局通道） */}
       <div class="card">
         <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-4">
@@ -151,11 +219,37 @@ export default function ConnectionsPage() {
             </div>
             <div>
               <h3 class="font-semibold">本地数据面</h3>
-              <p class="text-sm text-secondary mt-0.5">内置通道 · 监听 8080 (HTTP) / 8443 (HTTPS)</p>
+              <p class="text-sm text-secondary mt-0.5">
+                存量全局通道 · 监听 8080 (HTTP) / 8443 (HTTPS)
+                —— 历史路由仍广播到所有数据面，新路由请选择数据面分组
+              </p>
             </div>
           </div>
-          <span class="badge badge-success shrink-0">内置</span>
+          <span class="badge badge-warning shrink-0">存量</span>
         </div>
+      </div>
+
+      {/* 数据面分组 */}
+      <div class="card mt-6">
+        <div class="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 class="font-semibold">数据面分组</h3>
+            <p class="text-sm text-secondary mt-1">
+              按地区/用途划分的接入通道：路由发布到分组后，只下发给分配到该分组的实例；
+              实例归属可在本页或「实例管理」页双向维护。
+            </p>
+          </div>
+          <button class="btn btn-primary shrink-0" onClick={() => setShowCreateGroup(true)}>
+            <FaSolidPlus class="mr-2" />新建分组
+          </button>
+        </div>
+
+        <Table
+          columns={groupColumns}
+          data={groups()}
+          rowKey={(g) => g.id}
+          emptyMessage={loading() ? '加载中...' : '暂无分组'}
+        />
       </div>
 
       {/* Cloudflare 隧道 */}
@@ -239,6 +333,38 @@ export default function ConnectionsPage() {
         />
       </Show>
 
+      <Show when={showCreateGroup()}>
+        <TunnelNameModal
+          title="新建数据面分组"
+          label="分组名称"
+          placeholder="例如：home-eu"
+          initialName=""
+          onSave={async (name) => {
+            await api.createInstanceGroup(name);
+            addToast('success', `已创建分组 "${name}"`);
+            setShowCreateGroup(false);
+            await load();
+          }}
+          onClose={() => setShowCreateGroup(false)}
+        />
+      </Show>
+
+      <Show when={renamingGroup()}>
+        <TunnelNameModal
+          title={`重命名分组 "${renamingGroup()!.name}"`}
+          label="分组名称"
+          placeholder="例如：home-eu"
+          initialName={renamingGroup()!.name}
+          onSave={async (name) => {
+            await api.renameInstanceGroup(renamingGroup()!.id, name);
+            addToast('success', '分组已重命名');
+            setRenamingGroup(null);
+            await load();
+          }}
+          onClose={() => setRenamingGroup(null)}
+        />
+      </Show>
+
       <Show when={detailTunnel()}>
         <TunnelDetailModal tunnel={detailTunnel()!} onClose={() => setDetailTunnel(null)} />
       </Show>
@@ -251,6 +377,8 @@ export default function ConnectionsPage() {
 function TunnelNameModal(props: {
   title: string;
   initialName: string;
+  label?: string;
+  placeholder?: string;
   onSave: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
@@ -261,7 +389,7 @@ function TunnelNameModal(props: {
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     if (!name().trim()) {
-      setError('隧道名称不能为空');
+      setError(`${props.label || '名称'}不能为空`);
       return;
     }
     setSubmitting(true);
@@ -285,12 +413,12 @@ function TunnelNameModal(props: {
         </div>
         <form onSubmit={handleSubmit} class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1">隧道名称</label>
+            <label class="block text-sm font-medium mb-1">{props.label || '隧道名称'}</label>
             <input
               class="input"
               value={name()}
               onInput={(e) => { setName(e.currentTarget.value); setError(''); }}
-              placeholder="例如 home-internal"
+              placeholder={props.placeholder || '例如 home-internal'}
               autofocus
             />
             {error() && <p class="text-danger text-xs mt-1">{error()}</p>}

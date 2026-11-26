@@ -418,6 +418,196 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
+    /// 获取所有数据面分组（含实例数与引用路由数，按名称排序）
+    /// </summary>
+    public async Task<IReadOnlyList<DataPlaneGroup>> GetGroupsAsync()
+    {
+        var groups = await _dbContext.DataPlaneGroups
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+
+        var instanceCounts = await _dbContext.InstanceGroupAssignments
+            .GroupBy(a => a.GroupId)
+            .Select(g => new { GroupId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+
+        // 分组路由的引用计数在内存里归集（ConnectionId 形如 group:<GroupId>）
+        var routeConnectionIds = await _dbContext.Routes
+            .Where(r => r.ConnectionId.StartsWith(ConnectionIds.GroupPrefix))
+            .Select(r => r.ConnectionId)
+            .ToListAsync();
+        var routeCounts = routeConnectionIds
+            .Select(ConnectionIds.GetGroupId)
+            .Where(id => id != null)
+            .GroupBy(id => id!)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return groups.Select(g => new DataPlaneGroup
+        {
+            Id = g.Id,
+            Name = g.Name,
+            InstanceCount = instanceCounts.GetValueOrDefault(g.Id),
+            RouteCount = routeCounts.GetValueOrDefault(g.Id),
+            CreatedAt = g.CreatedAt,
+            UpdatedAt = g.UpdatedAt
+        }).ToList();
+    }
+
+    /// <summary>
+    /// 根据ID获取分组
+    /// </summary>
+    public async Task<DataPlaneGroup?> GetGroupAsync(string id)
+    {
+        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        if (entity == null) return null;
+
+        var instanceCount = await _dbContext.InstanceGroupAssignments.CountAsync(a => a.GroupId == id);
+        var routeCount = await _dbContext.Routes.CountAsync(r => r.ConnectionId == ConnectionIds.ForGroup(id));
+
+        return new DataPlaneGroup
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            InstanceCount = instanceCount,
+            RouteCount = routeCount,
+            CreatedAt = entity.CreatedAt,
+            UpdatedAt = entity.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// 创建分组（ID 由后端生成）
+    /// </summary>
+    public async Task<DataPlaneGroup> CreateGroupAsync(string name)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var entity = new DataPlaneGroupEntity
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = name,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        await _dbContext.DataPlaneGroups.AddAsync(entity);
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Created data plane group: {GroupId} ({Name})", entity.Id, entity.Name);
+        return new DataPlaneGroup
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            CreatedAt = entity.CreatedAt,
+            UpdatedAt = entity.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// 重命名分组；不存在返回 null
+    /// </summary>
+    public async Task<DataPlaneGroup?> RenameGroupAsync(string id, string name)
+    {
+        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        if (entity == null) return null;
+
+        entity.Name = name;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Renamed data plane group: {GroupId} -> {Name}", id, name);
+        return new DataPlaneGroup
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            CreatedAt = entity.CreatedAt,
+            UpdatedAt = entity.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// 删除分组。被路由引用时拒绝（fail-closed，不级联删除）；分组不存在返回 null。
+    /// </summary>
+    public async Task<GroupDeleteResult?> DeleteGroupAsync(string id)
+    {
+        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        if (entity == null) return null;
+
+        var referencing = await _dbContext.Routes
+            .Where(r => r.ConnectionId == ConnectionIds.ForGroup(id))
+            .Select(r => r.Name)
+            .ToListAsync();
+        if (referencing.Count > 0)
+            return new GroupDeleteResult(false, referencing);
+
+        var assignments = await _dbContext.InstanceGroupAssignments
+            .Where(a => a.GroupId == id)
+            .ToListAsync();
+        _dbContext.InstanceGroupAssignments.RemoveRange(assignments);
+        _dbContext.DataPlaneGroups.Remove(entity);
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Deleted data plane group: {GroupId} ({Name}, cleared {Count} assignments)",
+            id, entity.Name, assignments.Count);
+        return new GroupDeleteResult(true, []);
+    }
+
+    /// <summary>
+    /// 获取实例的分组归属（未分配返回 null）
+    /// </summary>
+    public async Task<InstanceGroupAssignment?> GetInstanceGroupAsync(string instanceId)
+    {
+        var assignment = await _dbContext.InstanceGroupAssignments
+            .Include(a => a.Group)
+            .FirstOrDefaultAsync(a => a.InstanceId == instanceId);
+
+        return assignment?.Group == null
+            ? null
+            : new InstanceGroupAssignment(assignment.InstanceId, assignment.GroupId, assignment.Group.Name);
+    }
+
+    /// <summary>
+    /// 设置实例分组（groupId 为 null/空白表示取消分配）
+    /// </summary>
+    public async Task SetInstanceGroupAsync(string instanceId, string? groupId)
+    {
+        var existing = await _dbContext.InstanceGroupAssignments
+            .FirstOrDefaultAsync(a => a.InstanceId == instanceId);
+
+        if (string.IsNullOrWhiteSpace(groupId))
+        {
+            if (existing != null)
+            {
+                _dbContext.InstanceGroupAssignments.Remove(existing);
+                await _dbContext.SaveChangesAsync();
+                _logger.LogInformation("Cleared group assignment for instance {InstanceId}", instanceId);
+            }
+            return;
+        }
+
+        if (existing == null)
+        {
+            _dbContext.InstanceGroupAssignments.Add(new InstanceGroupAssignmentEntity
+            {
+                InstanceId = instanceId,
+                GroupId = groupId,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+        }
+        else if (existing.GroupId != groupId)
+        {
+            existing.GroupId = groupId;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+            return;
+        }
+
+        await _dbContext.SaveChangesAsync();
+        _logger.LogInformation("Assigned instance {InstanceId} to group {GroupId}", instanceId, groupId);
+    }
+
+    /// <summary>
     /// 初始化示例数据
     /// </summary>
     public async Task InitializeSampleDataAsync()

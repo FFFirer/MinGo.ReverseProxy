@@ -213,6 +213,20 @@ export interface GatewayInstance {
   errorRequests: number;
   errorRate: number;
   metadata?: Record<string, string>;
+  /** 接入分组 Id（未分配为空字符串） */
+  groupId: string;
+  /** 接入分组名称（展示用） */
+  groupName: string;
+}
+
+export interface DataPlaneGroup {
+  id: string;
+  name: string;
+  instanceCount: number;
+  onlineCount: number;
+  routeCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type InstanceStatus = 'Online' | 'Offline' | 'HeartbeatTimeout' | 'Unhealthy' | 'Starting' | 'Unknown';
@@ -370,7 +384,7 @@ export interface ReconcileReport {
 export interface ConnectionSummary {
   id: string;
   name: string;
-  kind: 'local' | 'cloudflare-tunnel' | string;
+  kind: 'local' | 'cloudflare-tunnel' | 'data-plane-group' | string;
   status?: string | null;
 }
 

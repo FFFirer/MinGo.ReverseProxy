@@ -68,5 +68,7 @@ public static class RouteUniquenessPolicy
         string.IsNullOrWhiteSpace(route.Name) ? route.Id : route.Name.Trim();
 
     private static string ConnectionLabel(RouteConfig route) =>
-        ConnectionIds.IsLocal(route.ConnectionId) ? "本地数据面" : "外部隧道";
+        ConnectionIds.IsLocal(route.ConnectionId) ? "本地数据面"
+        : ConnectionIds.IsGroup(route.ConnectionId) ? "数据面分组"
+        : "外部隧道";
 }

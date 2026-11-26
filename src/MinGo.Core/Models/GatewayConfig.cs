@@ -3,14 +3,26 @@ using System.ComponentModel.DataAnnotations;
 namespace MinGo.Core.Models;
 
 /// <summary>
-/// 接入通道标识。local 为内置的本地数据面，其余为外部通道（如 Cloudflare 隧道）的 ID。
+/// 接入通道标识。local 为内置的本地数据面（存量全局通道），
+/// 其余为外部通道（Cloudflare 隧道 ID）或数据面分组（<c>group:&lt;GroupId&gt;</c>）。
 /// </summary>
 public static class ConnectionIds
 {
     public const string Local = "local";
+    public const string GroupPrefix = "group:";
 
     public static bool IsLocal(string? connectionId) =>
         string.IsNullOrWhiteSpace(connectionId) || string.Equals(connectionId, Local, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>是否为数据面分组通道（按 Id 引用，分组重命名不影响已发布路由）。</summary>
+    public static bool IsGroup(string? connectionId) =>
+        connectionId is not null && connectionId.StartsWith(GroupPrefix, StringComparison.Ordinal);
+
+    /// <summary>从分组通道标识中取出分组 Id；非分组通道返回 null。</summary>
+    public static string? GetGroupId(string? connectionId) =>
+        IsGroup(connectionId) ? connectionId![GroupPrefix.Length..] : null;
+
+    public static string ForGroup(string groupId) => GroupPrefix + groupId;
 }
 
 public class GatewayConfig
@@ -38,7 +50,8 @@ public class RouteConfig
     public string ClusterId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 路由发布到的接入通道：<see cref="ConnectionIds.Local"/> 或 Cloudflare 隧道 ID。
+    /// 路由发布到的接入通道：<see cref="ConnectionIds.Local"/>（存量全局）、
+    /// Cloudflare 隧道 ID，或数据面分组 <c>group:&lt;GroupId&gt;</c>。
     /// </summary>
     public string ConnectionId { get; set; } = ConnectionIds.Local;
 

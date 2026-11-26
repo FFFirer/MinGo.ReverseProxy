@@ -118,4 +118,76 @@ public class CertificateSnapshotPolicyTests
         Assert.Equal(new[] { "Alpha.Local", "beta.local", "zeta.local" }, forward);
         Assert.Equal(forward, reversed);
     }
+
+    // ── 按路由域名过滤（分组隔离：私钥不跨组） ──
+
+    [Fact]
+    public void RouteHosts_OnlyReferencedDomains_AreDelivered()
+    {
+        var certs = new[]
+        {
+            Cert("home.local", Now.AddDays(30)),
+            Cert("office.local", Now.AddDays(30))
+        };
+
+        var result = CertificateSnapshotPolicy.SelectForDelivery(certs, Now, ["home.local"]);
+
+        Assert.Equal("home.local", Assert.Single(result).DomainName);
+    }
+
+    [Fact]
+    public void RouteHosts_WildcardRoute_CoversConcreteCert()
+    {
+        var result = CertificateSnapshotPolicy.SelectForDelivery(
+            new[] { Cert("api.home.local", Now.AddDays(30)) }, Now, ["*.home.local"]);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void RouteHosts_WildcardCert_CoversConcreteRouteHost()
+    {
+        var result = CertificateSnapshotPolicy.SelectForDelivery(
+            new[] { Cert("*.home.local", Now.AddDays(30)) }, Now, ["api.home.local"]);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void RouteHosts_Wildcard_DoesNotCoverBareDomain()
+    {
+        var result = CertificateSnapshotPolicy.SelectForDelivery(
+            new[] { Cert("*.home.local", Now.AddDays(30)) }, Now, ["home.local"]);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void RouteHosts_WithAnyHostRoute_AllCertsDelivered()
+    {
+        var certs = new[] { Cert("home.local", Now.AddDays(30)) };
+
+        var result = CertificateSnapshotPolicy.SelectForDelivery(certs, Now, ["", "api.home.local"]);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void RouteHosts_Null_DisablesFiltering()
+    {
+        var certs = new[] { Cert("home.local", Now.AddDays(30)) };
+
+        var result = CertificateSnapshotPolicy.SelectForDelivery(certs, Now, null);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void RouteHosts_HostPorts_AreNormalized()
+    {
+        var result = CertificateSnapshotPolicy.SelectForDelivery(
+            new[] { Cert("api.home.local", Now.AddDays(30)) }, Now, ["api.home.local:8443"]);
+
+        Assert.Single(result);
+    }
 }

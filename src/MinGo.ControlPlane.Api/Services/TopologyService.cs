@@ -104,7 +104,8 @@ public class TopologyService
         foreach (var connection in connectionList)
         {
             var nodeId = ConnectionNodeId(connection.Id);
-            var isTunnel = !ConnectionIds.IsLocal(connection.Id);
+            var isTunnel = !ConnectionIds.IsLocal(connection.Id) && !ConnectionIds.IsGroup(connection.Id);
+            var isGroup = ConnectionIds.IsGroup(connection.Id);
             var referencedRoutes = routeList.Count(r => ConnectionKeyOf(r) == connection.Id);
 
             if (isTunnel && !string.Equals(connection.Status, "healthy", StringComparison.OrdinalIgnoreCase))
@@ -117,11 +118,13 @@ public class TopologyService
                     nodeId);
             }
 
+            var kindLabel = isTunnel ? "Cloudflare Tunnel" : isGroup ? "数据面分组" : "内置数据面";
+            var kindValue = isTunnel ? "cloudflare-tunnel" : isGroup ? "data-plane-group" : "local";
             drafts.Add(new NodeDraft(nodeId, TopologyNodeKind.Connection, connection.Name,
-                isTunnel ? "Cloudflare Tunnel" : "内置数据面", false,
+                kindLabel, false,
                 [
                     new TopologyDetailItem("通道 ID", connection.Id),
-                    new TopologyDetailItem("类型", isTunnel ? "cloudflare-tunnel" : "local"),
+                    new TopologyDetailItem("类型", kindValue),
                     new TopologyDetailItem("隧道状态", isTunnel ? TunnelStatusLabel(connection.Status) : null),
                     new TopologyDetailItem("引用路由", referencedRoutes.ToString()),
                 ]));
@@ -165,10 +168,11 @@ public class TopologyService
             var connectionName = connectionById.TryGetValue(connectionKey, out var conn)
                 ? conn.Name
                 : connectionKey;
-            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey);
+            var isGroupRoute = ConnectionIds.IsGroup(connectionKey);
+            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey) && !isGroupRoute;
             var forwardPath = isTunnelRoute
                 ? $"{connectionName} → 本地数据面 → 集群"
-                : "本地数据面 → 集群";
+                : isGroupRoute ? "分组数据面 → 集群" : "本地数据面 → 集群";
 
             drafts.Add(new NodeDraft(nodeId, TopologyNodeKind.Route, RouteLabel(route),
                 $"{host} {path}", !route.Enabled,
@@ -286,7 +290,8 @@ public class TopologyService
         {
             var routeNodeId = RouteNodeId(route.Id);
             var connectionKey = ConnectionKeyOf(route);
-            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey);
+            var isGroupRoute = ConnectionIds.IsGroup(connectionKey);
+            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey) && !isGroupRoute;
 
             if (isTunnelRoute && connectionById.ContainsKey(connectionKey))
             {
@@ -295,8 +300,11 @@ public class TopologyService
                         ConnectionNodeId(ConnectionIds.Local), "origin"));
             }
 
-            // 数据面节点缺失（老版本通道清单）时退回通道直连，避免路由在图上悬空
-            var ingressKey = isTunnelRoute && !hasLocalConnection ? connectionKey : ConnectionIds.Local;
+            // 数据面节点缺失（老版本通道清单）时退回通道直连，避免路由在图上悬空；
+            // 分组路由的规则装在分组数据面上，ingress 边从分组节点出发
+            var ingressKey = isTunnelRoute && !hasLocalConnection ? connectionKey
+                : isGroupRoute ? connectionKey
+                : ConnectionIds.Local;
             if (connectionById.ContainsKey(ingressKey))
                 edges.Add(new TopologyEdge(ConnectionNodeId(ingressKey), routeNodeId, "ingress"));
 

@@ -10,11 +10,13 @@ namespace MinGo.Core.Routing;
 /// 这里锁住三条契约：
 /// <list type="number">
 /// <item><description>
-/// 接入通道只决定「流量从哪里进来」，不决定「规则装在哪个进程」。绑定外部隧道的启用路由
-/// 必须同样产出一条「数据面 → 后端集群」规则：隧道 ingress 一律回源到数据面
-/// （见 <c>IngressReconciler.Merge</c>），缺了这条内部规则，隧道流量到数据面就是 404。
-/// 编译过程完全不读 <see cref="RouteConfig.ConnectionId"/>，正是这条契约的实现方式，
-/// 单测 <c>DataPlaneRuleCompilerTests.Compile_KeepsTunnelBoundRoutes</c> 负责防止它被改回去。
+/// 接入通道决定「流量从哪里进来」，也决定「分组规则装进哪些数据面」——但只按
+/// <c>group:&lt;GroupId&gt;</c> 过滤：绑定外部隧道的启用路由必须同样产出一条
+/// 「数据面 → 后端集群」规则（隧道 ingress 一律回源到数据面，见
+/// <c>IngressReconciler.Merge</c>），隧道路由与 local 路由对所有数据面一视同仁；
+/// 分组路由只装进目标分组的实例。单测
+/// <c>DataPlaneRuleCompilerTests.Compile_KeepsTunnelBoundRoutes</c> 与
+/// <c>Compile_GroupRoutes_OnlyForTargetGroup</c> 负责防止这条契约被改回去。
 /// </description></item>
 /// <item><description>
 /// 同一匹配键（域名 + 路径）只留一条规则，其余抑制。重复键在 YARP 里命中顺序不确定，
@@ -36,10 +38,19 @@ public static class DataPlaneRuleCompiler
         IReadOnlyList<RouteConfig> Suppressed,
         IReadOnlyList<string> Warnings);
 
-    public static Result Compile(IEnumerable<RouteConfig>? routes)
+    /// <summary>
+    /// 编译规则集。
+    /// </summary>
+    /// <param name="routes">全量路由表</param>
+    /// <param name="targetGroupId">
+    /// 目标数据面的分组 Id；null 或 <see cref="ConnectionIds.Local"/> 表示启动默认组（未分配实例）。
+    /// 分组路由只对匹配的分组生效，local 与隧道路由不受分组影响（对所有数据面生效）。
+    /// </param>
+    public static Result Compile(IEnumerable<RouteConfig>? routes, string? targetGroupId = null)
     {
         var ordered = (routes ?? Array.Empty<RouteConfig>())
             .Where(static route => route.Enabled)
+            .Where(route => BelongsToTargetGroup(route.ConnectionId, targetGroupId))
             .Select(route => (Route: route, Key: RouteMatchKey.Of(route.Match?.Host, route.Match?.Path)))
             .OrderBy(x => x.Key.Host, StringComparer.Ordinal)
             .ThenBy(x => x.Key.Path, StringComparer.Ordinal)
@@ -67,6 +78,17 @@ public static class DataPlaneRuleCompiler
         }
 
         return new Result(rules, suppressed, warnings);
+    }
+
+    /// <summary>
+    /// 通道归属判定：local 与隧道路由对所有数据面生效；分组路由只装进目标分组的实例。
+    /// </summary>
+    internal static bool BelongsToTargetGroup(string? connectionId, string? targetGroupId)
+    {
+        if (!ConnectionIds.IsGroup(connectionId))
+            return true;
+
+        return string.Equals(ConnectionIds.GetGroupId(connectionId), targetGroupId, StringComparison.Ordinal);
     }
 
     private static string Label(RouteConfig route) =>

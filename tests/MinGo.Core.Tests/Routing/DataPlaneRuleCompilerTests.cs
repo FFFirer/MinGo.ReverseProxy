@@ -4,9 +4,9 @@ using MinGo.Core.Routing;
 namespace MinGo.Core.Tests.Routing;
 
 /// <summary>
-/// 底层配置编译器测试。重点锁两条契约：
-/// 绑定外部隧道的启用路由必须同样产出数据面规则（隧道不直连后端），
-/// 以及同一匹配键只留一条、且谁留谁走是确定的。
+/// 底层配置编译器测试。重点锁三条契约：
+/// 绑定外部隧道的启用路由必须同样产出数据面规则（隧道不直连后端）、
+/// 分组路由只装进目标分组的实例、同一匹配键只留一条且谁留谁走是确定的。
 /// </summary>
 public class DataPlaneRuleCompilerTests
 {
@@ -55,6 +55,57 @@ public class DataPlaneRuleCompilerTests
         ]);
 
         Assert.Equal(new[] { "tun", "local" }, Ids(result));
+    }
+
+    // ── 分组过滤（group:<GroupId> 只装进目标分组的实例） ──
+
+    [Fact]
+    public void Compile_GroupRoutes_OnlyForTargetGroup()
+    {
+        var groupRoute = Route("g1", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("home"));
+
+        // 目标分组匹配 → 收分组路由
+        var matched = DataPlaneRuleCompiler.Compile([groupRoute], "home");
+        Assert.Equal(new[] { "g1" }, Ids(matched));
+
+        // 其他分组 → 不收
+        var other = DataPlaneRuleCompiler.Compile([groupRoute], "office");
+        Assert.Empty(other.Rules);
+
+        // 未分配实例 → 不收任何分组路由
+        var unassigned = DataPlaneRuleCompiler.Compile([groupRoute], null);
+        Assert.Empty(unassigned.Rules);
+
+        // 启动默认组 local（未分配实例的 GroupId 默认值）→ 同样不收分组路由
+        var defaultGroup = DataPlaneRuleCompiler.Compile([groupRoute], ConnectionIds.Local);
+        Assert.Empty(defaultGroup.Rules);
+    }
+
+    [Fact]
+    public void Compile_LocalAndTunnelRoutes_ReachEveryDataPlane()
+    {
+        var routes = new[]
+        {
+            Route("local", "web.example.com", "/web"),
+            Route("tun", "api.example.com", "/api", connectionId: "tun-1"),
+            Route("g", "grp.example.com", "/grp", connectionId: ConnectionIds.ForGroup("home")),
+        };
+
+        Assert.Equal(new[] { "tun", "local" }, Ids(DataPlaneRuleCompiler.Compile(routes, null)));
+        Assert.Equal(new[] { "tun", "g", "local" }, Ids(DataPlaneRuleCompiler.Compile(routes, "home")));
+    }
+
+    [Fact]
+    public void Compile_SameKeyAcrossGroups_DoesNotSuppressWithinTargetGroup()
+    {
+        // 同一域名+路径分属两个分组：对单个分组编译时不视为重复（各装各的）
+        var result = DataPlaneRuleCompiler.Compile([
+            Route("home", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("home")),
+            Route("office", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("office")),
+        ], "home");
+
+        Assert.Equal(new[] { "home" }, Ids(result));
+        Assert.Empty(result.Warnings);
     }
 
     // ── 去重 ──

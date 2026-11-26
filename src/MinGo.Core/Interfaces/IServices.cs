@@ -90,6 +90,12 @@ public interface IGatewayInstanceService
     Task<int> CheckAndUpdateTimeoutInstancesAsync();
 
     /// <summary>
+    /// 更新实例的内存分组归属（分配表由 IApiDbService 落库，这里只同步内存态）。
+    /// 实例不存在返回 null。
+    /// </summary>
+    Task<GatewayInstance?> UpdateInstanceGroupAsync(string instanceId, string? groupId, string? groupName);
+
+    /// <summary>
     /// 清理长时间心跳超时的实例
     /// </summary>
     /// <returns>清理的实例数量</returns>

@@ -1,19 +1,25 @@
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onMount, Show, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
-import type { GatewayInstance } from '../types';
+import type { GatewayInstance, DataPlaneGroup } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 import InstanceConfigModal from '../components/shared/InstanceConfigModal';
 
 export default function InstancesPage() {
   const [instances, setInstances] = createSignal<GatewayInstance[]>([]);
+  const [groups, setGroups] = createSignal<DataPlaneGroup[]>([]);
+  const [groupFilter, setGroupFilter] = createSignal('all');
   const [configTarget, setConfigTarget] = createSignal<GatewayInstance | null>(null);
 
   const fetchInstances = async () => {
     try {
-      const data = await api.get<any>('/instances');
+      const [data, gs] = await Promise.all([
+        api.get<any>('/instances'),
+        api.getInstanceGroups(),
+      ]);
       setInstances(data?.instances || []);
+      setGroups(gs);
     } catch { /* ignore */ }
   };
 
@@ -92,6 +98,29 @@ export default function InstancesPage() {
   const offlineCount = () => instances().filter(i => i.status === 'Offline').length;
   const timeoutCount = () => instances().filter(i => i.status === 'HeartbeatTimeout').length;
 
+  const filteredInstances = () => instances().filter(i =>
+    groupFilter() === 'all' ? true
+    : groupFilter() === 'none' ? !i.groupId
+    : i.groupId === groupFilter());
+
+  const handleGroupChange = async (inst: GatewayInstance, value: string) => {
+    try {
+      if (value === '__create__') {
+        const name = prompt('新分组名称：');
+        if (!name?.trim()) return;
+        const created = await api.createInstanceGroup(name.trim());
+        await api.setInstanceGroup(inst.instanceId, created.id);
+        addToast('success', `已创建分组 "${created.name}" 并分配实例`);
+      } else {
+        await api.setInstanceGroup(inst.instanceId, value || null);
+        addToast('success', value ? '分组已更新' : '已回到 local（默认组）');
+      }
+      await fetchInstances();
+    } catch (err) {
+      addToast('error', `更新分组失败: ${(err as Error).message}`);
+    }
+  };
+
   const columns: Column<GatewayInstance>[] = [
     {
       key: 'name',
@@ -118,6 +147,30 @@ export default function InstancesPage() {
       cell: (inst) => (
         <span class={`badge ${statusBadge(inst.status)}`}>{statusLabel(inst.status)}</span>
       ),
+    },
+    {
+      key: 'group',
+      title: '接入分组',
+      mobileVisible: true,
+      cell: (inst) => {
+        // 读取 groups() 使 cell 依赖分组信号：分组晚于实例到达时，
+        // select 的 value 会在选项就绪后重新应用（否则会被浏览器重置为空）
+        const opts = groups();
+        return (
+          <select
+            class="input py-1 text-sm"
+            value={inst.groupId || ''}
+            onChange={(e) => handleGroupChange(inst, e.currentTarget.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">local（默认）</option>
+            <For each={opts}>{(g) => (
+              <option value={g.id}>{g.name}</option>
+            )}</For>
+            <option value="__create__">＋ 新建分组…</option>
+          </select>
+        );
+      },
     },
     {
       key: 'cpu',
@@ -237,9 +290,26 @@ export default function InstancesPage() {
       </div>
 
       <div class="card">
+        <div class="flex items-center justify-between gap-4 mb-4">
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-secondary">分组筛选</label>
+            <select
+              class="input py-1 w-auto text-sm"
+              value={groupFilter()}
+              onChange={(e) => setGroupFilter(e.currentTarget.value)}
+            >
+              <option value="all">全部实例</option>
+              <option value="none">local（默认）</option>
+              <For each={groups()}>{(g) => (
+                <option value={g.id}>{g.name}</option>
+              )}</For>
+            </select>
+          </div>
+          <span class="text-xs text-secondary">分组通道在「接入通道」页维护</span>
+        </div>
         <Table
           columns={columns}
-          data={instances()}
+          data={filteredInstances()}
           rowKey={(i) => i.instanceId}
           emptyMessage={
             <div>

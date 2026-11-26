@@ -94,3 +94,27 @@ public class ApiCertificateEntity
     public string? Password { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
+
+/// <summary>
+/// 数据面分组：可管理的接入通道资产。路由按 <c>group:&lt;Id&gt;</c> 引用，
+/// 只有分配到该分组的实例才会收到对应路由。
+/// </summary>
+public class DataPlaneGroupEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// 实例 → 分组分配表。实例 Id 为主键（一个实例最多一个分组），
+/// 落库使分配在控制面重启、实例重连后依然存在（实例注册表本身仍在内存）。
+/// </summary>
+public class InstanceGroupAssignmentEntity
+{
+    public string InstanceId { get; set; } = string.Empty;
+    public string GroupId { get; set; } = string.Empty;
+    public DataPlaneGroupEntity? Group { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
