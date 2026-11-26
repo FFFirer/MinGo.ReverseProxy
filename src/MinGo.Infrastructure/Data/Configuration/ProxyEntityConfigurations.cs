@@ -57,13 +57,13 @@ public class ApiCertificateEntityConfiguration : IEntityTypeConfiguration<ApiCer
 }
 
 /// <summary>
-/// 数据面分组实体配置
+/// 数据面节点实体配置
 /// </summary>
-public class DataPlaneGroupEntityConfiguration : IEntityTypeConfiguration<DataPlaneGroupEntity>
+public class DataPlaneNodeEntityConfiguration : IEntityTypeConfiguration<DataPlaneNodeEntity>
 {
-    public void Configure(EntityTypeBuilder<DataPlaneGroupEntity> builder)
+    public void Configure(EntityTypeBuilder<DataPlaneNodeEntity> builder)
     {
-        builder.ToTable("DataPlaneGroups");
+        builder.ToTable("DataPlaneNodes");
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasMaxLength(64);
         builder.Property(e => e.Name).HasMaxLength(128);
@@ -71,18 +71,18 @@ public class DataPlaneGroupEntityConfiguration : IEntityTypeConfiguration<DataPl
 }
 
 /// <summary>
-/// 实例分组分配实体配置（实例 Id 为主键）
+/// 实例节点绑定实体配置（实例 Id 为主键）
 /// </summary>
-public class InstanceGroupAssignmentEntityConfiguration : IEntityTypeConfiguration<InstanceGroupAssignmentEntity>
+public class InstanceNodeAssignmentEntityConfiguration : IEntityTypeConfiguration<InstanceNodeAssignmentEntity>
 {
-    public void Configure(EntityTypeBuilder<InstanceGroupAssignmentEntity> builder)
+    public void Configure(EntityTypeBuilder<InstanceNodeAssignmentEntity> builder)
     {
-        builder.ToTable("InstanceGroupAssignments");
+        builder.ToTable("InstanceNodeAssignments");
         builder.HasKey(e => e.InstanceId);
         builder.Property(e => e.InstanceId).HasMaxLength(128);
-        builder.HasOne(e => e.Group)
+        builder.HasOne(e => e.Node)
             .WithMany()
-            .HasForeignKey(e => e.GroupId);
+            .HasForeignKey(e => e.NodeId);
     }
 }
 

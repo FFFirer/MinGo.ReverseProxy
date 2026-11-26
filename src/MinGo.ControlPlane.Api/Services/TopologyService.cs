@@ -104,8 +104,8 @@ public class TopologyService
         foreach (var connection in connectionList)
         {
             var nodeId = ConnectionNodeId(connection.Id);
-            var isTunnel = !ConnectionIds.IsLocal(connection.Id) && !ConnectionIds.IsGroup(connection.Id);
-            var isGroup = ConnectionIds.IsGroup(connection.Id);
+            var isTunnel = !ConnectionIds.IsNode(connection.Id);
+            var isDataPlaneNode = ConnectionIds.IsNode(connection.Id);
             var referencedRoutes = routeList.Count(r => ConnectionKeyOf(r) == connection.Id);
 
             if (isTunnel && !string.Equals(connection.Status, "healthy", StringComparison.OrdinalIgnoreCase))
@@ -118,8 +118,8 @@ public class TopologyService
                     nodeId);
             }
 
-            var kindLabel = isTunnel ? "Cloudflare Tunnel" : isGroup ? "数据面分组" : "内置数据面";
-            var kindValue = isTunnel ? "cloudflare-tunnel" : isGroup ? "data-plane-group" : "local";
+            var kindLabel = isTunnel ? "Cloudflare Tunnel" : "数据面节点";
+            var kindValue = isTunnel ? "cloudflare-tunnel" : "data-plane-node";
             drafts.Add(new NodeDraft(nodeId, TopologyNodeKind.Connection, connection.Name,
                 kindLabel, false,
                 [
@@ -156,23 +156,22 @@ public class TopologyService
                     nodeId);
             }
 
-            if (!ConnectionIds.IsLocal(connectionKey) && !connectionById.ContainsKey(connectionKey))
+            if (!connectionById.ContainsKey(connectionKey))
             {
                 AddIssue("connection-missing", TopologySeverity.Danger,
                     $"路由 “{RouteLabel(route)}” 绑定的接入通道 “{connectionKey}” 已不存在",
                     nodeId);
             }
 
-            // 隧道路由不直连后端：ingress 一律回源到本地数据面，再由数据面的同一条规则转成后端集群。
-            // 图上必须把这跳中转画出来，否则 "隧道 → 路由 → 集群" 看起来就是隧道自己找到了后端。
+            // 隧道路由不直连后端：ingress 一律回源到数据面，再由数据面的同一条规则转成后端集群。
+            // 图上没有数据面实体节点，这条中转在「转发路径」文案里说明，连线按通道直达路由。
             var connectionName = connectionById.TryGetValue(connectionKey, out var conn)
                 ? conn.Name
                 : connectionKey;
-            var isGroupRoute = ConnectionIds.IsGroup(connectionKey);
-            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey) && !isGroupRoute;
+            var isTunnelRoute = !ConnectionIds.IsNode(connectionKey);
             var forwardPath = isTunnelRoute
-                ? $"{connectionName} → 本地数据面 → 集群"
-                : isGroupRoute ? "分组数据面 → 集群" : "本地数据面 → 集群";
+                ? $"{connectionName} → 数据面 → 集群"
+                : "节点数据面 → 集群";
 
             drafts.Add(new NodeDraft(nodeId, TopologyNodeKind.Route, RouteLabel(route),
                 $"{host} {path}", !route.Enabled,
@@ -282,31 +281,16 @@ public class TopologyService
         }
 
         // ── 连线：只在两端节点都存在时建立 ──
-        // 转发规则一律装在数据面，所以 ingress 边恒从 conn:local 出发；
-        // 外部通道多一条 origin 边指向数据面，表示 "隧道的下一跳是数据面，不是后端"。
+        // 转发规则一律装在数据面，ingress 边从接入通道直达路由：
+        // 隧道路由从 conn:<tunnelId> 出发（流量经隧道回源数据面），节点路由从 conn:node:<NodeId> 出发。
         var edges = new List<TopologyEdge>();
-        var hasLocalConnection = connectionById.ContainsKey(ConnectionIds.Local);
         foreach (var route in routeList)
         {
             var routeNodeId = RouteNodeId(route.Id);
             var connectionKey = ConnectionKeyOf(route);
-            var isGroupRoute = ConnectionIds.IsGroup(connectionKey);
-            var isTunnelRoute = !ConnectionIds.IsLocal(connectionKey) && !isGroupRoute;
 
-            if (isTunnelRoute && connectionById.ContainsKey(connectionKey))
-            {
-                if (hasLocalConnection)
-                    edges.Add(new TopologyEdge(ConnectionNodeId(connectionKey),
-                        ConnectionNodeId(ConnectionIds.Local), "origin"));
-            }
-
-            // 数据面节点缺失（老版本通道清单）时退回通道直连，避免路由在图上悬空；
-            // 分组路由的规则装在分组数据面上，ingress 边从分组节点出发
-            var ingressKey = isTunnelRoute && !hasLocalConnection ? connectionKey
-                : isGroupRoute ? connectionKey
-                : ConnectionIds.Local;
-            if (connectionById.ContainsKey(ingressKey))
-                edges.Add(new TopologyEdge(ConnectionNodeId(ingressKey), routeNodeId, "ingress"));
+            if (connectionById.ContainsKey(connectionKey))
+                edges.Add(new TopologyEdge(ConnectionNodeId(connectionKey), routeNodeId, "ingress"));
 
             if (!string.IsNullOrWhiteSpace(route.ClusterId) && clusterById.ContainsKey(route.ClusterId))
                 edges.Add(new TopologyEdge(routeNodeId, ClusterNodeId(route.ClusterId), "forward"));
@@ -386,9 +370,9 @@ public class TopologyService
         return list;
     }
 
-    /// <summary>路由归属的通道键：空值与 local 归一为同一个节点。</summary>
+    /// <summary>路由归属的通道键：空白归一为空串（拓扑会将其标记为通道缺失）。</summary>
     private static string ConnectionKeyOf(RouteConfig route)
-        => ConnectionIds.IsLocal(route.ConnectionId) ? ConnectionIds.Local : route.ConnectionId!.Trim();
+        => route.ConnectionId?.Trim() ?? string.Empty;
 
     private static string RouteLabel(RouteConfig route)
         => string.IsNullOrWhiteSpace(route.Name) ? route.Id : route.Name.Trim();

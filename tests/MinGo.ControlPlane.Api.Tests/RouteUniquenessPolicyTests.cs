@@ -15,13 +15,13 @@ public class RouteUniquenessPolicyTests
         string? host,
         string? path,
         bool enabled = true,
-        string connectionId = ConnectionIds.Local,
+        string? connectionId = null,
         string? name = null) => new()
     {
         Id = id,
         Name = name ?? id,
         ClusterId = "c1",
-        ConnectionId = connectionId,
+        ConnectionId = connectionId ?? ConnectionIds.ForNode(ConnectionIds.DefaultNode),
         Enabled = enabled,
         // RouteMatch.Host/Path 在非空引用下用空串表达「未填」，归一化后等价于任意匹配
         Match = new RouteMatch { Host = host ?? string.Empty, Path = path ?? string.Empty },
@@ -111,13 +111,13 @@ public class RouteUniquenessPolicyTests
     }
 
     [Fact]
-    public void Check_LocalOccupant_IsNamedAsLocalChannel()
+    public void Check_NodeOccupant_IsNamedAsNodeChannel()
     {
         var verdict = Check(
             Route("new", "api.example.com", "/v1/*"),
-            [Route("old", "api.example.com", "/v1/*", name: "本地路由")]);
+            [Route("old", "api.example.com", "/v1/*", name: "节点路由")]);
 
-        Assert.Contains("本地数据面", verdict.Error);
+        Assert.Contains("数据面节点", verdict.Error);
     }
 
     // ── 放行 ──

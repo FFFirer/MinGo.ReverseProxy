@@ -42,14 +42,14 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     public DbSet<CloudflareSettingsEntity> CloudflareSettings { get; set; }
 
     /// <summary>
-    /// 数据面分组表
+    /// 数据面节点表
     /// </summary>
-    public DbSet<DataPlaneGroupEntity> DataPlaneGroups { get; set; }
+    public DbSet<DataPlaneNodeEntity> DataPlaneNodes { get; set; }
 
     /// <summary>
-    /// 实例分组分配表
+    /// 实例节点绑定表
     /// </summary>
-    public DbSet<InstanceGroupAssignmentEntity> InstanceGroupAssignments { get; set; }
+    public DbSet<InstanceNodeAssignmentEntity> InstanceNodeAssignments { get; set; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -75,7 +75,7 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         builder.ApplyConfiguration(new ApiCertificateEntityConfiguration());
         builder.ApplyConfiguration(new PortainerInstanceEntityConfiguration());
         builder.ApplyConfiguration(new CloudflareSettingsEntityConfiguration());
-        builder.ApplyConfiguration(new DataPlaneGroupEntityConfiguration());
-        builder.ApplyConfiguration(new InstanceGroupAssignmentEntityConfiguration());
+        builder.ApplyConfiguration(new DataPlaneNodeEntityConfiguration());
+        builder.ApplyConfiguration(new InstanceNodeAssignmentEntityConfiguration());
     }
 }

@@ -4,9 +4,9 @@ using MinGo.Core.Routing;
 namespace MinGo.Core.Tests.Routing;
 
 /// <summary>
-/// 底层配置编译器测试。重点锁三条契约：
-/// 绑定外部隧道的启用路由必须同样产出数据面规则（隧道不直连后端）、
-/// 分组路由只装进目标分组的实例、同一匹配键只留一条且谁留谁走是确定的。
+/// 底层配置编译器测试。重点锁四条契约：
+/// 绑定外部隧道的启用路由必须同样产出数据面规则（隧道不直连后端，对所有已绑定实例生效）、
+/// 节点路由只装进目标节点的实例、未绑定节点的实例得到空规则集、同一匹配键只留一条且谁留谁走是确定的。
 /// </summary>
 public class DataPlaneRuleCompilerTests
 {
@@ -15,7 +15,7 @@ public class DataPlaneRuleCompilerTests
         string? host,
         string? path,
         bool enabled = true,
-        string connectionId = ConnectionIds.Local,
+        string connectionId = null!,
         string clusterId = "c1") => new()
     {
         Id = id,
@@ -27,10 +27,27 @@ public class DataPlaneRuleCompilerTests
         Match = new RouteMatch { Host = host ?? string.Empty, Path = path ?? string.Empty },
     };
 
+    /// <summary>默认节点通道路由（路由表单里节点通道的典型取值）。</summary>
+    private static RouteConfig NodeRoute(
+        string id,
+        string? host,
+        string? path,
+        string nodeId = ConnectionIds.DefaultNode,
+        bool enabled = true) =>
+        Route(id, host, path, enabled, ConnectionIds.ForNode(nodeId));
+
+    /// <summary>Cloudflare 隧道路由。</summary>
+    private static RouteConfig TunnelRoute(
+        string id,
+        string? host,
+        string? path,
+        bool enabled = true) =>
+        Route(id, host, path, enabled, $"tun-{id}");
+
     private static IReadOnlyList<string> Ids(DataPlaneRuleCompiler.Result result) =>
         result.Rules.Select(r => r.Id).ToArray();
 
-    // ── 隧道不直连后端 ──
+    // ── 隧道不直连后端：隧道路由对所有已绑定节点的实例生效 ──
 
     [Fact]
     public void Compile_KeepsTunnelBoundRoutes()
@@ -39,69 +56,91 @@ public class DataPlaneRuleCompilerTests
         // 所以绑隧道的路由必须在数据面也有规则，否则隧道流量落地即 404。
         // 谁把这里改成「按 ConnectionId 过滤」，这条先红。
         var result = DataPlaneRuleCompiler.Compile([
-            Route("t1", "api.example.com", "/api/{**catch-all}", connectionId: "tun-1"),
-        ]);
+            TunnelRoute("t1", "api.example.com", "/api/{**catch-all}"),
+        ], ConnectionIds.DefaultNode);
 
         Assert.Equal(new[] { "t1" }, Ids(result));
         Assert.Empty(result.Warnings);
     }
 
     [Fact]
-    public void Compile_TunnelAndLocalRoutes_BothProduceRules()
+    public void Compile_TunnelRoutes_ReachEveryBoundNode()
+    {
+        var tun = TunnelRoute("tun", "api.example.com", "/api");
+
+        // 隧道路由不按节点过滤：任何已绑定节点的实例都收到
+        Assert.Equal(new[] { "tun" }, Ids(DataPlaneRuleCompiler.Compile([tun], "default")));
+        Assert.Equal(new[] { "tun" }, Ids(DataPlaneRuleCompiler.Compile([tun], "home")));
+    }
+
+    [Fact]
+    public void Compile_TunnelAndNodeRoutes_BothProduceRules()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("local", "web.example.com", "/web", clusterId: "c-web"),
-            Route("tun", "api.example.com", "/api", connectionId: "tun-1", clusterId: "c-api"),
-        ]);
+            NodeRoute("local", "web.example.com", "/web"),
+            TunnelRoute("tun", "api.example.com", "/api"),
+        ], ConnectionIds.DefaultNode);
 
         Assert.Equal(new[] { "tun", "local" }, Ids(result));
     }
 
-    // ── 分组过滤（group:<GroupId> 只装进目标分组的实例） ──
+    // ── 节点过滤（node:<NodeId> 只装进目标节点的实例） ──
 
     [Fact]
-    public void Compile_GroupRoutes_OnlyForTargetGroup()
+    public void Compile_NodeRoutes_OnlyForTargetNode()
     {
-        var groupRoute = Route("g1", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("home"));
+        var nodeRoute = NodeRoute("g1", "api.example.com", "/api", nodeId: "home");
 
-        // 目标分组匹配 → 收分组路由
-        var matched = DataPlaneRuleCompiler.Compile([groupRoute], "home");
+        // 目标节点匹配 → 收节点路由
+        var matched = DataPlaneRuleCompiler.Compile([nodeRoute], "home");
         Assert.Equal(new[] { "g1" }, Ids(matched));
 
-        // 其他分组 → 不收
-        var other = DataPlaneRuleCompiler.Compile([groupRoute], "office");
+        // 其他节点 → 不收
+        var other = DataPlaneRuleCompiler.Compile([nodeRoute], "office");
         Assert.Empty(other.Rules);
 
-        // 未分配实例 → 不收任何分组路由
-        var unassigned = DataPlaneRuleCompiler.Compile([groupRoute], null);
-        Assert.Empty(unassigned.Rules);
-
-        // 启动默认组 local（未分配实例的 GroupId 默认值）→ 同样不收分组路由
-        var defaultGroup = DataPlaneRuleCompiler.Compile([groupRoute], ConnectionIds.Local);
-        Assert.Empty(defaultGroup.Rules);
+        // 未绑定节点（targetNodeId 为 null）→ 空规则集，不推送任何配置
+        var unbound = DataPlaneRuleCompiler.Compile([nodeRoute], null);
+        Assert.Empty(unbound.Rules);
     }
 
     [Fact]
-    public void Compile_LocalAndTunnelRoutes_ReachEveryDataPlane()
+    public void Compile_UnboundNode_ProducesNoRules()
+    {
+        // fail-closed 契约：未绑定节点的实例不生效任何转发规则，
+        // 隧道与节点路由一律不装。
+        var routes = new[]
+        {
+            NodeRoute("local", "web.example.com", "/web"),
+            TunnelRoute("tun", "api.example.com", "/api"),
+            NodeRoute("g", "grp.example.com", "/grp", nodeId: "home"),
+        };
+
+        Assert.Empty(DataPlaneRuleCompiler.Compile(routes, null).Rules);
+    }
+
+    [Fact]
+    public void Compile_NodeAndTunnelRoutes_ReachBoundInstance()
     {
         var routes = new[]
         {
-            Route("local", "web.example.com", "/web"),
-            Route("tun", "api.example.com", "/api", connectionId: "tun-1"),
-            Route("g", "grp.example.com", "/grp", connectionId: ConnectionIds.ForGroup("home")),
+            NodeRoute("local", "web.example.com", "/web"),
+            TunnelRoute("tun", "api.example.com", "/api"),
+            NodeRoute("g", "grp.example.com", "/grp", nodeId: "home"),
         };
 
-        Assert.Equal(new[] { "tun", "local" }, Ids(DataPlaneRuleCompiler.Compile(routes, null)));
-        Assert.Equal(new[] { "tun", "g", "local" }, Ids(DataPlaneRuleCompiler.Compile(routes, "home")));
+        Assert.Equal(new[] { "tun", "local" }, Ids(DataPlaneRuleCompiler.Compile(routes, "default")));
+        Assert.Equal(new[] { "tun", "g" }, Ids(DataPlaneRuleCompiler.Compile(routes, "home")));
+        Assert.Equal(new[] { "tun" }, Ids(DataPlaneRuleCompiler.Compile(routes, "office")));
     }
 
     [Fact]
-    public void Compile_SameKeyAcrossGroups_DoesNotSuppressWithinTargetGroup()
+    public void Compile_SameKeyAcrossNodes_DoesNotSuppressWithinTargetNode()
     {
-        // 同一域名+路径分属两个分组：对单个分组编译时不视为重复（各装各的）
+        // 同一域名+路径分属两个节点：对单个节点编译时不视为重复（各装各的）
         var result = DataPlaneRuleCompiler.Compile([
-            Route("home", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("home")),
-            Route("office", "api.example.com", "/api", connectionId: ConnectionIds.ForGroup("office")),
+            NodeRoute("home", "api.example.com", "/api", nodeId: "home"),
+            NodeRoute("office", "api.example.com", "/api", nodeId: "office"),
         ], "home");
 
         Assert.Equal(new[] { "home" }, Ids(result));
@@ -114,9 +153,9 @@ public class DataPlaneRuleCompilerTests
     public void Compile_SameHostAndPath_KeepsOneAndWarns()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("r-b", "API.example.com.", "/v1/*"),
-            Route("r-a", "api.example.com", "/v1/*", clusterId: "c2"),
-        ]);
+            NodeRoute("r-b", "API.example.com.", "/v1/*"),
+            NodeRoute("r-a", "api.example.com", "/v1/*"),
+        ], ConnectionIds.DefaultNode);
 
         // 域名大小写、末尾点都归一后是同一条规则；留 ID 字典序最小的一条
         Assert.Equal(new[] { "r-a" }, Ids(result));
@@ -130,9 +169,9 @@ public class DataPlaneRuleCompilerTests
     public void Compile_CatchAllAndEmptyPath_AreTheSameRule()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("r1", "api.example.com", ""),
-            Route("r2", "api.example.com", "/{**catch-all}"),
-        ]);
+            NodeRoute("r1", "api.example.com", ""),
+            NodeRoute("r2", "api.example.com", "/{**catch-all}"),
+        ], ConnectionIds.DefaultNode);
 
         Assert.Single(result.Rules);
         Assert.Equal("r1", Ids(result)[0]);
@@ -142,9 +181,9 @@ public class DataPlaneRuleCompilerTests
     public void Compile_DifferentPathsOnSameHost_BothKept()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("api", "api.example.com", "/api"),
-            Route("web", "api.example.com", "/web"),
-        ]);
+            NodeRoute("api", "api.example.com", "/api"),
+            NodeRoute("web", "api.example.com", "/web"),
+        ], ConnectionIds.DefaultNode);
 
         Assert.Equal(2, result.Rules.Count);
         Assert.Empty(result.Suppressed);
@@ -154,9 +193,9 @@ public class DataPlaneRuleCompilerTests
     public void Compile_DisabledRoutes_AreNotCompiled()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("on", "api.example.com", "/v1"),
-            Route("off", "api.example.com", "/v1", enabled: false),
-        ]);
+            NodeRoute("on", "api.example.com", "/v1"),
+            NodeRoute("off", "api.example.com", "/v1", enabled: false),
+        ], ConnectionIds.DefaultNode);
 
         Assert.Equal(new[] { "on" }, Ids(result));
         Assert.Empty(result.Warnings);
@@ -166,17 +205,17 @@ public class DataPlaneRuleCompilerTests
     public void Compile_WithoutHost_StillDedupesByPath()
     {
         var result = DataPlaneRuleCompiler.Compile([
-            Route("r1", "", "/{**catch-all}"),
-            Route("r2", "*", "/"),
-        ]);
+            NodeRoute("r1", "", "/{**catch-all}"),
+            NodeRoute("r2", "*", "/"),
+        ], ConnectionIds.DefaultNode);
 
         // 两条都是「不限域名」，但路径不同：任意路径 vs "/"，不是同一条规则
         Assert.Equal(2, result.Rules.Count);
 
         var clash = DataPlaneRuleCompiler.Compile([
-            Route("r1", "", "/x"),
-            Route("r2", null, "/x"),
-        ]);
+            NodeRoute("r1", "", "/x"),
+            NodeRoute("r2", null, "/x"),
+        ], ConnectionIds.DefaultNode);
         Assert.Single(clash.Rules);
     }
 
@@ -187,13 +226,13 @@ public class DataPlaneRuleCompilerTests
     {
         var routes = new[]
         {
-            Route("r3", "c.example.com", "/v1"),
-            Route("r1", "a.example.com", "/v2"),
-            Route("r2", "a.example.com", "/v1"),
+            NodeRoute("r3", "c.example.com", "/v1"),
+            NodeRoute("r1", "a.example.com", "/v2"),
+            NodeRoute("r2", "a.example.com", "/v1"),
         };
 
-        var forward = Ids(DataPlaneRuleCompiler.Compile(routes));
-        var reversed = Ids(DataPlaneRuleCompiler.Compile(routes.Reverse().ToArray()));
+        var forward = Ids(DataPlaneRuleCompiler.Compile(routes, ConnectionIds.DefaultNode));
+        var reversed = Ids(DataPlaneRuleCompiler.Compile(routes.Reverse().ToArray(), ConnectionIds.DefaultNode));
 
         Assert.Equal(forward, reversed);
         Assert.Equal(new[] { "r2", "r1", "r3" }, forward);
@@ -202,7 +241,7 @@ public class DataPlaneRuleCompilerTests
     [Fact]
     public void Compile_NullOrEmpty_ProducesNoRules()
     {
-        Assert.Empty(DataPlaneRuleCompiler.Compile(null).Rules);
-        Assert.Empty(DataPlaneRuleCompiler.Compile([]).Rules);
+        Assert.Empty(DataPlaneRuleCompiler.Compile(null, ConnectionIds.DefaultNode).Rules);
+        Assert.Empty(DataPlaneRuleCompiler.Compile([], ConnectionIds.DefaultNode).Rules);
     }
 }

@@ -90,16 +90,13 @@ public sealed class CloudflareSyncService
 
     public async Task<ConnectionSummary[]> ListConnectionsAsync(CancellationToken ct)
     {
-        var items = new List<ConnectionSummary>
-        {
-            new(ConnectionIds.Local, "本地数据面", "local", null),
-        };
+        var items = new List<ConnectionSummary>();
 
-        // 数据面分组通道（路由按 group:<GroupId> 引用，只下发给分配到该分组的实例）
-        foreach (var group in await _apiDbService.GetGroupsAsync())
+        // 数据面节点通道（路由按 node:<NodeId> 引用，只下发给绑定到该节点的实例）
+        foreach (var node in await _apiDbService.GetNodesAsync())
         {
             items.Add(new ConnectionSummary(
-                ConnectionIds.ForGroup(group.Id), group.Name, "data-plane-group", null));
+                ConnectionIds.ForNode(node.Id), node.Name, "data-plane-node", null));
         }
 
         if (!(await _config.GetAsync(ct)).IsConfigured)
@@ -126,7 +123,7 @@ public sealed class CloudflareSyncService
     public async Task<RouteValidation> ValidateRouteAsync(
         RouteConfig route, string? updatingRouteId, CancellationToken ct)
     {
-        if (ConnectionIds.IsLocal(route.ConnectionId) || ConnectionIds.IsGroup(route.ConnectionId))
+        if (ConnectionIds.IsNode(route.ConnectionId))
         {
             return new RouteValidation(true, null);
         }
@@ -171,11 +168,10 @@ public sealed class CloudflareSyncService
             if (otherHost.Length == 0 || !string.Equals(otherHost, normalized, StringComparison.Ordinal))
                 continue;
 
-            // 分组与 local 同为数据面侧通道，同一域名可跨组并存（分组隔离语义）；
+            // 节点同为数据面侧通道，同一域名可跨节点并存（节点隔离语义）；
             // 只有两条都绑隧道且隧道不同才算冲突
-            if (!ConnectionIds.IsLocal(other.ConnectionId)
-                && !ConnectionIds.IsGroup(other.ConnectionId)
-                && !ConnectionIds.IsGroup(route.ConnectionId)
+            if (!ConnectionIds.IsNode(other.ConnectionId)
+                && !ConnectionIds.IsNode(route.ConnectionId)
                 && !string.Equals(other.ConnectionId, route.ConnectionId, StringComparison.Ordinal))
             {
                 return new RouteValidation(
@@ -191,7 +187,7 @@ public sealed class CloudflareSyncService
     {
         var routes = await _apiDbService.GetRoutesAsync();
         return routes
-            .Where(r => !ConnectionIds.IsLocal(r.ConnectionId)
+            .Where(r => !ConnectionIds.IsNode(r.ConnectionId)
                         && string.Equals(r.ConnectionId, tunnelId, StringComparison.Ordinal))
             .ToList();
     }
@@ -202,7 +198,7 @@ public sealed class CloudflareSyncService
         RouteConfig route, string? previousConnectionId, CancellationToken ct)
     {
         foreach (var tunnelId in new[] { previousConnectionId, route.ConnectionId }
-                     .Where(id => !ConnectionIds.IsLocal(id) && !ConnectionIds.IsGroup(id))
+                     .Where(id => !ConnectionIds.IsNode(id))
                      .Distinct(StringComparer.Ordinal))
         {
             try
@@ -218,7 +214,7 @@ public sealed class CloudflareSyncService
 
     public async Task SyncRouteDeletedAsync(RouteConfig deletedRoute, CancellationToken ct)
     {
-        if (ConnectionIds.IsLocal(deletedRoute.ConnectionId) || ConnectionIds.IsGroup(deletedRoute.ConnectionId))
+        if (ConnectionIds.IsNode(deletedRoute.ConnectionId))
             return;
 
         try

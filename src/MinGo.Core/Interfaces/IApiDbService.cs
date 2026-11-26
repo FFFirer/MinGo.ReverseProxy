@@ -126,40 +126,45 @@ public interface IApiDbService
     Task DeleteCertificateAsync(string id);
 
     /// <summary>
-    /// 获取所有数据面分组（含实例数与引用路由数）
+    /// 获取所有数据面节点（含实例数与引用路由数）
     /// </summary>
-    Task<IReadOnlyList<DataPlaneGroup>> GetGroupsAsync();
+    Task<IReadOnlyList<DataPlaneNode>> GetNodesAsync();
 
     /// <summary>
-    /// 根据ID获取分组
+    /// 根据ID获取节点
     /// </summary>
-    Task<DataPlaneGroup?> GetGroupAsync(string id);
+    Task<DataPlaneNode?> GetNodeAsync(string id);
 
     /// <summary>
-    /// 创建分组（ID 由后端生成）
+    /// 创建节点（ID 由后端生成）
     /// </summary>
-    Task<DataPlaneGroup> CreateGroupAsync(string name);
+    Task<DataPlaneNode> CreateNodeAsync(string name);
 
     /// <summary>
-    /// 重命名分组；不存在返回 null
+    /// 重命名节点；不存在返回 null
     /// </summary>
-    Task<DataPlaneGroup?> RenameGroupAsync(string id, string name);
+    Task<DataPlaneNode?> RenameNodeAsync(string id, string name);
 
     /// <summary>
-    /// 删除分组。被路由引用时拒绝（Deleted=false 并列出引用路由名）；分组不存在返回 null。
-    /// 删除会同时清除该分组下的实例分配（实例回到未分配）。
+    /// 删除节点。被路由引用时拒绝（Deleted=false 并列出引用路由名）；节点不存在返回 null。
+    /// 删除会同时清除该节点下的实例绑定（实例回到未绑定）。
     /// </summary>
-    Task<GroupDeleteResult?> DeleteGroupAsync(string id);
+    Task<NodeDeleteResult?> DeleteNodeAsync(string id);
 
     /// <summary>
-    /// 获取实例的分组归属（未分配返回 null）
+    /// 幂等确保默认节点（Id=<see cref="ConnectionIds.DefaultNode"/>）存在
     /// </summary>
-    Task<InstanceGroupAssignment?> GetInstanceGroupAsync(string instanceId);
+    Task EnsureDefaultNodeAsync();
 
     /// <summary>
-    /// 设置实例分组（groupId 为 null/空白表示取消分配）
+    /// 获取实例的节点绑定（未绑定返回 null）
     /// </summary>
-    Task SetInstanceGroupAsync(string instanceId, string? groupId);
+    Task<InstanceNodeAssignment?> GetInstanceNodeAsync(string instanceId);
+
+    /// <summary>
+    /// 设置实例节点绑定（nodeId 为 null/空白表示解绑）
+    /// </summary>
+    Task SetInstanceNodeAsync(string instanceId, string? nodeId);
 
     /// <summary>
     /// 初始化示例数据

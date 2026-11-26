@@ -86,14 +86,14 @@ public class GatewayInstance
     public long ErrorRequests { get; set; }
 
     /// <summary>
-    /// 接入分组 Id（来自落库的分配表，注册时解析；未分配为空字符串，等同启动默认组 local）
+    /// 绑定节点 Id（来自落库的绑定表，注册时解析；未绑定为空字符串，不推送配置）
     /// </summary>
-    public string GroupId { get; set; } = string.Empty;
+    public string NodeId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 接入分组名称（展示用，与 GroupId 同步解析）
+    /// 绑定节点名称（展示用，与 NodeId 同步解析）
     /// </summary>
-    public string GroupName { get; set; } = string.Empty;
+    public string NodeName { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -301,14 +301,14 @@ public class GatewayInstanceResponse
     public Dictionary<string, string>? Metadata { get; set; }
 
     /// <summary>
-    /// 接入分组 Id（未分配为空字符串，等同启动默认组 local）
+    /// 绑定节点 Id（未绑定为空字符串）
     /// </summary>
-    public string GroupId { get; set; } = string.Empty;
+    public string NodeId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 接入分组名称
+    /// 绑定节点名称
     /// </summary>
-    public string GroupName { get; set; } = string.Empty;
+    public string NodeName { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -8,21 +8,19 @@ namespace MinGo.Core.Models;
 /// </summary>
 public static class ConnectionIds
 {
-    public const string Local = "local";
-    public const string GroupPrefix = "group:";
+    /// <summary>默认节点的固定 Id（迁移种子 + 启动确保，存量 local 路由迁移至此）。</summary>
+    public const string DefaultNode = "default";
+    public const string NodePrefix = "node:";
 
-    public static bool IsLocal(string? connectionId) =>
-        string.IsNullOrWhiteSpace(connectionId) || string.Equals(connectionId, Local, StringComparison.OrdinalIgnoreCase);
+    /// <summary>是否为数据面节点通道（按 Id 引用，节点重命名不影响已发布路由）。</summary>
+    public static bool IsNode(string? connectionId) =>
+        connectionId is not null && connectionId.StartsWith(NodePrefix, StringComparison.Ordinal);
 
-    /// <summary>是否为数据面分组通道（按 Id 引用，分组重命名不影响已发布路由）。</summary>
-    public static bool IsGroup(string? connectionId) =>
-        connectionId is not null && connectionId.StartsWith(GroupPrefix, StringComparison.Ordinal);
+    /// <summary>从节点通道标识中取出节点 Id；非节点通道返回 null。</summary>
+    public static string? GetNodeId(string? connectionId) =>
+        IsNode(connectionId) ? connectionId![NodePrefix.Length..] : null;
 
-    /// <summary>从分组通道标识中取出分组 Id；非分组通道返回 null。</summary>
-    public static string? GetGroupId(string? connectionId) =>
-        IsGroup(connectionId) ? connectionId![GroupPrefix.Length..] : null;
-
-    public static string ForGroup(string groupId) => GroupPrefix + groupId;
+    public static string ForNode(string nodeId) => NodePrefix + nodeId;
 }
 
 public class GatewayConfig
@@ -50,10 +48,9 @@ public class RouteConfig
     public string ClusterId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 路由发布到的接入通道：<see cref="ConnectionIds.Local"/>（存量全局）、
-    /// Cloudflare 隧道 ID，或数据面分组 <c>group:&lt;GroupId&gt;</c>。
+    /// 路由发布到的接入通道：Cloudflare 隧道 ID，或数据面节点 <c>node:&lt;NodeId&gt;</c>。
     /// </summary>
-    public string ConnectionId { get; set; } = ConnectionIds.Local;
+    public string ConnectionId { get; set; } = ConnectionIds.ForNode(ConnectionIds.DefaultNode);
 
     [Required]
     public RouteMatch Match { get; set; } = new();

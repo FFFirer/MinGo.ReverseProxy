@@ -9,7 +9,11 @@ namespace MinGo.ControlPlane.Api.Tests;
 /// </summary>
 public class TopologyServiceTests
 {
-    private static readonly ConnectionSummary Local = new("local", "本地数据面", "local", null);
+    private static readonly ConnectionSummary DefaultNode = new(
+        ConnectionIds.ForNode(ConnectionIds.DefaultNode), "默认节点", "data-plane-node", null);
+
+    private static ConnectionSummary NodeConnection(string id = "home", string name = "华东") =>
+        new(ConnectionIds.ForNode(id), name, "data-plane-node", null);
 
     private static ConnectionSummary Tunnel(string id = "tun-1", string? status = "healthy") =>
         new(id, "远端隧道", "cloudflare-tunnel", status);
@@ -20,12 +24,12 @@ public class TopologyServiceTests
         string host = "*",
         string path = "/",
         bool enabled = true,
-        string connectionId = "local") => new()
+        string? connectionId = null) => new()
     {
         Id = id,
         Name = id,
         ClusterId = clusterId,
-        ConnectionId = connectionId,
+        ConnectionId = connectionId ?? ConnectionIds.ForNode(ConnectionIds.DefaultNode),
         Enabled = enabled,
         Match = new RouteMatch { Host = host, Path = path },
     };
@@ -40,7 +44,7 @@ public class TopologyServiceTests
         IReadOnlyList<RouteConfig> routes,
         IReadOnlyList<ClusterConfig> clusters,
         IReadOnlyList<ConnectionSummary>? connections = null) =>
-        TopologyService.Build(routes, clusters, connections ?? [Local], DateTimeOffset.UnixEpoch);
+        TopologyService.Build(routes, clusters, connections ?? [DefaultNode], DateTimeOffset.UnixEpoch);
 
     private static TopologyNode Node(TopologyResponse response, string id) =>
         response.Nodes.Single(n => n.Id == id);
@@ -64,12 +68,14 @@ public class TopologyServiceTests
             [Cluster("c1", Dest("d1", "http://10.0.0.1:8080"))]);
 
         Assert.Equal(4, response.Nodes.Count);
-        Assert.True(HasEdge(response, "conn:local", "route:r1"));
+        Assert.True(HasEdge(response, ConnectionNode(ConnectionIds.ForNode(ConnectionIds.DefaultNode)), "route:r1"));
         Assert.True(HasEdge(response, "route:r1", "cluster:c1"));
         Assert.True(HasEdge(response, "cluster:c1", "dest:c1:d1"));
         Assert.Empty(response.Issues);
         Assert.Equal(TopologyNodeStatus.Ok, Node(response, "dest:c1:d1").Status);
     }
+
+    private static string ConnectionNode(string connectionId) => $"conn:{connectionId}";
 
     [Fact]
     public void Build_SharesOneClusterNodeAcrossRoutes_AndScopesDestinationsByCluster()
@@ -85,13 +91,15 @@ public class TopologyServiceTests
     }
 
     [Fact]
-    public void Build_EmptyConnectionId_BelongsToLocalConnection()
+    public void Build_EmptyConnectionId_ReportsMissingChannel()
     {
+        // 空白通道键不是任何合法通道：不画 ingress 边，而是产出一条危险级问题
         var response = Build(
             [Route("r1", "c1", connectionId: "")],
             [Cluster("c1", Dest("d1", "http://a:80"))]);
 
-        Assert.True(HasEdge(response, "conn:local", "route:r1"));
+        Assert.DoesNotContain(response.Edges, e => e.Target == "route:r1");
+        Assert.Equal(TopologySeverity.Danger, Issue(response, "connection-missing").Severity);
     }
 
     // ── 孤儿路由与缺失通道 ──
@@ -141,7 +149,7 @@ public class TopologyServiceTests
             [Route("r1", "c1", "a.example.com", "/gone/*", connectionId: "tun-gone"),
              Route("r2", "c1", "b.example.com", "/keep/*")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local]);
+            [DefaultNode]);
 
         var issue = Issue(response, "connection-missing");
         Assert.Equal(TopologySeverity.Danger, issue.Severity);
@@ -265,7 +273,7 @@ public class TopologyServiceTests
         var response = Build(
             [Route("r1", "c1", connectionId: "tun-1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel("tun-1", status)]);
+            [DefaultNode, Tunnel("tun-1", status)]);
 
         Assert.Equal(expectedSeverity, Issue(response, "tunnel-down").Severity);
         Assert.Equal(new[] { "conn:tun-1" }, Issue(response, "tunnel-down").NodeIds);
@@ -277,7 +285,7 @@ public class TopologyServiceTests
         var response = Build(
             [Route("r1", "c1", connectionId: "tun-1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel("tun-1", "healthy")]);
+            [DefaultNode, Tunnel("tun-1", "healthy")]);
 
         Assert.DoesNotContain(response.Issues, i => i.Code == "tunnel-down");
         Assert.Equal("远端隧道", Node(response, "conn:tun-1").Label);
@@ -286,31 +294,31 @@ public class TopologyServiceTests
     // ── 隧道一律经数据面转发 ──
 
     [Fact]
-    public void Build_TunnelRoute_EntersViaDataPlane_NotStraightToBackend()
+    public void Build_TunnelRoute_IngressIsDirect_NoDataPlaneHop()
     {
+        // 拓扑上没有数据面实体节点：隧道路由的 ingress 边从隧道直达路由，
+        // 「隧道 → 数据面」的中转在路由节点的「转发路径」文案里说明。
         var response = Build(
             [Route("r1", "c1", connectionId: "tun-1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel()]);
+            [DefaultNode, Tunnel()]);
 
-        // 隧道 → 数据面（origin）→ 路由（ingress）→ 集群：隧道的下一跳是数据面，不是后端
-        Assert.True(HasEdge(response, "conn:tun-1", "conn:local"));
-        Assert.True(HasEdge(response, "conn:local", "route:r1"));
+        Assert.True(HasEdge(response, "conn:tun-1", "route:r1"));
         Assert.True(HasEdge(response, "route:r1", "cluster:c1"));
-        Assert.DoesNotContain(response.Edges, e => e.Source == "conn:tun-1" && e.Target == "route:r1");
+        Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
     }
 
     [Fact]
-    public void Build_TunnelRoute_SharedDataPlaneIngress_EdgesStayDeduped()
+    public void Build_TunnelRoutes_ShareIngressPerRoute_EdgesStayDeduped()
     {
         var response = Build(
             [Route("r1", "c1", "a.example.com", "/a/*", connectionId: "tun-1"),
              Route("r2", "c1", "b.example.com", "/b/*", connectionId: "tun-1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel()]);
+            [DefaultNode, Tunnel()]);
 
-        Assert.Equal(1, response.Edges.Count(e => e.Source == "conn:tun-1" && e.Target == "conn:local"));
         Assert.Equal(2, response.Edges.Count(e => e.Kind == "ingress"));
+        Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
     }
 
     [Fact]
@@ -319,69 +327,56 @@ public class TopologyServiceTests
         var response = Build(
             [Route("r1", "c1", connectionId: "tun-1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel()]);
+            [DefaultNode, Tunnel()]);
 
-        Assert.Equal("远端隧道 → 本地数据面 → 集群",
+        Assert.Equal("远端隧道 → 数据面 → 集群",
             Detail(Node(response, "route:r1"), "转发路径"));
     }
 
     [Fact]
-    public void Build_LocalRoute_KeepsDataPlaneAsSoleIngress()
+    public void Build_NodeRoute_KeepsNodeAsSoleIngress()
     {
         var response = Build(
             [Route("r1", "c1")],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, Tunnel()]);
+            [DefaultNode, Tunnel()]);
 
         Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
-        Assert.Equal("本地数据面 → 集群", Detail(Node(response, "route:r1"), "转发路径"));
+        Assert.Equal("节点数据面 → 集群", Detail(Node(response, "route:r1"), "转发路径"));
         // 无人使用的隧道仍出现在图上，但不能成为任何路由的入口
         Assert.DoesNotContain(response.Edges, e => e.Source == "conn:tun-1" || e.Target == "conn:tun-1");
     }
 
-    [Fact]
-    public void Build_TunnelRoute_WithoutDataPlaneNode_FallsBackToDirectIngress()
-    {
-        // 通道清单里没有 local（老版本数据面）：退回直连，避免路由在图上悬空
-        var response = Build(
-            [Route("r1", "c1", connectionId: "tun-1")],
-            [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Tunnel()]);
-
-        Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
-        Assert.True(HasEdge(response, "conn:tun-1", "route:r1"));
-    }
-
-    // ── 数据面分组通道 ──
+    // ── 数据面节点通道 ──
 
     [Fact]
-    public void Build_GroupChannel_IsNotTreatedAsTunnel()
+    public void Build_NodeChannel_IsNotTreatedAsTunnel()
     {
-        var group = new ConnectionSummary("group:g1", "华东", "data-plane-group", null);
         var response = Build(
-            [Route("r1", "c1", connectionId: "group:g1")],
+            [Route("r1", "c1", connectionId: ConnectionIds.ForNode("home"))],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, group]);
+            [DefaultNode, NodeConnection()]);
 
-        var node = Node(response, "conn:group:g1");
-        Assert.Equal("数据面分组", node.SubLabel);
-        Assert.Equal("data-plane-group", Detail(node, "类型"));
+        var node = Node(response, ConnectionNode(ConnectionIds.ForNode("home")));
+        Assert.Equal("数据面节点", node.SubLabel);
+        Assert.Equal("data-plane-node", Detail(node, "类型"));
         Assert.DoesNotContain(response.Issues, i => i.Code == "tunnel-down");
         Assert.DoesNotContain(response.Edges, e => e.Kind == "origin");
     }
 
     [Fact]
-    public void Build_GroupRoute_EntersFromGroupNode_AndSkipsLocal()
+    public void Build_NodeRoute_EntersFromItsNodeConnection()
     {
         var response = Build(
-            [Route("r1", "c1", connectionId: "group:g1")],
+            [Route("r1", "c1", connectionId: ConnectionIds.ForNode("home"))],
             [Cluster("c1", Dest("d1", "http://a:80"))],
-            [Local, new ConnectionSummary("group:g1", "华东", "data-plane-group", null)]);
+            [DefaultNode, NodeConnection()]);
 
-        // 分组路由的规则装在分组数据面上：ingress 边从分组节点出发，不经过本地数据面
-        Assert.True(HasEdge(response, "conn:group:g1", "route:r1"));
-        Assert.DoesNotContain(response.Edges, e => e.Source == "conn:local" && e.Target == "route:r1");
-        Assert.Equal("分组数据面 → 集群", Detail(Node(response, "route:r1"), "转发路径"));
+        // 节点路由的规则装在绑定该节点的数据面上：ingress 边从节点连接出发
+        Assert.True(HasEdge(response, ConnectionNode(ConnectionIds.ForNode("home")), "route:r1"));
+        Assert.DoesNotContain(response.Edges,
+            e => e.Source == ConnectionNode(ConnectionIds.ForNode(ConnectionIds.DefaultNode)) && e.Target == "route:r1");
+        Assert.Equal("节点数据面 → 集群", Detail(Node(response, "route:r1"), "转发路径"));
     }
 
     // ── 状态与摘要 ──
@@ -419,7 +414,7 @@ public class TopologyServiceTests
             [Cluster("c1", Dest("d2", "http://bbb:80"), Dest("d1", "http://aaa:80"))]);
 
         Assert.Equal(
-            new[] { "conn:local", "route:r1", "cluster:c1", "dest:c1:d1", "dest:c1:d2" },
+            new[] { ConnectionNode(ConnectionIds.ForNode(ConnectionIds.DefaultNode)), "route:r1", "cluster:c1", "dest:c1:d1", "dest:c1:d2" },
             response.Nodes.Select(n => n.Id));
     }
 

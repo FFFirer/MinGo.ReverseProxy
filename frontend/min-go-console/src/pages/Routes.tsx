@@ -18,7 +18,7 @@ export default function RoutesPage() {
   const [schemas, setSchemas] = createSignal<TransformSchema[]>([]);
 
   const connectionName = (id?: string) => {
-    if (!id || id === 'local') return '本地';
+    if (!id) return '未设置';
     const conn = connections().find((c) => c.id === id);
     return conn?.name || id.slice(0, 8);
   };
@@ -117,22 +117,22 @@ export default function RoutesPage() {
       title: '接入通道',
       cell: (route) => {
         const conn = connections().find((c) => c.id === route.connectionId);
-        if (conn?.kind === 'data-plane-group') {
+        if (conn?.kind === 'data-plane-node') {
           return (
             <div class="flex flex-col items-start gap-0.5">
               <span class="badge badge-success">{connectionName(route.connectionId)}</span>
-              <span class="text-xs text-secondary">仅该分组实例</span>
+              <span class="text-xs text-secondary">仅该节点实例</span>
             </div>
           );
         }
-        return route.connectionId && route.connectionId !== 'local'
+        return route.connectionId
           ? (
             <div class="flex flex-col items-start gap-0.5">
               <span class="badge badge-warning">{connectionName(route.connectionId)}</span>
               <span class="text-xs text-secondary">经数据面转发</span>
             </div>
           )
-          : <span class="badge badge-success">本地（全局）</span>;
+          : <span class="badge badge-danger">未设置</span>;
       },
     },
     {
@@ -352,13 +352,11 @@ function RouteFormModal(props: {
   const [showTransforms, setShowTransforms] = createSignal(false);
 
   const tunnelConnections = () => props.connections.filter((c) => c.kind === 'cloudflare-tunnel');
-  const groupConnections = () => props.connections.filter((c) => c.kind === 'data-plane-group');
+  const nodeConnections = () => props.connections.filter((c) => c.kind === 'data-plane-node');
   const connectionOf = () => props.connections.find((c) => c.id === connectionId());
   const isTunnel = () => connectionOf()?.kind === 'cloudflare-tunnel';
-  const isGroup = () => connectionOf()?.kind === 'data-plane-group';
-  const tunnelName = () => connectionOf()?.name || '外部隧道';
-  // 编辑存量 local 路由时保留该选项；新建路由不提供 local（存量全局通道不再扩张）
-  const isLegacyLocal = () => props.route?.connectionId === 'local';
+  const isNode = () => connectionOf()?.kind === 'data-plane-node';
+  const channelLabel = () => connectionOf()?.name || '数据面节点';
 
   // 通道选项异步到达后才应用 select 的 value，否则浏览器会因无匹配选项把值重置为空
   const channelValue = createMemo(() => {
@@ -551,24 +549,21 @@ function RouteFormModal(props: {
               onChange={(e) => setConnectionId(e.currentTarget.value)}
             >
               <option value="">-- 请选择接入通道 --</option>
-              <Show when={isLegacyLocal()}>
-                <option value="local">本地数据面（全部，存量）</option>
-              </Show>
-              <For each={groupConnections()}>{(conn) => (
-                <option value={conn.id}>数据面分组：{conn.name}</option>
+              <For each={nodeConnections()}>{(conn) => (
+                <option value={conn.id}>数据面节点：{conn.name}</option>
               )}</For>
               <For each={tunnelConnections()}>{(conn) => (
                 <option value={conn.id}>Cloudflare 隧道：{conn.name}</option>
               )}</For>
             </select>
             {errors().connectionId && <p class="text-danger text-xs mt-1">{errors().connectionId}</p>}
-            <Show when={groupConnections().length === 0 && tunnelConnections().length === 0}>
-              <p class="text-secondary text-xs mt-1">暂无可用通道，请先在「接入通道」页面创建分组或隧道</p>
+            <Show when={tunnelConnections().length === 0}>
+              <p class="text-secondary text-xs mt-1">暂无 Cloudflare 隧道，请先在「接入通道」页面添加（节点通道始终可用）</p>
             </Show>
-            <Show when={isGroup()}>
+            <Show when={isNode()}>
               <div class="mt-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
-                <p class="font-medium">分组通道：路由只下发给分配到「{tunnelName()}」的实例</p>
-                <p class="text-secondary">未分配实例不会安装此路由；实例归属在「实例管理」或「接入通道」页维护。</p>
+                <p class="font-medium">节点通道：路由只下发给绑定到「{channelLabel()}」的实例</p>
+                <p class="text-secondary">未绑定节点的实例不接收任何配置；实例归属在「实例管理」或「接入通道」页维护。</p>
               </div>
             </Show>
             <Show when={isTunnel()}>
@@ -586,8 +581,8 @@ function RouteFormModal(props: {
                   </li>
                 </ol>
                 <p class="text-secondary">
-                  外部隧道的流量一律经 {tunnelName()} → 本地数据面 → 后端服务，
-                  {tunnelName()} 侧只会看到回源到数据面的那条规则
+                  外部隧道的流量一律经 {channelLabel()} → 数据面 → 后端服务，
+                  {channelLabel()} 侧只会看到回源到数据面的那条规则
                 </p>
               </div>
             </Show>

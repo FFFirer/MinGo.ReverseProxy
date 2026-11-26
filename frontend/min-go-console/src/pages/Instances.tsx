@@ -1,25 +1,25 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
-import type { GatewayInstance, DataPlaneGroup } from '../types';
+import type { GatewayInstance, DataPlaneNode } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 import InstanceConfigModal from '../components/shared/InstanceConfigModal';
 
 export default function InstancesPage() {
   const [instances, setInstances] = createSignal<GatewayInstance[]>([]);
-  const [groups, setGroups] = createSignal<DataPlaneGroup[]>([]);
-  const [groupFilter, setGroupFilter] = createSignal('all');
+  const [nodes, setNodes] = createSignal<DataPlaneNode[]>([]);
+  const [nodeFilter, setNodeFilter] = createSignal('all');
   const [configTarget, setConfigTarget] = createSignal<GatewayInstance | null>(null);
 
   const fetchInstances = async () => {
     try {
-      const [data, gs] = await Promise.all([
+      const [data, ns] = await Promise.all([
         api.get<any>('/instances'),
-        api.getInstanceGroups(),
+        api.getDataPlaneNodes(),
       ]);
       setInstances(data?.instances || []);
-      setGroups(gs);
+      setNodes(ns);
     } catch { /* ignore */ }
   };
 
@@ -99,25 +99,25 @@ export default function InstancesPage() {
   const timeoutCount = () => instances().filter(i => i.status === 'HeartbeatTimeout').length;
 
   const filteredInstances = () => instances().filter(i =>
-    groupFilter() === 'all' ? true
-    : groupFilter() === 'none' ? !i.groupId
-    : i.groupId === groupFilter());
+    nodeFilter() === 'all' ? true
+    : nodeFilter() === 'none' ? !i.nodeId
+    : i.nodeId === nodeFilter());
 
-  const handleGroupChange = async (inst: GatewayInstance, value: string) => {
+  const handleNodeChange = async (inst: GatewayInstance, value: string) => {
     try {
       if (value === '__create__') {
-        const name = prompt('新分组名称：');
+        const name = prompt('新节点名称：');
         if (!name?.trim()) return;
-        const created = await api.createInstanceGroup(name.trim());
-        await api.setInstanceGroup(inst.instanceId, created.id);
-        addToast('success', `已创建分组 "${created.name}" 并分配实例`);
+        const created = await api.createDataPlaneNode(name.trim());
+        await api.setInstanceNode(inst.instanceId, created.id);
+        addToast('success', `已创建节点 "${created.name}" 并绑定实例`);
       } else {
-        await api.setInstanceGroup(inst.instanceId, value || null);
-        addToast('success', value ? '分组已更新' : '已回到 local（默认组）');
+        await api.setInstanceNode(inst.instanceId, value || null);
+        addToast('success', value ? '节点绑定已更新' : '已解除绑定（该实例不再接收配置）');
       }
       await fetchInstances();
     } catch (err) {
-      addToast('error', `更新分组失败: ${(err as Error).message}`);
+      addToast('error', `更新节点绑定失败: ${(err as Error).message}`);
     }
   };
 
@@ -149,25 +149,25 @@ export default function InstancesPage() {
       ),
     },
     {
-      key: 'group',
-      title: '接入分组',
+      key: 'node',
+      title: '接入节点',
       mobileVisible: true,
       cell: (inst) => {
-        // 读取 groups() 使 cell 依赖分组信号：分组晚于实例到达时，
+        // 读取 nodes() 使 cell 依赖节点信号：节点晚于实例到达时，
         // select 的 value 会在选项就绪后重新应用（否则会被浏览器重置为空）
-        const opts = groups();
+        const opts = nodes();
         return (
           <select
             class="input py-1 text-sm"
-            value={inst.groupId || ''}
-            onChange={(e) => handleGroupChange(inst, e.currentTarget.value)}
+            value={inst.nodeId || ''}
+            onChange={(e) => handleNodeChange(inst, e.currentTarget.value)}
             onClick={(e) => e.stopPropagation()}
           >
-            <option value="">local（默认）</option>
-            <For each={opts}>{(g) => (
-              <option value={g.id}>{g.name}</option>
+            <option value="">未绑定</option>
+            <For each={opts}>{(n) => (
+              <option value={n.id}>{n.name}</option>
             )}</For>
-            <option value="__create__">＋ 新建分组…</option>
+            <option value="__create__">＋ 新建节点…</option>
           </select>
         );
       },
@@ -292,20 +292,20 @@ export default function InstancesPage() {
       <div class="card">
         <div class="flex items-center justify-between gap-4 mb-4">
           <div class="flex items-center gap-2">
-            <label class="text-sm text-secondary">分组筛选</label>
+            <label class="text-sm text-secondary">节点筛选</label>
             <select
               class="input py-1 w-auto text-sm"
-              value={groupFilter()}
-              onChange={(e) => setGroupFilter(e.currentTarget.value)}
+              value={nodeFilter()}
+              onChange={(e) => setNodeFilter(e.currentTarget.value)}
             >
               <option value="all">全部实例</option>
-              <option value="none">local（默认）</option>
-              <For each={groups()}>{(g) => (
-                <option value={g.id}>{g.name}</option>
+              <option value="none">未绑定</option>
+              <For each={nodes()}>{(n) => (
+                <option value={n.id}>{n.name}</option>
               )}</For>
             </select>
           </div>
-          <span class="text-xs text-secondary">分组通道在「接入通道」页维护</span>
+          <span class="text-xs text-secondary">节点在「接入通道」页维护；未绑定节点的实例不接收配置</span>
         </div>
         <Table
           columns={columns}

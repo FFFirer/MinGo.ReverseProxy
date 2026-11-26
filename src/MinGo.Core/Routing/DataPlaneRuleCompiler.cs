@@ -10,13 +10,14 @@ namespace MinGo.Core.Routing;
 /// 这里锁住三条契约：
 /// <list type="number">
 /// <item><description>
-/// 接入通道决定「流量从哪里进来」，也决定「分组规则装进哪些数据面」——但只按
-/// <c>group:&lt;GroupId&gt;</c> 过滤：绑定外部隧道的启用路由必须同样产出一条
+/// 接入通道决定「流量从哪里进来」，也决定「节点规则装进哪些数据面」——只按
+/// <c>node:&lt;NodeId&gt;</c> 过滤：绑定外部隧道的启用路由必须同样产出一条
 /// 「数据面 → 后端集群」规则（隧道 ingress 一律回源到数据面，见
-/// <c>IngressReconciler.Merge</c>），隧道路由与 local 路由对所有数据面一视同仁；
-/// 分组路由只装进目标分组的实例。单测
+/// <c>IngressReconciler.Merge</c>），隧道路由对所有已绑定节点的数据面一视同仁；
+/// 节点路由只装进目标节点的实例；未绑定节点的实例收到空规则集（不推送配置）。
+/// 单测
 /// <c>DataPlaneRuleCompilerTests.Compile_KeepsTunnelBoundRoutes</c> 与
-/// <c>Compile_GroupRoutes_OnlyForTargetGroup</c> 负责防止这条契约被改回去。
+/// <c>Compile_NodeRoutes_OnlyForTargetNode</c> 负责防止这条契约被改回去。
 /// </description></item>
 /// <item><description>
 /// 同一匹配键（域名 + 路径）只留一条规则，其余抑制。重复键在 YARP 里命中顺序不确定，
@@ -42,15 +43,15 @@ public static class DataPlaneRuleCompiler
     /// 编译规则集。
     /// </summary>
     /// <param name="routes">全量路由表</param>
-    /// <param name="targetGroupId">
-    /// 目标数据面的分组 Id；null 或 <see cref="ConnectionIds.Local"/> 表示启动默认组（未分配实例）。
-    /// 分组路由只对匹配的分组生效，local 与隧道路由不受分组影响（对所有数据面生效）。
+    /// <param name="targetNodeId">
+    /// 目标数据面绑定的节点 Id；null 表示未绑定实例（不推送配置，返回空规则集）。
+    /// 节点路由只对匹配的节点生效，隧道路由对所有已绑定节点的数据面生效。
     /// </param>
-    public static Result Compile(IEnumerable<RouteConfig>? routes, string? targetGroupId = null)
+    public static Result Compile(IEnumerable<RouteConfig>? routes, string? targetNodeId)
     {
         var ordered = (routes ?? Array.Empty<RouteConfig>())
             .Where(static route => route.Enabled)
-            .Where(route => BelongsToTargetGroup(route.ConnectionId, targetGroupId))
+            .Where(route => BelongsToTargetNode(route.ConnectionId, targetNodeId))
             .Select(route => (Route: route, Key: RouteMatchKey.Of(route.Match?.Host, route.Match?.Path)))
             .OrderBy(x => x.Key.Host, StringComparer.Ordinal)
             .ThenBy(x => x.Key.Path, StringComparer.Ordinal)
@@ -81,14 +82,18 @@ public static class DataPlaneRuleCompiler
     }
 
     /// <summary>
-    /// 通道归属判定：local 与隧道路由对所有数据面生效；分组路由只装进目标分组的实例。
+    /// 通道归属判定：未绑定实例（null）不推送任何规则；隧道路由对所有已绑定实例生效；
+    /// 节点路由只装进目标节点的实例。
     /// </summary>
-    internal static bool BelongsToTargetGroup(string? connectionId, string? targetGroupId)
+    internal static bool BelongsToTargetNode(string? connectionId, string? targetNodeId)
     {
-        if (!ConnectionIds.IsGroup(connectionId))
+        if (targetNodeId == null)
+            return false;
+
+        if (!ConnectionIds.IsNode(connectionId))
             return true;
 
-        return string.Equals(ConnectionIds.GetGroupId(connectionId), targetGroupId, StringComparison.Ordinal);
+        return string.Equals(ConnectionIds.GetNodeId(connectionId), targetNodeId, StringComparison.Ordinal);
     }
 
     private static string Label(RouteConfig route) =>

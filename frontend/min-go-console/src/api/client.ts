@@ -93,26 +93,26 @@ export const api = {
   getConnections: () => request<import('../types').ConnectionSummary[]>('/connections'),
   getTopology: () => request<import('../types').TopologyResponse>('/topology'),
 
-  // 数据面分组（接入通道资产，与实例管理页双向维护）
-  getInstanceGroups: () => request<import('../types').DataPlaneGroup[]>('/instance-groups'),
-  createInstanceGroup: (name: string) =>
-    request<import('../types').DataPlaneGroup>('/instance-groups', {
+  // 数据面节点（接入通道资产，与实例管理页双向维护）
+  getDataPlaneNodes: () => request<import('../types').DataPlaneNode[]>('/data-plane-nodes'),
+  createDataPlaneNode: (name: string) =>
+    request<import('../types').DataPlaneNode>('/data-plane-nodes', {
       method: 'POST',
       body: JSON.stringify({ name }),
     }),
-  renameInstanceGroup: (id: string, name: string) =>
-    request<import('../types').DataPlaneGroup>(`/instance-groups/${encodeURIComponent(id)}`, {
+  renameDataPlaneNode: (id: string, name: string) =>
+    request<import('../types').DataPlaneNode>(`/data-plane-nodes/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify({ name }),
     }),
-  deleteInstanceGroup: (id: string) =>
-    request<void>(`/instance-groups/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteDataPlaneNode: (id: string) =>
+    request<void>(`/data-plane-nodes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  // 实例分组分配（groupId 为 null 取消分配）
-  setInstanceGroup: (instanceId: string, groupId: string | null) =>
-    request<import('../types').GatewayInstance>(`/instances/${encodeURIComponent(instanceId)}/group`, {
+  // 实例节点绑定（nodeId 为 null 解绑）
+  setInstanceNode: (instanceId: string, nodeId: string | null) =>
+    request<import('../types').GatewayInstance>(`/instances/${encodeURIComponent(instanceId)}/node`, {
       method: 'PUT',
-      body: JSON.stringify({ groupId }),
+      body: JSON.stringify({ nodeId }),
     }),
 
   getCloudflareSettings: () =>

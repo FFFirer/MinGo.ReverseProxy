@@ -126,8 +126,8 @@ public class GatewayInstanceService : IGatewayInstanceService
                     ? Math.Round((double)inst.ErrorRequests / inst.TotalRequests * 100, 2)
                     : 0,
                 Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(inst.MetadataJson),
-                GroupId = inst.GroupId,
-                GroupName = inst.GroupName
+                NodeId = inst.NodeId,
+                NodeName = inst.NodeName
             }).ToList(),
             TotalCount = allInstances.Count,
             OnlineCount = allInstances.Count(i => i.Status == GatewayInstanceStatus.Online),
@@ -215,23 +215,23 @@ public class GatewayInstanceService : IGatewayInstanceService
     }
 
     /// <summary>
-    /// 更新实例的内存分组归属（分配表由 IApiDbService 落库，这里只同步内存态）
+    /// 更新实例的内存节点绑定（绑定表由 IApiDbService 落库，这里只同步内存态）
     /// </summary>
-    public Task<GatewayInstance?> UpdateInstanceGroupAsync(string instanceId, string? groupId, string? groupName)
+    public Task<GatewayInstance?> UpdateInstanceNodeAsync(string instanceId, string? nodeId, string? nodeName)
     {
         if (!_instances.TryGetValue(instanceId, out var instance))
             return Task.FromResult<GatewayInstance?>(null);
 
-        var newGroupId = groupId ?? string.Empty;
-        var newGroupName = groupName ?? string.Empty;
+        var newNodeId = nodeId ?? string.Empty;
+        var newNodeName = nodeName ?? string.Empty;
 
-        if (instance.GroupId == newGroupId && instance.GroupName == newGroupName)
+        if (instance.NodeId == newNodeId && instance.NodeName == newNodeName)
             return Task.FromResult<GatewayInstance?>(instance);
 
-        instance.GroupId = newGroupId;
-        instance.GroupName = newGroupName;
-        _logger.LogInformation("Instance {InstanceId} group changed to {GroupId} ({GroupName})",
-            instanceId, newGroupId, newGroupName);
+        instance.NodeId = newNodeId;
+        instance.NodeName = newNodeName;
+        _logger.LogInformation("Instance {InstanceId} node changed to {NodeId} ({NodeName})",
+            instanceId, newNodeId, newNodeName);
         return Task.FromResult<GatewayInstance?>(instance);
     }
 }

@@ -17,7 +17,7 @@ public class ConnectionsController : ControllerBase
     }
 
     /// <summary>
-    /// 路由表单的接入通道下拉数据源：内置本地数据面 + 各 Cloudflare 隧道。
+    /// 路由表单的接入通道下拉数据源：各数据面节点 + Cloudflare 隧道。
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ConnectionSummary>>> GetConnections(CancellationToken ct)

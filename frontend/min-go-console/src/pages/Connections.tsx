@@ -7,12 +7,11 @@ import type {
   TunnelConnection,
   TunnelIngressView,
   ReconcileReport,
-  DataPlaneGroup,
+  DataPlaneNode,
 } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 import {
-  FaSolidServer,
   FaSolidPlus,
   FaSolidEdit,
   FaSolidTrash,
@@ -30,6 +29,9 @@ const TUNNEL_STATUS_LABELS: Record<string, string> = {
   inactive: '未启动',
 };
 
+/** 与后端 ConnectionIds.DefaultNode 一致：启动即有的默认节点，不可删除。 */
+const DEFAULT_NODE_ID = 'default';
+
 function tunnelStatusBadge(status?: string | null) {
   if (!status) return <span class="badge badge-warning">未知</span>;
   const label = TUNNEL_STATUS_LABELS[status] || status;
@@ -44,14 +46,14 @@ function tunnelStatusBadge(status?: string | null) {
 export default function ConnectionsPage() {
   const [status, setStatus] = createSignal<CloudflareStatus | null>(null);
   const [tunnels, setTunnels] = createSignal<CloudflareTunnel[]>([]);
-  const [groups, setGroups] = createSignal<DataPlaneGroup[]>([]);
+  const [nodes, setNodes] = createSignal<DataPlaneNode[]>([]);
   const [loading, setLoading] = createSignal(true);
 
   const [showCreate, setShowCreate] = createSignal(false);
   const [renaming, setRenaming] = createSignal<CloudflareTunnel | null>(null);
   const [detailTunnel, setDetailTunnel] = createSignal<CloudflareTunnel | null>(null);
-  const [showCreateGroup, setShowCreateGroup] = createSignal(false);
-  const [renamingGroup, setRenamingGroup] = createSignal<DataPlaneGroup | null>(null);
+  const [showCreateNode, setShowCreateNode] = createSignal(false);
+  const [renamingNode, setRenamingNode] = createSignal<DataPlaneNode | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -65,11 +67,11 @@ export default function ConnectionsPage() {
     } catch (err) {
       addToast('error', `加载 Cloudflare 信息失败: ${(err as Error).message}`);
     }
-    // 分组与 Cloudflare 解耦：未配置 Cloudflare 时隧道接口返回 503，不能让分组卡跟着失效
+    // 节点与 Cloudflare 解耦：未配置 Cloudflare 时隧道接口返回 503，不能让节点列表跟着失效
     try {
-      setGroups(await api.getInstanceGroups());
+      setNodes(await api.getDataPlaneNodes());
     } catch (err) {
-      addToast('error', `加载数据面分组失败: ${(err as Error).message}`);
+      addToast('error', `加载数据面节点失败: ${(err as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -77,11 +79,12 @@ export default function ConnectionsPage() {
 
   onMount(load);
 
-  const handleGroupDelete = async (group: DataPlaneGroup) => {
-    if (!confirm(`确定删除分组 "${group.name}"？被路由引用的分组无法删除。`)) return;
+  const handleNodeDelete = async (node: DataPlaneNode) => {
+    if (node.id === DEFAULT_NODE_ID) return;
+    if (!confirm(`确定删除节点 "${node.name}"？被路由引用的节点无法删除，其下实例将解除绑定。`)) return;
     try {
-      await api.deleteInstanceGroup(group.id);
-      addToast('success', `已删除分组 "${group.name}"`);
+      await api.deleteDataPlaneNode(node.id);
+      addToast('success', `已删除节点 "${node.name}"`);
       await load();
     } catch (err) {
       addToast('error', `删除失败: ${(err as Error).message}`);
@@ -159,22 +162,27 @@ export default function ConnectionsPage() {
     },
   ];
 
-  const groupColumns: Column<DataPlaneGroup>[] = [
+  const nodeColumns: Column<DataPlaneNode>[] = [
     {
       key: 'name',
       title: '名称',
       mobileVisible: true,
-      cell: (g) => <span class="font-medium">{g.name}</span>,
+      cell: (n) => (
+        <span class="font-medium inline-flex items-center gap-2">
+          {n.name}
+          {n.id === DEFAULT_NODE_ID && <span class="badge badge-warning shrink-0">默认</span>}
+        </span>
+      ),
     },
     {
       key: 'instanceCount',
       title: '实例数',
-      cell: (g) => <span class="text-sm">{g.onlineCount}/{g.instanceCount} 在线</span>,
+      cell: (n) => <span class="text-sm">{n.onlineCount}/{n.instanceCount} 在线</span>,
     },
     {
       key: 'routeCount',
       title: '引用路由',
-      cell: (g) => <span class="text-sm">{g.routeCount}</span>,
+      cell: (n) => <span class="text-sm">{n.routeCount}</span>,
     },
     {
       key: 'actions',
@@ -182,19 +190,20 @@ export default function ConnectionsPage() {
       mobileVisible: true,
       mobileDetailVisible: false,
       class: 'w-28',
-      cell: (g) => (
+      cell: (n) => (
         <div class="flex items-center justify-end gap-1">
           <button
             class="btn-icon btn-icon-primary"
             title="重命名"
-            onClick={(e) => { e.stopPropagation(); setRenamingGroup(g); }}
+            onClick={(e) => { e.stopPropagation(); setRenamingNode(n); }}
           >
             <FaSolidEdit />
           </button>
           <button
-            class="btn-icon btn-icon-danger"
-            title="删除"
-            onClick={(e) => { e.stopPropagation(); handleGroupDelete(g); }}
+            class="btn-icon btn-icon-danger disabled:opacity-40 disabled:cursor-not-allowed"
+            title={n.id === DEFAULT_NODE_ID ? '默认节点不可删除' : '删除'}
+            disabled={n.id === DEFAULT_NODE_ID}
+            onClick={(e) => { e.stopPropagation(); handleNodeDelete(n); }}
           >
             <FaSolidTrash />
           </button>
@@ -207,48 +216,29 @@ export default function ConnectionsPage() {
     <div>
       <div class="mb-6">
         <h2 class="text-2xl font-bold mb-2">接入通道</h2>
-        <p class="text-secondary">流量进入网关的通道：内置本地数据面与 Cloudflare 隧道并列，路由按需选择发布通道</p>
+        <p class="text-secondary">流量进入网关的通道：数据面节点与 Cloudflare 隧道并列，路由按需选择发布通道</p>
       </div>
 
-      {/* 本地数据面（存量全局通道） */}
+      {/* 数据面节点 */}
       <div class="card">
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <FaSolidServer class="w-5 h-5" />
-            </div>
-            <div>
-              <h3 class="font-semibold">本地数据面</h3>
-              <p class="text-sm text-secondary mt-0.5">
-                存量全局通道 · 监听 8080 (HTTP) / 8443 (HTTPS)
-                —— 历史路由仍广播到所有数据面，新路由请选择数据面分组
-              </p>
-            </div>
-          </div>
-          <span class="badge badge-warning shrink-0">存量</span>
-        </div>
-      </div>
-
-      {/* 数据面分组 */}
-      <div class="card mt-6">
         <div class="flex items-center justify-between gap-4 mb-4">
           <div>
-            <h3 class="font-semibold">数据面分组</h3>
+            <h3 class="font-semibold">数据面节点</h3>
             <p class="text-sm text-secondary mt-1">
-              按地区/用途划分的接入通道：路由发布到分组后，只下发给分配到该分组的实例；
-              实例归属可在本页或「实例管理」页双向维护。
+              按地区/用途划分的接入通道：路由发布到节点后，只下发给绑定该节点的实例；
+              未绑定节点的实例不接收配置。实例归属可在本页或「实例管理」页双向维护。
             </p>
           </div>
-          <button class="btn btn-primary shrink-0" onClick={() => setShowCreateGroup(true)}>
-            <FaSolidPlus class="mr-2" />新建分组
+          <button class="btn btn-primary shrink-0" onClick={() => setShowCreateNode(true)}>
+            <FaSolidPlus class="mr-2" />新建节点
           </button>
         </div>
 
         <Table
-          columns={groupColumns}
-          data={groups()}
-          rowKey={(g) => g.id}
-          emptyMessage={loading() ? '加载中...' : '暂无分组'}
+          columns={nodeColumns}
+          data={nodes()}
+          rowKey={(n) => n.id}
+          emptyMessage={loading() ? '加载中...' : '暂无节点'}
         />
       </div>
 
@@ -333,35 +323,35 @@ export default function ConnectionsPage() {
         />
       </Show>
 
-      <Show when={showCreateGroup()}>
+      <Show when={showCreateNode()}>
         <TunnelNameModal
-          title="新建数据面分组"
-          label="分组名称"
+          title="新建数据面节点"
+          label="节点名称"
           placeholder="例如：home-eu"
           initialName=""
           onSave={async (name) => {
-            await api.createInstanceGroup(name);
-            addToast('success', `已创建分组 "${name}"`);
-            setShowCreateGroup(false);
+            await api.createDataPlaneNode(name);
+            addToast('success', `已创建节点 "${name}"`);
+            setShowCreateNode(false);
             await load();
           }}
-          onClose={() => setShowCreateGroup(false)}
+          onClose={() => setShowCreateNode(false)}
         />
       </Show>
 
-      <Show when={renamingGroup()}>
+      <Show when={renamingNode()}>
         <TunnelNameModal
-          title={`重命名分组 "${renamingGroup()!.name}"`}
-          label="分组名称"
+          title={`重命名节点 "${renamingNode()!.name}"`}
+          label="节点名称"
           placeholder="例如：home-eu"
-          initialName={renamingGroup()!.name}
+          initialName={renamingNode()!.name}
           onSave={async (name) => {
-            await api.renameInstanceGroup(renamingGroup()!.id, name);
-            addToast('success', '分组已重命名');
-            setRenamingGroup(null);
+            await api.renameDataPlaneNode(renamingNode()!.id, name);
+            addToast('success', '节点已重命名');
+            setRenamingNode(null);
             await load();
           }}
-          onClose={() => setRenamingGroup(null)}
+          onClose={() => setRenamingNode(null)}
         />
       </Show>
 

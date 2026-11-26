@@ -374,7 +374,7 @@ namespace MinGo.Infrastructure.Migrations
                     b.ToTable("CloudflareSettings", (string)null);
                 });
 
-            modelBuilder.Entity("MinGo.Core.Entities.DataPlaneGroupEntity", b =>
+            modelBuilder.Entity("MinGo.Core.Entities.DataPlaneNodeEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
@@ -393,16 +393,16 @@ namespace MinGo.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DataPlaneGroups", (string)null);
+                    b.ToTable("DataPlaneNodes", (string)null);
                 });
 
-            modelBuilder.Entity("MinGo.Core.Entities.InstanceGroupAssignmentEntity", b =>
+            modelBuilder.Entity("MinGo.Core.Entities.InstanceNodeAssignmentEntity", b =>
                 {
                     b.Property<string>("InstanceId")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("GroupId")
+                    b.Property<string>("NodeId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -411,9 +411,9 @@ namespace MinGo.Infrastructure.Migrations
 
                     b.HasKey("InstanceId");
 
-                    b.HasIndex("GroupId");
+                    b.HasIndex("NodeId");
 
-                    b.ToTable("InstanceGroupAssignments", (string)null);
+                    b.ToTable("InstanceNodeAssignments", (string)null);
                 });
 
             modelBuilder.Entity("MinGo.Core.Entities.PortainerInstanceEntity", b =>
@@ -539,15 +539,15 @@ namespace MinGo.Infrastructure.Migrations
                     b.Navigation("Cluster");
                 });
 
-            modelBuilder.Entity("MinGo.Core.Entities.InstanceGroupAssignmentEntity", b =>
+            modelBuilder.Entity("MinGo.Core.Entities.InstanceNodeAssignmentEntity", b =>
                 {
-                    b.HasOne("MinGo.Core.Entities.DataPlaneGroupEntity", "Group")
+                    b.HasOne("MinGo.Core.Entities.DataPlaneNodeEntity", "Node")
                         .WithMany()
-                        .HasForeignKey("GroupId")
+                        .HasForeignKey("NodeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Group");
+                    b.Navigation("Node");
                 });
 
             modelBuilder.Entity("MinGo.Core.Entities.ApiClusterEntity", b =>

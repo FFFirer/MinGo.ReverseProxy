@@ -10,9 +10,9 @@ public class ApiRouteEntity
     public string ClusterId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 路由发布到的接入通道：local 或 Cloudflare 隧道 ID。
+    /// 路由发布到的接入通道：Cloudflare 隧道 ID，或数据面节点 node:<NodeId>。
     /// </summary>
-    public string ConnectionId { get; set; } = ConnectionIds.Local;
+    public string ConnectionId { get; set; } = ConnectionIds.ForNode(ConnectionIds.DefaultNode);
     public string MatchJson { get; set; } = "{}";
     public string TransformsJson { get; set; } = "[]";
     public bool Enabled { get; set; } = true;
@@ -96,10 +96,10 @@ public class ApiCertificateEntity
 }
 
 /// <summary>
-/// 数据面分组：可管理的接入通道资产。路由按 <c>group:&lt;Id&gt;</c> 引用，
-/// 只有分配到该分组的实例才会收到对应路由。
+/// 数据面节点：可管理的接入通道资产。路由按 <c>node:&lt;Id&gt;</c> 引用，
+/// 只有绑定到该节点的实例才会收到对应路由；未绑定实例不推送配置。
 /// </summary>
-public class DataPlaneGroupEntity
+public class DataPlaneNodeEntity
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -108,13 +108,13 @@ public class DataPlaneGroupEntity
 }
 
 /// <summary>
-/// 实例 → 分组分配表。实例 Id 为主键（一个实例最多一个分组），
-/// 落库使分配在控制面重启、实例重连后依然存在（实例注册表本身仍在内存）。
+/// 实例 → 节点绑定表。实例 Id 为主键（一个实例最多绑定一个节点），
+/// 落库使绑定在控制面重启、实例重连后依然存在（实例注册表本身仍在内存）。
 /// </summary>
-public class InstanceGroupAssignmentEntity
+public class InstanceNodeAssignmentEntity
 {
     public string InstanceId { get; set; } = string.Empty;
-    public string GroupId { get; set; } = string.Empty;
-    public DataPlaneGroupEntity? Group { get; set; }
+    public string NodeId { get; set; } = string.Empty;
+    public DataPlaneNodeEntity? Node { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

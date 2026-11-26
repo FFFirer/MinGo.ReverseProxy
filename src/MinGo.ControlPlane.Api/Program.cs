@@ -214,6 +214,9 @@ using (var scope = app.Services.CreateScope())
 
     // 种子数据：首次运行时创建默认管理员（所有环境）
     await DbInitializer.SeedDataAsync(sp, app.Configuration);
+
+    // 幂等确保默认数据面节点存在（迁移已插入，这里兜底防止被误删）
+    await sp.GetRequiredService<IApiDbService>().EnsureDefaultNodeAsync();
 }
 
 // 连接配置查询服务与事件订阅服务（所有环境均需装配）

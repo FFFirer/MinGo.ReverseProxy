@@ -87,7 +87,9 @@ public class ApiDbService : IApiDbService
 
         existing.Name = route.Name;
         existing.ClusterId = route.ClusterId;
-        existing.ConnectionId = ConnectionIds.IsLocal(route.ConnectionId) ? ConnectionIds.Local : route.ConnectionId;
+        existing.ConnectionId = string.IsNullOrWhiteSpace(route.ConnectionId)
+            ? ConnectionIds.ForNode(ConnectionIds.DefaultNode)
+            : route.ConnectionId;
         existing.MatchJson = JsonSerializer.Serialize(route.Match);
         existing.TransformsJson = JsonSerializer.Serialize(route.Transforms ?? new List<Dictionary<string, string>>());
         existing.Enabled = route.Enabled;
@@ -418,53 +420,53 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 获取所有数据面分组（含实例数与引用路由数，按名称排序）
+    /// 获取所有数据面节点（含实例数与引用路由数，按名称排序）
     /// </summary>
-    public async Task<IReadOnlyList<DataPlaneGroup>> GetGroupsAsync()
+    public async Task<IReadOnlyList<DataPlaneNode>> GetNodesAsync()
     {
-        var groups = await _dbContext.DataPlaneGroups
-            .OrderBy(g => g.Name)
+        var nodes = await _dbContext.DataPlaneNodes
+            .OrderBy(n => n.Name)
             .ToListAsync();
 
-        var instanceCounts = await _dbContext.InstanceGroupAssignments
-            .GroupBy(a => a.GroupId)
-            .Select(g => new { GroupId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.GroupId, x => x.Count);
+        var instanceCounts = await _dbContext.InstanceNodeAssignments
+            .GroupBy(a => a.NodeId)
+            .Select(g => new { NodeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.NodeId, x => x.Count);
 
-        // 分组路由的引用计数在内存里归集（ConnectionId 形如 group:<GroupId>）
+        // 节点路由的引用计数在内存里归集（ConnectionId 形如 node:<NodeId>）
         var routeConnectionIds = await _dbContext.Routes
-            .Where(r => r.ConnectionId.StartsWith(ConnectionIds.GroupPrefix))
+            .Where(r => r.ConnectionId.StartsWith(ConnectionIds.NodePrefix))
             .Select(r => r.ConnectionId)
             .ToListAsync();
         var routeCounts = routeConnectionIds
-            .Select(ConnectionIds.GetGroupId)
+            .Select(ConnectionIds.GetNodeId)
             .Where(id => id != null)
             .GroupBy(id => id!)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        return groups.Select(g => new DataPlaneGroup
+        return nodes.Select(n => new DataPlaneNode
         {
-            Id = g.Id,
-            Name = g.Name,
-            InstanceCount = instanceCounts.GetValueOrDefault(g.Id),
-            RouteCount = routeCounts.GetValueOrDefault(g.Id),
-            CreatedAt = g.CreatedAt,
-            UpdatedAt = g.UpdatedAt
+            Id = n.Id,
+            Name = n.Name,
+            InstanceCount = instanceCounts.GetValueOrDefault(n.Id),
+            RouteCount = routeCounts.GetValueOrDefault(n.Id),
+            CreatedAt = n.CreatedAt,
+            UpdatedAt = n.UpdatedAt
         }).ToList();
     }
 
     /// <summary>
-    /// 根据ID获取分组
+    /// 根据ID获取节点
     /// </summary>
-    public async Task<DataPlaneGroup?> GetGroupAsync(string id)
+    public async Task<DataPlaneNode?> GetNodeAsync(string id)
     {
-        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        var entity = await _dbContext.DataPlaneNodes.FirstOrDefaultAsync(n => n.Id == id);
         if (entity == null) return null;
 
-        var instanceCount = await _dbContext.InstanceGroupAssignments.CountAsync(a => a.GroupId == id);
-        var routeCount = await _dbContext.Routes.CountAsync(r => r.ConnectionId == ConnectionIds.ForGroup(id));
+        var instanceCount = await _dbContext.InstanceNodeAssignments.CountAsync(a => a.NodeId == id);
+        var routeCount = await _dbContext.Routes.CountAsync(r => r.ConnectionId == ConnectionIds.ForNode(id));
 
-        return new DataPlaneGroup
+        return new DataPlaneNode
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -476,12 +478,12 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 创建分组（ID 由后端生成）
+    /// 创建节点（ID 由后端生成）
     /// </summary>
-    public async Task<DataPlaneGroup> CreateGroupAsync(string name)
+    public async Task<DataPlaneNode> CreateNodeAsync(string name)
     {
         var now = DateTimeOffset.UtcNow;
-        var entity = new DataPlaneGroupEntity
+        var entity = new DataPlaneNodeEntity
         {
             Id = Guid.NewGuid().ToString(),
             Name = name,
@@ -489,11 +491,11 @@ public class ApiDbService : IApiDbService
             UpdatedAt = now
         };
 
-        await _dbContext.DataPlaneGroups.AddAsync(entity);
+        await _dbContext.DataPlaneNodes.AddAsync(entity);
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Created data plane group: {GroupId} ({Name})", entity.Id, entity.Name);
-        return new DataPlaneGroup
+        _logger.LogInformation("Created data plane node: {NodeId} ({Name})", entity.Id, entity.Name);
+        return new DataPlaneNode
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -503,19 +505,19 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 重命名分组；不存在返回 null
+    /// 重命名节点；不存在返回 null
     /// </summary>
-    public async Task<DataPlaneGroup?> RenameGroupAsync(string id, string name)
+    public async Task<DataPlaneNode?> RenameNodeAsync(string id, string name)
     {
-        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        var entity = await _dbContext.DataPlaneNodes.FirstOrDefaultAsync(n => n.Id == id);
         if (entity == null) return null;
 
         entity.Name = name;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Renamed data plane group: {GroupId} -> {Name}", id, name);
-        return new DataPlaneGroup
+        _logger.LogInformation("Renamed data plane node: {NodeId} -> {Name}", id, name);
+        return new DataPlaneNode
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -525,77 +527,97 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
-    /// 删除分组。被路由引用时拒绝（fail-closed，不级联删除）；分组不存在返回 null。
+    /// 删除节点。被路由引用时拒绝（fail-closed，不级联删除）；节点不存在返回 null。
     /// </summary>
-    public async Task<GroupDeleteResult?> DeleteGroupAsync(string id)
+    public async Task<NodeDeleteResult?> DeleteNodeAsync(string id)
     {
-        var entity = await _dbContext.DataPlaneGroups.FirstOrDefaultAsync(g => g.Id == id);
+        var entity = await _dbContext.DataPlaneNodes.FirstOrDefaultAsync(n => n.Id == id);
         if (entity == null) return null;
 
         var referencing = await _dbContext.Routes
-            .Where(r => r.ConnectionId == ConnectionIds.ForGroup(id))
+            .Where(r => r.ConnectionId == ConnectionIds.ForNode(id))
             .Select(r => r.Name)
             .ToListAsync();
         if (referencing.Count > 0)
-            return new GroupDeleteResult(false, referencing);
+            return new NodeDeleteResult(false, referencing);
 
-        var assignments = await _dbContext.InstanceGroupAssignments
-            .Where(a => a.GroupId == id)
+        var assignments = await _dbContext.InstanceNodeAssignments
+            .Where(a => a.NodeId == id)
             .ToListAsync();
-        _dbContext.InstanceGroupAssignments.RemoveRange(assignments);
-        _dbContext.DataPlaneGroups.Remove(entity);
+        _dbContext.InstanceNodeAssignments.RemoveRange(assignments);
+        _dbContext.DataPlaneNodes.Remove(entity);
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted data plane group: {GroupId} ({Name}, cleared {Count} assignments)",
+        _logger.LogInformation("Deleted data plane node: {NodeId} ({Name}, cleared {Count} bindings)",
             id, entity.Name, assignments.Count);
-        return new GroupDeleteResult(true, []);
+        return new NodeDeleteResult(true, []);
     }
 
     /// <summary>
-    /// 获取实例的分组归属（未分配返回 null）
+    /// 幂等确保默认节点存在（迁移已插入，这里兜底防止被误删）
     /// </summary>
-    public async Task<InstanceGroupAssignment?> GetInstanceGroupAsync(string instanceId)
+    public async Task EnsureDefaultNodeAsync()
     {
-        var assignment = await _dbContext.InstanceGroupAssignments
-            .Include(a => a.Group)
+        if (await _dbContext.DataPlaneNodes.AnyAsync(n => n.Id == ConnectionIds.DefaultNode))
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        await _dbContext.DataPlaneNodes.AddAsync(new DataPlaneNodeEntity
+        {
+            Id = ConnectionIds.DefaultNode,
+            Name = "默认节点",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await _dbContext.SaveChangesAsync();
+        _logger.LogInformation("Seeded default data plane node");
+    }
+
+    /// <summary>
+    /// 获取实例的节点归属（未绑定返回 null）
+    /// </summary>
+    public async Task<InstanceNodeAssignment?> GetInstanceNodeAsync(string instanceId)
+    {
+        var assignment = await _dbContext.InstanceNodeAssignments
+            .Include(a => a.Node)
             .FirstOrDefaultAsync(a => a.InstanceId == instanceId);
 
-        return assignment?.Group == null
+        return assignment?.Node == null
             ? null
-            : new InstanceGroupAssignment(assignment.InstanceId, assignment.GroupId, assignment.Group.Name);
+            : new InstanceNodeAssignment(assignment.InstanceId, assignment.NodeId, assignment.Node.Name);
     }
 
     /// <summary>
-    /// 设置实例分组（groupId 为 null/空白表示取消分配）
+    /// 设置实例节点绑定（nodeId 为 null/空白表示解绑）
     /// </summary>
-    public async Task SetInstanceGroupAsync(string instanceId, string? groupId)
+    public async Task SetInstanceNodeAsync(string instanceId, string? nodeId)
     {
-        var existing = await _dbContext.InstanceGroupAssignments
+        var existing = await _dbContext.InstanceNodeAssignments
             .FirstOrDefaultAsync(a => a.InstanceId == instanceId);
 
-        if (string.IsNullOrWhiteSpace(groupId))
+        if (string.IsNullOrWhiteSpace(nodeId))
         {
             if (existing != null)
             {
-                _dbContext.InstanceGroupAssignments.Remove(existing);
+                _dbContext.InstanceNodeAssignments.Remove(existing);
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("Cleared group assignment for instance {InstanceId}", instanceId);
+                _logger.LogInformation("Cleared node binding for instance {InstanceId}", instanceId);
             }
             return;
         }
 
         if (existing == null)
         {
-            _dbContext.InstanceGroupAssignments.Add(new InstanceGroupAssignmentEntity
+            _dbContext.InstanceNodeAssignments.Add(new InstanceNodeAssignmentEntity
             {
                 InstanceId = instanceId,
-                GroupId = groupId,
+                NodeId = nodeId,
                 UpdatedAt = DateTimeOffset.UtcNow
             });
         }
-        else if (existing.GroupId != groupId)
+        else if (existing.NodeId != nodeId)
         {
-            existing.GroupId = groupId;
+            existing.NodeId = nodeId;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
         }
         else
@@ -604,7 +626,7 @@ public class ApiDbService : IApiDbService
         }
 
         await _dbContext.SaveChangesAsync();
-        _logger.LogInformation("Assigned instance {InstanceId} to group {GroupId}", instanceId, groupId);
+        _logger.LogInformation("Bound instance {InstanceId} to node {NodeId}", instanceId, nodeId);
     }
 
     /// <summary>
@@ -754,7 +776,7 @@ public class ApiDbService : IApiDbService
             Id = entity.Id,
             Name = entity.Name,
             ClusterId = entity.ClusterId,
-            ConnectionId = string.IsNullOrWhiteSpace(entity.ConnectionId) ? ConnectionIds.Local : entity.ConnectionId,
+            ConnectionId = string.IsNullOrWhiteSpace(entity.ConnectionId) ? ConnectionIds.ForNode(ConnectionIds.DefaultNode) : entity.ConnectionId,
             Match = JsonSerializer.Deserialize<RouteMatch>(entity.MatchJson) ?? new RouteMatch(),
             Transforms = entity.GetTransforms(),
             Enabled = entity.Enabled
@@ -773,7 +795,9 @@ public class ApiDbService : IApiDbService
             Id = model.Id,
             Name = model.Name,
             ClusterId = model.ClusterId,
-            ConnectionId = ConnectionIds.IsLocal(model.ConnectionId) ? ConnectionIds.Local : model.ConnectionId,
+            ConnectionId = string.IsNullOrWhiteSpace(model.ConnectionId)
+                ? ConnectionIds.ForNode(ConnectionIds.DefaultNode)
+                : model.ConnectionId,
             MatchJson = JsonSerializer.Serialize(model.Match),
             TransformsJson = JsonSerializer.Serialize(model.Transforms ?? new List<Dictionary<string, string>>()),
             Enabled = model.Enabled

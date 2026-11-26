@@ -2,7 +2,7 @@ export interface RouteConfig {
   id: string;
   name: string;
   clusterId: string;
-  /** 接入通道：'local' 或 Cloudflare 隧道 ID */
+  /** 接入通道：数据面节点（node:<NodeId>）或 Cloudflare 隧道 ID */
   connectionId?: string;
   match: RouteMatch;
   transforms?: Record<string, string>[] | null;
@@ -213,13 +213,13 @@ export interface GatewayInstance {
   errorRequests: number;
   errorRate: number;
   metadata?: Record<string, string>;
-  /** 接入分组 Id（未分配为空字符串） */
-  groupId: string;
-  /** 接入分组名称（展示用） */
-  groupName: string;
+  /** 绑定节点 Id（未绑定为空字符串，不推送配置） */
+  nodeId: string;
+  /** 绑定节点名称（展示用） */
+  nodeName: string;
 }
 
-export interface DataPlaneGroup {
+export interface DataPlaneNode {
   id: string;
   name: string;
   instanceCount: number;
@@ -384,7 +384,7 @@ export interface ReconcileReport {
 export interface ConnectionSummary {
   id: string;
   name: string;
-  kind: 'local' | 'cloudflare-tunnel' | 'data-plane-group' | string;
+  kind: 'cloudflare-tunnel' | 'data-plane-node' | string;
   status?: string | null;
 }
 

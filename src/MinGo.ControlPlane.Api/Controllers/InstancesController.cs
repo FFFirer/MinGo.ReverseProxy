@@ -57,49 +57,49 @@ public class InstancesController : ControllerBase
     {
         var instance = await _gatewayInstanceService.RegisterInstanceAsync(request);
 
-        // 从落库的分配表解析分组归属（控制面重启后分配依然有效）
-        var assignment = await _apiDbService.GetInstanceGroupAsync(instance.InstanceId);
+        // 从落库的分配表解析节点归属（控制面重启后分配依然有效）
+        var assignment = await _apiDbService.GetInstanceNodeAsync(instance.InstanceId);
         if (assignment != null)
-            await _gatewayInstanceService.UpdateInstanceGroupAsync(instance.InstanceId, assignment.GroupId, assignment.GroupName);
+            await _gatewayInstanceService.UpdateInstanceNodeAsync(instance.InstanceId, assignment.NodeId, assignment.NodeName);
 
         return CreatedAtAction(nameof(GetInstance), new { id = instance.InstanceId }, instance);
     }
 
     /// <summary>
-    /// 分配实例到分组（groupId 为 null 表示取消分配）。
-    /// 分配落库并同步内存态；实例在线时立即按新分组重推快照。
+    /// 绑定实例到节点（nodeId 为 null 表示解绑）。
+    /// 绑定落库并同步内存态；实例在线时立即按新节点重推快照（解绑推空快照清规则）。
     /// </summary>
-    [HttpPut("{id}/group")]
-    public async Task<ActionResult<GatewayInstance>> SetInstanceGroup(string id, [FromBody] SetInstanceGroupRequest? request)
+    [HttpPut("{id}/node")]
+    public async Task<ActionResult<GatewayInstance>> SetInstanceNode(string id, [FromBody] SetInstanceNodeRequest? request)
     {
         var instance = await _gatewayInstanceService.GetInstanceAsync(id);
         if (instance == null)
             return NotFound(new { message = $"实例 {id} 不存在" });
 
-        var groupId = string.IsNullOrWhiteSpace(request?.GroupId) ? null : request.GroupId.Trim();
-        string? groupName = null;
-        if (groupId != null)
+        var nodeId = string.IsNullOrWhiteSpace(request?.NodeId) ? null : request.NodeId.Trim();
+        string? nodeName = null;
+        if (nodeId != null)
         {
-            var group = await _apiDbService.GetGroupAsync(groupId);
-            if (group == null)
-                return BadRequest(new { message = $"分组 {groupId} 不存在" });
-            groupName = group.Name;
+            var node = await _apiDbService.GetNodeAsync(nodeId);
+            if (node == null)
+                return BadRequest(new { message = $"节点 {nodeId} 不存在" });
+            nodeName = node.Name;
         }
 
-        await _apiDbService.SetInstanceGroupAsync(id, groupId);
-        await _gatewayInstanceService.UpdateInstanceGroupAsync(id, groupId, groupName);
-        _connectionManager.SetGroup(id, groupId);
+        await _apiDbService.SetInstanceNodeAsync(id, nodeId);
+        await _gatewayInstanceService.UpdateInstanceNodeAsync(id, nodeId, nodeName);
+        _connectionManager.SetNode(id, nodeId);
 
-        // 在线实例立即按新分组重推快照；离线实例在下次注册时按新分配组装
+        // 在线实例立即按新节点重推快照（解绑推空快照）；离线实例在下次注册时按新绑定组装
         await _configReplication.BroadcastConfigToDataPlaneAsync(id);
 
         var updated = await _gatewayInstanceService.GetInstanceAsync(id);
         return Ok(updated);
     }
 
-    public class SetInstanceGroupRequest
+    public class SetInstanceNodeRequest
     {
-        public string? GroupId { get; set; }
+        public string? NodeId { get; set; }
     }
 
     [HttpPost("heartbeat")]

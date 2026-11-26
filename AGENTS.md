@@ -30,26 +30,32 @@ cd frontend/min-go-console && pnpm build
 - 控制面启用 `SharedSecrets` 后，存量数据面必须同步配 `ControlPlane__SharedSecret`，否则全部拒连（fail-closed，设计如此）。
 - 数据面新增 `./data:/app/data` 挂载（agent-id 持久化），升级 compose 时注意不要覆盖已有 `mingocp.db` 目录结构——agent-id 与 db 文件并存无冲突。
 
-## 接入通道分组（2026-11-26）
+## 接入通道：数据面节点 + Cloudflare 隧道（2026-11-26，重设计后）
 
-对标 Portainer 多环境管理，把「接入通道」做成可管理的持久资产。变更目录 `openspec/changes/2026-11-26-instance-access-groups/`，文档见 `docs/Server-Agent架构与部署.md` 第 7 节。
+对标 Portainer 多环境管理，接入通道 = 数据面节点（落库资产）+ Cloudflare 隧道（不落库，经 CF API 管理）。本设计**取代**同日先发布的「接入通道分组」设计（v1.17.0）：分组表就地改名成节点表，`local`/`group:X` 路由由迁移改写。变更目录 `openspec/changes/2026-11-26-instance-access-groups/`，文档见 `docs/Server-Agent架构与部署.md` 第 7 节。
 
 关键决策：
-- **分组资产化**：`DataPlaneGroups` + `InstanceGroupAssignments` 落库（迁移 `20261126125556_AddDataPlaneGroups`）。路由按 `group:<GroupId>` 引用（按 Id 不按 name，重命名安全）。
-- **双向维护**：分组 CRUD 在「接入通道」页；实例归属在「实例管理」页行内下拉 + `PUT /api/instances/{id}/group`（`null` 取消分组，未知组 400、未知实例 404）。分配是唯一写路径，PUT 即更新内存态 + 连接分组 + 该实例快照重推，心跳不做重解析。
-- **隔离语义**：快照按连接分组组装（`DataPlaneConnection.GroupId`，未分配默认值 = `local`，即启动默认组）——隧道与存量 `local` 路由全数据面广播；`group:<G>` 只下发给该组；未分配实例只收 local/隧道路由，不收任何自定义分组路由。证书按快照路由引用的域名过滤（与 DP SNI 通配规则一致，私钥不跨组）；any-host 路由回退全量下发。
-- **存量兼容**：新建路由不提供 `local`（编辑存量 local 显示「本地数据面（全部，存量）」）；proto 与数据面零改动，过滤全在 CP 侧。
-- **fail-closed**：删除被路由引用的分组 → 409 + 引用路由清单；路由保存时 `group:*` 必须存在否则 400；`ValidateRouteAsync`/`SyncRouteChangeAsync`/`SyncRouteDeletedAsync`/拓扑均显式排除 `group:*`（不再误当隧道 ID）。
+- **节点资产化**：`DataPlaneNodes` + `InstanceNodeAssignments` 落库（迁移 `20261126161553_DataPlaneNodes`：表/列改名 + 插入默认节点 + 路由改写 `local`→`node:default`、`group:X`→`node:X`）。启动时 `EnsureDefaultNodeAsync` 幂等兜底。默认节点 Id=`default` 不可删除（400）、可重命名。
+- **双向维护**：节点 CRUD 在「接入通道」页（`/api/data-plane-nodes`）；实例绑定在「实例管理」页行内下拉 + `PUT /api/instances/{id}/node`（`null` 解绑，未知节点 400、未知实例 404）。绑定是唯一写路径，PUT 即更新内存态 + 连接节点 + 该实例快照重推，心跳不做重解析。
+- **未绑定不推送（fail-closed）**：`DataPlaneConnection.NodeId` 未绑定为空串——注册时不发初始化快照、广播时跳过、解绑推空快照（无路由无证书）清残留。`DataPlaneRuleCompiler.Compile(routes, null)` 返回空规则集；证书经 `SelectForDelivery` 空 routeHosts 同样全过滤（`All` 对空集合为真）。
+- **隔离语义**：隧道路由对所有已绑定节点的实例广播（隧道 ingress 回源数据面，规则必须装在数据面）；`node:<N>` 只下发给该节点。同一域名可跨节点并存（节点同为数据面侧通道）；`ValidateRouteAsync`/`SyncRouteChangeAsync`/`SyncRouteDeletedAsync`/拓扑均按 `!IsNode` 判隧道。拓扑不再有 `conn:local` 实体节点——ingress 边从通道直达路由，隧道中转在「转发路径」文案里说明。
+- **路由表单**：通道下拉 = 节点（含默认节点）+ 隧道，彻底移除 `local`；`RouteConfig.ConnectionId` 默认 `node:default`；保存 `node:*` 必须节点存在否则 400（`ValidateNodeChannelAsync`）。
 
-验证状态（2026-11-26 本机实测）：
-- 全量单测 `dotnet test`：PASS，438/438（Core 177 + CP 115 + DP 146）。
+验证状态（2026-11-27 本机实测）：
+- 全量单测 `dotnet test`：PASS，439/439（Core 179 + CP 114 + DP 146）。
 - 前端 `pnpm build`：PASS。
-- 浏览器实测：实例页组列/筛选/行内分配往返、通道页分组新建/重命名/删除（含 409 提示）、路由表单通道下拉（新建无 local、存量 local 编辑显示「存量」、分组路由编辑回填）。
-- 未验证：双组数据面实测（8.3，需真实 DP 运行环境）。
+- 浏览器实测（PASS，Production 环境 + 真实开发库 gateway.db）：
+  - 实例页：节点列（未绑定/默认节点）、按节点筛选（全部/未绑定/默认节点）、行内绑定往返（下拉选默认节点 → API 回读 `nodeId=default`/`nodeName=默认节点`）。
+  - 通道页：默认节点「默认」badge + 删除按钮禁用；创建/重命名节点往返；删除被引用节点 → 409，`{"message":"节点仍被 1 条路由引用，请先调整这些路由的接入通道","routes":["edge-test"]}`。
+  - 路由表单：通道下拉 = 数据面节点（含默认节点）+ 隧道提示，无 `local`/`group`；存量路由（迁移改写 `local`→`node:default`）回填正确；`node:*` 不存在的节点保存 → 400。
+  - 未绑定不推送：CP 日志「Data plane 4ce732c9 is not bound to any node, no config pushed」；绑定后 DP 收到快照（FullSync）；解绑后实例 `nodeId` 为空（空快照推送由单测覆盖）。
+  - 顺带发现并修复一个**既有** toast 不显示 bug（详见已知坑）。
+- 未验证：双节点数据面实测（需真实 DP 运行环境）。
 
-已知坑（本机验证中发现并修复）：
-- **SolidJS select 值竞态**：选项异步晚于 `value` 绑定时，浏览器会把 select 值重置为空且不再恢复（实例页行内分组、路由表单通道下拉都踩过）。修法：让 value 绑定响应式依赖选项信号（cell 内先读 `groups()`，或 `createMemo(() => { void props.connections; return connectionId(); })`）。
-- **Promise.all 耦合**：接入通道页把分组加载与 Cloudflare 接口捆在一个 `Promise.all`，Cloudflare 未配置（503）时分组卡整体失效。已解耦为独立 try/catch。
-- **group 通道误入隧道路径**：`ValidateRouteAsync` 原先只对 `local` 短路，分组路由在 Cloudflare 未配置时无法创建；域名冲突校验把跨组同域名误判为「多隧道冲突」。均已修复（分组与 local 同为数据面侧通道，同一域名可跨组并存）。
-- 分组删除 409 的 message 经前端 `client.ts` 提取（`payload.message`），列表接口 `/api/instance-groups` 返回 `instanceCount`/`onlineCount`/`routeCount`。
+已知坑（沿用并修复）：
+- **SolidJS 组件函数体读信号不响应**：`createComponent` 编译为 `untrack(() => Comp(props))`，函数体内 `const items = toasts(); if (items.length === 0) return null;` 的提前返回永远不更新——所有 toast 从不显示（与节点重设计无关的既有 bug）。修法：把信号读取移入返回 JSX（`<Show when={toasts().length > 0}><For each={toasts()}>…`），或 `createMemo`。浏览器实测成功/错误 toast 均正常渲染。
+- **SolidJS select 值竞态**：选项异步晚于 `value` 绑定时，浏览器会把 select 值重置为空且不再恢复（实例页行内节点、路由表单通道下拉都踩过）。修法：让 value 绑定响应式依赖选项信号（cell 内先读 `nodes()`，或 `createMemo(() => { void props.connections; return connectionId(); })`）。
+- **Promise.all 耦合**：接入通道页把节点加载与 Cloudflare 接口捆在一个 `Promise.all`，Cloudflare 未配置（503）时节点卡整体失效。已解耦为独立 try/catch。
+- **节点通道误入隧道路径**：`ValidateRouteAsync` 原先只对 `local` 短路，节点路由在 Cloudflare 未配置时无法创建；域名冲突校验把跨节点同域名误判为「多隧道冲突」。均已修复。
+- 节点删除 409 的 message 经前端 `client.ts` 提取（`payload.message`），列表接口 `/api/data-plane-nodes` 返回 `instanceCount`/`onlineCount`/`routeCount`。
 

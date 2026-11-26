@@ -62,15 +62,15 @@ public class DataPlaneConnectionManager
     }
 
     /// <summary>
-    /// 更新连接的分组归属（分配变更后调用，下一次快照按新分组组装）。
-    /// 取消分配回退启动默认组 local。
+    /// 更新连接所属节点（绑定变更后调用，下一次快照按新节点组装）。
+    /// 解绑（null）回退为空串——未绑定实例不推送任何配置。
     /// </summary>
-    public bool SetGroup(string dataPlaneId, string? groupId)
+    public bool SetNode(string dataPlaneId, string? nodeId)
     {
         if (!_connections.TryGetValue(dataPlaneId, out var conn))
             return false;
 
-        conn.GroupId = string.IsNullOrEmpty(groupId) ? ConnectionIds.Local : groupId;
+        conn.NodeId = nodeId ?? string.Empty;
         return true;
     }
 
@@ -171,9 +171,9 @@ public class DataPlaneConnectionManager
         public IServerStreamWriter<HeartbeatResponse>? HeartbeatWriter { get; set; }
 
         /// <summary>
-        /// 该连接所属数据面的接入分组 Id（注册时从分配表解析；未分配为启动默认组 local）。
-        /// 快照组装与广播都按它过滤分组路由。
+        /// 该连接所属数据面节点 Id（注册时从分配表解析；未绑定为空串，不推送配置）。
+        /// 快照组装与广播都按它过滤节点路由。
         /// </summary>
-        public string GroupId { get; set; } = ConnectionIds.Local;
+        public string NodeId { get; set; } = string.Empty;
     }
 }

@@ -46,7 +46,7 @@ public class ApiManagementController : ControllerBase
     [HttpPost("routes")]
     public async Task<ActionResult<RouteSaveResponse>> CreateRoute([FromBody] RouteConfig route, CancellationToken ct)
     {
-        var channelError = await ValidateGroupChannelAsync(route);
+        var channelError = await ValidateNodeChannelAsync(route);
         if (channelError != null) return BadRequest(new { message = channelError });
 
         var validation = await _cloudflareSyncService.ValidateRouteAsync(route, null, ct);
@@ -70,7 +70,7 @@ public class ApiManagementController : ControllerBase
     [HttpPut("routes/{id}")]
     public async Task<ActionResult<RouteSaveResponse>> UpdateRoute(string id, [FromBody] RouteConfig route, CancellationToken ct)
     {
-        var channelError = await ValidateGroupChannelAsync(route);
+        var channelError = await ValidateNodeChannelAsync(route);
         if (channelError != null) return BadRequest(new { message = channelError });
 
         var validation = await _cloudflareSyncService.ValidateRouteAsync(route, id, ct);
@@ -109,23 +109,23 @@ public class ApiManagementController : ControllerBase
     }
 
     /// <summary>
-    /// 分组通道校验：路由的接入通道为 <c>group:&lt;GroupId&gt;</c> 时分组必须存在。
+    /// 节点通道校验：路由的接入通道为 <c>node:&lt;NodeId&gt;</c> 时节点必须存在。
     /// </summary>
-    private async Task<string?> ValidateGroupChannelAsync(RouteConfig route)
+    private async Task<string?> ValidateNodeChannelAsync(RouteConfig route)
     {
-        var groupId = ConnectionIds.GetGroupId(route.ConnectionId);
-        if (groupId == null) return null;
+        var nodeId = ConnectionIds.GetNodeId(route.ConnectionId);
+        if (nodeId == null) return null;
 
-        var group = await _apiDbService.GetGroupAsync(groupId);
-        return group == null ? $"接入通道分组不存在：{groupId}" : null;
+        var node = await _apiDbService.GetNodeAsync(nodeId);
+        return node == null ? $"接入通道节点不存在：{nodeId}" : null;
     }
 
     private async Task<RoutePublishInfo?> PublishAsync(
         RouteConfig route, string? previousConnectionId, CancellationToken ct)
     {
-        // 只对 Cloudflare 隧道做发布对账；local 与分组通道不涉及隧道 ingress
+        // 只对 Cloudflare 隧道做发布对账；节点通道不涉及隧道 ingress
         var tunnelIds = new[] { previousConnectionId, route.ConnectionId }
-            .Where(id => !string.IsNullOrEmpty(id) && !ConnectionIds.IsLocal(id) && !ConnectionIds.IsGroup(id))
+            .Where(id => !string.IsNullOrEmpty(id) && !ConnectionIds.IsNode(id))
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
@@ -135,7 +135,7 @@ public class ApiManagementController : ControllerBase
         }
 
         // 切换通道时旧隧道要摘除发布
-        var target = !ConnectionIds.IsLocal(route.ConnectionId) && !ConnectionIds.IsGroup(route.ConnectionId)
+        var target = !ConnectionIds.IsNode(route.ConnectionId)
             ? route.ConnectionId
             : previousConnectionId;
         var results = new List<ReconcileReport>();
@@ -158,11 +158,12 @@ public class ApiManagementController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "路由 [{RouteId}] 发布同步失败", route.Id);
-            return new RoutePublishInfo(target ?? ConnectionIds.Local, false, ex.Message, [], [], []);
+            // tunnelIds 非空 ⇒ 前后通道至少一个是隧道 ⇒ target 非空
+            return new RoutePublishInfo(target!, false, ex.Message, [], [], []);
         }
 
         return new RoutePublishInfo(
-            target ?? ConnectionIds.Local,
+            target!,
             true,
             null,
             results.SelectMany(r => r.DnsCreated).ToArray(),
