@@ -420,6 +420,28 @@ public class ApiDbService : IApiDbService
     }
 
     /// <summary>
+    /// 批量删除某登记导入的全部证书（跨域级联清理），返回删除行数
+    /// </summary>
+    /// <param name="enrollmentId">证书接入登记 Id</param>
+    public async Task<int> DeleteCertificatesByEnrollmentAsync(string enrollmentId)
+    {
+        var certificates = await _dbContext.Certificates
+            .Where(c => c.EnrollmentId == enrollmentId)
+            .ToListAsync();
+        if (certificates.Count == 0)
+        {
+            return 0;
+        }
+
+        _dbContext.Certificates.RemoveRange(certificates);
+        await _dbContext.SaveChangesAsync();
+        _logger.LogInformation(
+            "Deleted {Count} certificates imported by enrollment {EnrollmentId}",
+            certificates.Count, enrollmentId);
+        return certificates.Count;
+    }
+
+    /// <summary>
     /// 获取所有数据面节点（含实例数与引用路由数，按名称排序）
     /// </summary>
     public async Task<IReadOnlyList<DataPlaneNode>> GetNodesAsync()
@@ -876,7 +898,8 @@ public class ApiDbService : IApiDbService
             Thumbprint = entity.Thumbprint,
             IsValid = entity.IsValid,
             CertificateData = entity.CertificateData,
-            Password = decryptedPassword
+            Password = decryptedPassword,
+            EnrollmentId = entity.EnrollmentId
         };
     }
 
@@ -905,7 +928,8 @@ public class ApiDbService : IApiDbService
             Thumbprint = model.Thumbprint,
             IsValid = model.IsValid,
             CertificateData = model.CertificateData,
-            Password = encryptedPassword
+            Password = encryptedPassword,
+            EnrollmentId = model.EnrollmentId
         };
     }
 }

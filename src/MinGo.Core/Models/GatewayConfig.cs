@@ -172,4 +172,7 @@ public class CertificateConfig
     public bool IsValid { get; set; } = true;
     public byte[]? CertificateData { get; set; }
     public string? Password { get; set; }
+
+    /// <summary>自动接入导入的来源登记 Id；人工上传为 null。</summary>
+    public string? EnrollmentId { get; set; }
 }

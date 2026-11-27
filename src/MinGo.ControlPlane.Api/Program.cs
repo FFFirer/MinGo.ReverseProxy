@@ -175,6 +175,10 @@ builder.Services.AddScoped<ICertManagerClient, CertManagerClient>();
 builder.Services.AddScoped<CertificateEnrollmentService>();
 builder.Services.AddHostedService<CertificateEnrollmentSyncWorker>();
 
+// 路由驱动证书登记：RoutesChanged 事件触发对账（只增不删），启动时兜底一次
+builder.Services.AddScoped<RouteCertEnrollmentReconcileService>();
+builder.Services.AddHostedService<RouteCertEnrollmentReconcileWorker>();
+
 // MinGo.Messaging 订阅 CertManager 证书事件（broker 复用环境现网；Messaging:Enabled 控制启用）
 if (builder.Configuration.GetValue<bool>("Messaging:Enabled"))
 {

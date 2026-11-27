@@ -180,6 +180,7 @@ export interface CertificateConfig {
   issuer?: string;
   thumbprint: string;
   isValid: boolean;
+  enrollmentId?: string | null;
 }
 
 export interface CertificateParseResult {

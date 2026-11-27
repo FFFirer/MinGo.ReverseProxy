@@ -134,6 +134,7 @@ public class CertificateEnrollmentService
                     IsValid = CertificateValidity.IsWithinWindow(cert, DateTimeOffset.Now),
                     CertificateData = pfx,
                     Password = password,
+                    EnrollmentId = enrollment.Id,
                 });
             }
 

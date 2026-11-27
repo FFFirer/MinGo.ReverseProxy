@@ -228,6 +228,9 @@ namespace MinGo.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("EnrollmentId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("TEXT");
 

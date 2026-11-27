@@ -126,6 +126,12 @@ public interface IApiDbService
     Task DeleteCertificateAsync(string id);
 
     /// <summary>
+    /// 批量删除某登记导入的全部证书（跨域级联清理），返回删除行数。
+    /// </summary>
+    /// <param name="enrollmentId">证书接入登记 Id</param>
+    Task<int> DeleteCertificatesByEnrollmentAsync(string enrollmentId);
+
+    /// <summary>
     /// 获取所有数据面节点（含实例数与引用路由数）
     /// </summary>
     Task<IReadOnlyList<DataPlaneNode>> GetNodesAsync();

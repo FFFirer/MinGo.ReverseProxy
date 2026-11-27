@@ -238,6 +238,8 @@ function EnrollmentsCard() {
   const [submitting, setSubmitting] = createSignal(false);
   const [syncingId, setSyncingId] = createSignal<string | null>(null);
   const [formError, setFormError] = createSignal('');
+  const [removeTarget, setRemoveTarget] = createSignal<CertificateEnrollment | null>(null);
+  const [removing, setRemoving] = createSignal(false);
 
   const load = async () => {
     setLoading(true);
@@ -294,14 +296,19 @@ function EnrollmentsCard() {
     }
   };
 
-  const handleDelete = async (e: CertificateEnrollment) => {
-    if (!confirm(`确定移除域名 "${e.domain}" 的登记？已同步到网关的证书不受影响`)) return;
+  const confirmRemove = async (e: CertificateEnrollment, deleteCertificates: boolean) => {
+    setRemoving(true);
     try {
-      await api.deleteCertEnrollment(e.id);
-      addToast('success', `已移除 ${e.domain} 的登记`);
+      await api.deleteCertEnrollment(e.id, deleteCertificates);
+      addToast('success', deleteCertificates
+        ? `已移除 ${e.domain} 的登记及其导入证书`
+        : `已移除 ${e.domain} 的登记`);
+      setRemoveTarget(null);
       await load();
     } catch (err) {
       addToast('error', `移除失败: ${(err as Error).message}`);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -369,7 +376,7 @@ function EnrollmentsCard() {
           <button
             class="btn-icon btn-icon-danger"
             title="移除登记"
-            onClick={(ev) => { ev.stopPropagation(); handleDelete(e); }}
+            onClick={(ev) => { ev.stopPropagation(); setRemoveTarget(e); }}
           >
             <FaSolidTrash />
           </button>
@@ -385,6 +392,7 @@ function EnrollmentsCard() {
           <h3 class="font-semibold">域名登记</h3>
           <p class="text-sm text-secondary mt-1">
             登记后自动向 CertManager 申请证书，签发完成后事件驱动同步 PFX 到网关并推送给数据面。
+            数据面通道路由保存后其域名会自动登记；登记不会因路由移除而自动删除，仅可在此页手动移除。
           </p>
         </div>
       </div>
@@ -433,6 +441,27 @@ function EnrollmentsCard() {
         />
       }>
         <div class="py-12 text-center text-secondary">加载中...</div>
+      </Show>
+
+      <Show when={removeTarget()}>
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setRemoveTarget(null)}>
+          <div class="card w-full max-w-md mx-4" onClick={(ev) => ev.stopPropagation()}>
+            <h3 class="font-semibold mb-2">移除登记</h3>
+            <p class="text-sm text-secondary mb-4">
+              确定移除域名 <span class="font-mono font-medium">{removeTarget()!.domain}</span> 的登记？
+              移除后不再自动申请/续期；已导入的证书默认保留至过期，也可一并删除。
+            </p>
+            <div class="flex justify-end gap-2">
+              <button class="btn btn-secondary" disabled={removing()} onClick={() => setRemoveTarget(null)}>取消</button>
+              <button class="btn btn-secondary" disabled={removing()} onClick={() => confirmRemove(removeTarget()!, false)}>
+                仅移除登记
+              </button>
+              <button class="btn btn-danger" disabled={removing()} onClick={() => confirmRemove(removeTarget()!, true)}>
+                移除并删除证书
+              </button>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   );

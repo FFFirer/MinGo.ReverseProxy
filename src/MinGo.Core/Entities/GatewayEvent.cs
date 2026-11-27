@@ -28,7 +28,11 @@ public enum GatewayEventType
     /// <summary>
     /// 安全告警
     /// </summary>
-    SecurityAlert = 5
+    SecurityAlert = 5,
+    /// <summary>
+    /// 路由配置变更（触发证书登记对账；区别于 ConfigUpdate，不随证书/集群变更触发）
+    /// </summary>
+    RoutesChanged = 6
 }
 
 /// <summary>

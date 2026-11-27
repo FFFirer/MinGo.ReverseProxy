@@ -42,6 +42,11 @@ public interface IApiManagementService
     Task<CertificateConfig> CreateCertificateAsync(CertificateConfig certificate);
     Task<CertificateConfig?> UpdateCertificateAsync(string id, CertificateConfig certificate);
     Task DeleteCertificateAsync(string id);
+
+    /// <summary>
+    /// 批量删除某登记导入的证书（级联清理），返回删除行数；触发一次配置广播。
+    /// </summary>
+    Task<int> DeleteCertificatesByEnrollmentAsync(string enrollmentId);
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MinGo.Application.Services;
+using MinGo.Core.Interfaces;
 using MinGo.Core.Models;
 
 namespace MinGo.ControlPlane.Api.Controllers;
@@ -11,13 +12,16 @@ namespace MinGo.ControlPlane.Api.Controllers;
 public class CertEnrollmentsController : ControllerBase
 {
     private readonly CertificateEnrollmentService _service;
+    private readonly IApiManagementService _apiManagement;
     private readonly ILogger<CertEnrollmentsController> _logger;
 
     public CertEnrollmentsController(
         CertificateEnrollmentService service,
+        IApiManagementService apiManagement,
         ILogger<CertEnrollmentsController> logger)
     {
         _service = service;
+        _apiManagement = apiManagement;
         _logger = logger;
     }
 
@@ -71,10 +75,24 @@ public class CertEnrollmentsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>移除登记；<paramref name="deleteCertificates"/> 为 true 时级联删除其导入的证书（批量删除、单次广播）。</summary>
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
+    public async Task<IActionResult> Delete(string id, [FromQuery] bool deleteCertificates = false)
     {
-        var deleted = await _service.DeleteAsync(id);
-        return deleted ? NoContent() : NotFound(new { message = "登记不存在" });
+        var enrollment = (await _service.ListAsync()).FirstOrDefault(e => e.Id == id);
+        if (enrollment is null)
+        {
+            return NotFound(new { message = "登记不存在" });
+        }
+
+        if (deleteCertificates)
+        {
+            var deleted = await _apiManagement.DeleteCertificatesByEnrollmentAsync(id);
+            _logger.LogInformation(
+                "移除登记 {Domain} 并级联删除 {Count} 张导入证书", enrollment.Domain, deleted);
+        }
+
+        await _service.DeleteAsync(id);
+        return NoContent();
     }
 }

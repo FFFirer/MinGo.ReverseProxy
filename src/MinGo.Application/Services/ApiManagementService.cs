@@ -32,6 +32,7 @@ public class ApiManagementService : IApiManagementService
     {
         var result = await _apiDbService.CreateRouteAsync(route);
         await NotifyGatewayConfigChangeAsync();
+        await NotifyRoutesChangedAsync();
         return result;
     }
 
@@ -39,6 +40,7 @@ public class ApiManagementService : IApiManagementService
     {
         var result = await _apiDbService.UpdateRouteAsync(id, route);
         await NotifyGatewayConfigChangeAsync();
+        await NotifyRoutesChangedAsync();
         return result;
     }
 
@@ -46,6 +48,7 @@ public class ApiManagementService : IApiManagementService
     {
         await _apiDbService.DeleteRouteAsync(id);
         await NotifyGatewayConfigChangeAsync();
+        await NotifyRoutesChangedAsync();
     }
 
     public async Task<IEnumerable<ClusterConfig>> GetClustersAsync()
@@ -115,6 +118,22 @@ public class ApiManagementService : IApiManagementService
         }
     }
 
+    /// <summary>
+    /// 通知路由变更（触发证书登记对账）。与 ConfigUpdate 分开：
+    /// 后者也由证书/集群变更触发，复用会导致每次证书同步都触发一次无意义对账。
+    /// </summary>
+    private async Task NotifyRoutesChangedAsync()
+    {
+        try
+        {
+            await _gatewayEventService.SendEventToAllInstancesAsync(GatewayEventType.RoutesChanged, "{}", 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify route change for certificate enrollment reconcile");
+        }
+    }
+
     public async Task<IEnumerable<CertificateConfig>> GetCertificatesAsync()
     {
         return await _apiDbService.GetCertificatesAsync();
@@ -143,5 +162,19 @@ public class ApiManagementService : IApiManagementService
     {
         await _apiDbService.DeleteCertificateAsync(id);
         await NotifyGatewayConfigChangeAsync();
+    }
+
+    /// <summary>
+    /// 批量删除某登记导入的证书（级联清理）：批量落库一次、广播一次。
+    /// </summary>
+    public async Task<int> DeleteCertificatesByEnrollmentAsync(string enrollmentId)
+    {
+        var deleted = await _apiDbService.DeleteCertificatesByEnrollmentAsync(enrollmentId);
+        if (deleted > 0)
+        {
+            await NotifyGatewayConfigChangeAsync();
+        }
+
+        return deleted;
     }
 }

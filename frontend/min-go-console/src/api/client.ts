@@ -167,6 +167,9 @@ export const api = {
     }),
   syncCertEnrollment: (id: string) =>
     request<void>(`/cert-enrollments/${encodeURIComponent(id)}/sync`, { method: 'POST' }),
-  deleteCertEnrollment: (id: string) =>
-    request<void>(`/cert-enrollments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteCertEnrollment: (id: string, deleteCertificates = false) =>
+    request<void>(
+      `/cert-enrollments/${encodeURIComponent(id)}${deleteCertificates ? '?deleteCertificates=true' : ''}`,
+      { method: 'DELETE' },
+    ),
 };

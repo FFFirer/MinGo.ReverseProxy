@@ -47,7 +47,14 @@ export default function CertificatesPage() {
       key: 'domain',
       title: '域名',
       mobileVisible: true,
-      cell: (cert) => <span class="font-medium">{cert.domainName}</span>,
+      cell: (cert) => (
+        <div class="flex items-center gap-2">
+          <span class="font-medium">{cert.domainName}</span>
+          <Show when={cert.enrollmentId}>
+            <span class="badge badge-info text-xs">自动接入</span>
+          </Show>
+        </div>
+      ),
     },
     {
       key: 'type',
@@ -324,6 +331,10 @@ function CertDetailModal(props: { cert: CertificateConfig; onClose: () => void }
           <div class="flex justify-between">
             <span class="text-secondary">域名</span>
             <span class="font-medium">{cert.domainName}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-secondary">来源</span>
+            <span class="font-medium">{cert.enrollmentId ? '自动接入' : '人工上传'}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-secondary">类型</span>

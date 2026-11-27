@@ -226,6 +226,7 @@ public class CertificateEnrollmentServiceTests
         Assert.Contains(created, c => c.DomainName == "example.com");
         Assert.Contains(created, c => c.DomainName == "*.example.com");
         Assert.All(created, c => Assert.Equal("Pfx", c.CertificateType));
+        Assert.All(created, c => Assert.Equal("enroll-1", c.EnrollmentId));
         Assert.All(created, c => Assert.NotNull(c.Password));
         Assert.All(created, c => Assert.NotNull(c.CertificateData));
         Assert.Equal(pfx.Thumbprint, wildcard.LastThumbprint);

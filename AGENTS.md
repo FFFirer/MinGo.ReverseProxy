@@ -80,4 +80,35 @@ cd frontend/min-go-console && pnpm build
 
 已知坑：
 - **单测 PFX 往返**：mock `DownloadPfxAsync` 必须用服务传入的密码重导出 PFX（服务每次同步生成随机密码，用固定密码导出的 PFX 会报 password incorrect）。
-- `src/MinGo.ControlPlane.Api/wwwroot/` 是 Vite.AspNetCore 在 `dotnet build` 时拷入的前端产物，勿提交。
+- `src/MinGo.ControlPlane.Api/wwwroot/` 是前端产物拷贝目录（`dotnet build` 并不自动生成，本地验证时手工拷入 `frontend/min-go-console/dist/.`，且 Production 环境才托管），勿提交。
+
+## 路由驱动证书自动登记（2026-11-28）
+
+路由保存即自动收集数据面域名并登记证书（只增不删）。权威文档：`openspec/changes/route-cert-auto-enrollment/`（proposal/design/tasks；目录名无日期前缀——openspec CLI 要求变更名以字母开头）。
+
+关键决策：
+- **收集口径**（`RouteCertEnrollmentPolicy.CollectHosts`，纯函数）：仅 `Enabled` 路由且数据面通道（`node:*` 或空值）；AnyHost/IP/localhost/无点域名跳过；剥端口、去尾点、转小写；`*.domain` 记裸域 + 泛域标记，同名取并集。Cloudflare 隧道路由不收集（边缘终结 TLS，自有证书）。
+- **触发**：新增 `GatewayEventType.RoutesChanged`（与 `ConfigUpdate` 分离，避免证书/集群变更误触发对账）。`ApiManagementService` 路由增/改/删后发布；`RouteCertEnrollmentReconcileWorker` 订阅 + 启动兜底一次对账，`Interlocked` 在途合并，每事件 `CreateScope`（照抄 `ConfigUpdateGrpcBroadcaster` 模式）。
+- **只增不删（D4 修订）**：对账只补登记与泛域升级（`IsWildcard=false` → 要求泛域时升级），从不删除——仅 UI 登记的域名完整保留；移除登记只能在此页人工操作。
+- **设置守卫**：CertManager `!Enabled || !Configured` 时整轮跳过（不读路由、不落 Failed 登记）。
+- **溯源与级联**：`ApiCertificates.EnrollmentId`（迁移 `20261127171206_AddCertificateEnrollmentId`）记录导入来源，人工上传为 null；移除登记可选 `?deleteCertificates=true` 级联批量删除（`DeleteCertificatesByEnrollmentAsync`，单次广播）。
+- **作用域修复**：`CertificateEnrollmentSyncWorker` 原先把 Scoped `CertificateEnrollmentService` 注入单例（captive dependency，Development `ValidateScopes` 下直接启动失败）——改为注入 `IServiceScopeFactory`，每轮 `CreateScope` 解析。
+- **未做**：`ICertificateIssuer` 抽象（用户决定暂不引入，仍用 `ICertManagerClient`）。
+
+验证状态（2026-11-28 本机实测）：
+- `dotnet build MinGo.ReverseProxy.slnx`：PASS，0 错误。
+- 全量单测 `dotnet test`：PASS，510/510（Core 216 + CP 148 + DP 146；新增 Policy 19 + 对账 10 + 通知/级联 5）。
+- 前端 `pnpm build`：PASS。
+- Development 启动：PASS（captive dependency 修复后无 DI 异常；启动日志「CertManager 未启用或未配置，跳过路由域名自动登记」）。
+- 浏览器实测（PASS，Production 环境 + 真实开发库 gateway.db + 本机假 CertManager 服务）：
+  - 路由保存（`node:default` + 新域名）→ 证书接入页自动出现「申请中」登记；假服务日志证实探测 `GET …/download?format=Pem` 404 → `POST /api/external/certificates {domain,isWildcard:false,useStaging:false}`。
+  - 删除该路由 → 登记保留（只增不删）。
+  - 停用自动接入（Enabled=false，仍 Configured）→ 再存同型路由不产生新登记、无 Failed 噪音。
+  - 设置卡片保存/回显、登记表徽标、移除对话框三按钮（取消/仅移除登记/移除并删除证书）均正常。
+  - 未验证：真实 CertManager 全链路（签发→事件→SyncAsync→证书页「自动接入」徽标+级联删有数据）——需部署环境；隧道路由因本机 Cloudflare 未配置无法保存，隧道排除由单测覆盖。
+- 测试数据已清理（验证用路由/登记/设置已还原；设置 ApiKey 因设计上空白不回写，加密密文保留但 `configured=false` 不影响）。
+
+已知坑：
+- **openspec 变更名**：CLI 要求以字母开头，日期前缀目录会报 "Change name must start with a letter"。
+- **本地验证前端**：`dotnet build` 不拷前端产物，需手工 `cp -r frontend/min-go-console/dist/. src/MinGo.ControlPlane.Api/wwwroot/`；且静态托管与 SPA 回退只在非 Development 生效（`ASPNETCORE_ENVIRONMENT=Production dotnet run --no-launch-profile`，launchSettings 会覆盖环境变量）。
+- **MinGo.Messaging 消费者作用域风险（7.2 结论：未消除，待核查）**：`CertificateCompleted/FailedEventConsumer` 注入 Scoped `CertificateEnrollmentService`。若库从根容器解析消费者，即为同型 captive dependency；当前 `Messaging:Enabled=false` 未暴露。启用 Messaging 部署前需确认 MinGo.Messaging 是否按消息 `CreateScope` 解析消费者。
