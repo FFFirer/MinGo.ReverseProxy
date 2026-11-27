@@ -1,16 +1,19 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
+import { FaSolidChevronDown } from 'solid-icons/fa';
 import { api } from '../api/client';
 import { addToast } from '../store/toast';
 import type { GatewayInstance, DataPlaneNode } from '../types';
 import type { Column } from '../components/shared/Table';
 import Table from '../components/shared/Table';
 import InstanceConfigModal from '../components/shared/InstanceConfigModal';
+import NodeSelectModal from '../components/shared/NodeSelectModal';
 
 export default function InstancesPage() {
   const [instances, setInstances] = createSignal<GatewayInstance[]>([]);
   const [nodes, setNodes] = createSignal<DataPlaneNode[]>([]);
   const [nodeFilter, setNodeFilter] = createSignal('all');
   const [configTarget, setConfigTarget] = createSignal<GatewayInstance | null>(null);
+  const [nodePicker, setNodePicker] = createSignal<GatewayInstance | null>(null);
 
   const fetchInstances = async () => {
     try {
@@ -103,23 +106,7 @@ export default function InstancesPage() {
     : nodeFilter() === 'none' ? !i.nodeId
     : i.nodeId === nodeFilter());
 
-  const handleNodeChange = async (inst: GatewayInstance, value: string) => {
-    try {
-      if (value === '__create__') {
-        const name = prompt('新节点名称：');
-        if (!name?.trim()) return;
-        const created = await api.createDataPlaneNode(name.trim());
-        await api.setInstanceNode(inst.instanceId, created.id);
-        addToast('success', `已创建节点 "${created.name}" 并绑定实例`);
-      } else {
-        await api.setInstanceNode(inst.instanceId, value || null);
-        addToast('success', value ? '节点绑定已更新' : '已解除绑定（该实例不再接收配置）');
-      }
-      await fetchInstances();
-    } catch (err) {
-      addToast('error', `更新节点绑定失败: ${(err as Error).message}`);
-    }
-  };
+  const nodeName = (id?: string | null) => nodes().find(n => n.id === id)?.name;
 
   const columns: Column<GatewayInstance>[] = [
     {
@@ -152,25 +139,16 @@ export default function InstancesPage() {
       key: 'node',
       title: '接入节点',
       mobileVisible: true,
-      cell: (inst) => {
-        // 读取 nodes() 使 cell 依赖节点信号：节点晚于实例到达时，
-        // select 的 value 会在选项就绪后重新应用（否则会被浏览器重置为空）
-        const opts = nodes();
-        return (
-          <select
-            class="input py-1 text-sm"
-            value={inst.nodeId || ''}
-            onChange={(e) => handleNodeChange(inst, e.currentTarget.value)}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <option value="">未绑定</option>
-            <For each={opts}>{(n) => (
-              <option value={n.id}>{n.name}</option>
-            )}</For>
-            <option value="__create__">＋ 新建节点…</option>
-          </select>
-        );
-      },
+      cell: (inst) => (
+        <button
+          class="btn-text-primary text-sm inline-flex items-center gap-1 max-w-44"
+          title={`接入节点：${nodeName(inst.nodeId) || '未绑定'}（点击修改）`}
+          onClick={() => setNodePicker(inst)}
+        >
+          <span class="truncate">{nodeName(inst.nodeId) || '未绑定'}</span>
+          <FaSolidChevronDown class="shrink-0 text-xs text-secondary" />
+        </button>
+      ),
     },
     {
       key: 'cpu',
@@ -325,6 +303,17 @@ export default function InstancesPage() {
           <InstanceConfigModal
             instance={target()}
             onClose={() => setConfigTarget(null)}
+          />
+        )}
+      </Show>
+
+      <Show when={nodePicker()}>
+        {(target) => (
+          <NodeSelectModal
+            instance={target()}
+            nodes={nodes()}
+            onChanged={fetchInstances}
+            onClose={() => setNodePicker(null)}
           />
         )}
       </Show>
