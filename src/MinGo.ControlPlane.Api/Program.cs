@@ -1,10 +1,14 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using MinGo.Infrastructure.Data;
+using MinGo.Infrastructure.Services;
 using MinGo.Application.Services;
+using MinGo.Application.Consumers;
+using MinGo.Application.Workers;
 using MinGo.Core.Interfaces;
 using MinGo.Core.Logging;
 using MinGo.Core.Services;
@@ -13,6 +17,8 @@ using MinGo.ControlPlane.Api.Data;
 using MinGo.ControlPlane.Api.GrpcServices;
 using MinGo.ControlPlane.Api.Services;
 using MinGo.IdentityKit;
+using MinGo.Messaging;
+using MinGo.Messaging.SimpleMessageBroker;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -150,6 +156,34 @@ builder.Services.AddScoped<CloudflareSyncService>();
 
 // 网络拓扑聚合（只读：图 + 配置一致性体检）
 builder.Services.AddScoped<TopologyService>();
+
+// DataProtection 密钥环持久化：容器默认目录在临时层，镜像重建后旧加密值（证书密码、CertManager ApiKey）
+// 无法解密；部署经 DataProtection:KeysPath 指到挂载卷（/app/data/keys），本地开发留空走默认目录
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+
+// CertManager 证书自动接入（连接配置落库，BaseAddress/ApiKey 每次调用按设置解析）
+builder.Services.AddHttpClient("CertManager");
+builder.Services.AddScoped<ICertManagerSettingsService, CertManagerSettingsService>();
+builder.Services.AddScoped<ICertificateEnrollmentStore, CertificateEnrollmentStore>();
+builder.Services.AddScoped<ICertManagerClient, CertManagerClient>();
+builder.Services.AddScoped<CertificateEnrollmentService>();
+builder.Services.AddHostedService<CertificateEnrollmentSyncWorker>();
+
+// MinGo.Messaging 订阅 CertManager 证书事件（broker 复用环境现网；Messaging:Enabled 控制启用）
+if (builder.Configuration.GetValue<bool>("Messaging:Enabled"))
+{
+    builder.Services.AddMessaging(builder.Configuration)
+        .UseSimpleMessageBroker()
+        .AddConsumer(typeof(CertificateCompletedEventConsumer).Assembly);
+
+    builder.AddMessagingHost();
+}
 
 // OpenTelemetry (可通过 OpenTelemetry:Enabled=false 禁用)
 var otelSection = builder.Configuration.GetSection("OpenTelemetry");

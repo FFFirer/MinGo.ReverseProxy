@@ -34,6 +34,7 @@ services:
       - Kestrel__Endpoints__gRPC__Url=http://+:5001
       - Kestrel__Endpoints__gRPC__Protocols=Http2
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/mingocp.db
+      - DataProtection__KeysPath=/app/data/keys
       - OpenTelemetry__Enabled=true
       - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:4317
       # 数据面接入认证（可选）：配置后所有数据面 gRPC 连接必须携带匹配密钥，

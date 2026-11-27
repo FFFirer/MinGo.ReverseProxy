@@ -51,6 +51,16 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     /// </summary>
     public DbSet<InstanceNodeAssignmentEntity> InstanceNodeAssignments { get; set; }
 
+    /// <summary>
+    /// CertManager 远程接入配置表（单行）
+    /// </summary>
+    public DbSet<CertManagerSettingsEntity> CertManagerSettings { get; set; }
+
+    /// <summary>
+    /// 证书自动接入登记表
+    /// </summary>
+    public DbSet<CertificateEnrollmentEntity> CertificateEnrollments { get; set; }
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
@@ -77,5 +87,7 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         builder.ApplyConfiguration(new CloudflareSettingsEntityConfiguration());
         builder.ApplyConfiguration(new DataPlaneNodeEntityConfiguration());
         builder.ApplyConfiguration(new InstanceNodeAssignmentEntityConfiguration());
+        builder.ApplyConfiguration(new CertManagerSettingsEntityConfiguration());
+        builder.ApplyConfiguration(new CertificateEnrollmentEntityConfiguration());
     }
 }

@@ -8,6 +8,7 @@ import RoutesPage from './pages/Routes';
 import ClustersPage from './pages/Clusters';
 import TopologyPage from './pages/Topology';
 import CertificatesPage from './pages/Certificates';
+import CertEnrollmentsPage from './pages/CertEnrollments';
 import MonitoringPage from './pages/Monitoring';
 import LogsPage from './pages/Logs';
 import InstancesPage from './pages/Instances';
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/clusters" component={() => <ProtectedLayout><ClustersPage /></ProtectedLayout>} />
         <Route path="/topology" component={() => <ProtectedLayout><TopologyPage /></ProtectedLayout>} />
         <Route path="/certificates" component={() => <ProtectedLayout><CertificatesPage /></ProtectedLayout>} />
+        <Route path="/cert-enrollments" component={() => <ProtectedLayout><CertEnrollmentsPage /></ProtectedLayout>} />
         <Route path="/monitoring" component={() => <ProtectedLayout><MonitoringPage /></ProtectedLayout>} />
         <Route path="/logs" component={() => <ProtectedLayout><LogsPage /></ProtectedLayout>} />
         <Route path="/instances" component={() => <ProtectedLayout><InstancesPage /></ProtectedLayout>} />

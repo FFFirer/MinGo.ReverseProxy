@@ -487,3 +487,38 @@ export interface TopologyResponse {
   edges: TopologyEdge[];
   issues: TopologyIssue[];
 }
+
+// ── 证书自动接入（MinGo.CertManager） ──
+
+export interface CertManagerSettings {
+  baseUrl: string;
+  /** 脱敏 ApiKey；保存时传空或含 *** 表示不修改 */
+  apiKey: string;
+  enabled: boolean;
+  timeoutSeconds: number;
+  configured: boolean;
+  updatedAt?: string | null;
+}
+
+export interface CertManagerConnectionResult {
+  ok: boolean;
+  message: string;
+}
+
+export type EnrollmentState = 'Unrequested' | 'Pending' | 'Synced' | 'Failed' | 'Disabled';
+
+export interface CertificateEnrollment {
+  id: string;
+  domain: string;
+  isWildcard: boolean;
+  useStaging: boolean;
+  externalCertificateId?: string | null;
+  state: EnrollmentState;
+  expiresAt?: string | null;
+  lastSyncAt?: string | null;
+  lastThumbprint?: string | null;
+  lastError?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

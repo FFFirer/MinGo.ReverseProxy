@@ -147,4 +147,26 @@ export const api = {
     request<import('../types').ReconcileReport>(`/cloudflare/tunnels/${encodeURIComponent(id)}/reconcile`, {
       method: 'POST',
     }),
+
+  // 证书自动接入（MinGo.CertManager）
+  getCertManagerSettings: () =>
+    request<import('../types').CertManagerSettings>('/cert-manager/settings'),
+  saveCertManagerSettings: (data: { baseUrl: string; apiKey: string; enabled: boolean; timeoutSeconds: number }) =>
+    request<import('../types').CertManagerSettings>('/cert-manager/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  testCertManagerConnection: () =>
+    request<import('../types').CertManagerConnectionResult>('/cert-manager/test', { method: 'POST' }),
+  getCertEnrollments: () =>
+    request<import('../types').CertificateEnrollment[]>('/cert-enrollments'),
+  registerCertEnrollment: (data: { domain: string; isWildcard: boolean; useStaging: boolean }) =>
+    request<import('../types').CertificateEnrollment>('/cert-enrollments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  syncCertEnrollment: (id: string) =>
+    request<void>(`/cert-enrollments/${encodeURIComponent(id)}/sync`, { method: 'POST' }),
+  deleteCertEnrollment: (id: string) =>
+    request<void>(`/cert-enrollments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

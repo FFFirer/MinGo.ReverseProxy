@@ -59,3 +59,25 @@ cd frontend/min-go-console && pnpm build
 - **节点通道误入隧道路径**：`ValidateRouteAsync` 原先只对 `local` 短路，节点路由在 Cloudflare 未配置时无法创建；域名冲突校验把跨节点同域名误判为「多隧道冲突」。均已修复。
 - 节点删除 409 的 message 经前端 `client.ts` 提取（`payload.message`），列表接口 `/api/data-plane-nodes` 返回 `instanceCount`/`onlineCount`/`routeCount`。
 
+
+## 证书自动接入：对接 MinGo.CertManager（2026-11-27）
+
+全托管证书：登记域名 → CertManager 申请/续期（ACME，阿里云 DNS-01）→ 事件驱动同步回控制面。权威文档：`openspec/changes/2026-11-27-cert-auto-enrollment/`（proposal/design/tasks）。
+
+关键决策：
+- **对接方式**：事件驱动（MinGo.Messaging，broker 复用环境现网 `http://100.102.18.111:5292`，无认证）。CertManager 侧零代码改动（发布侧 `Messaging__Enabled=true` 即启用）；CP 只订阅 `certmanager.certificate.completed/failed` 两个事件（`MessageConsumer` Group=`cert-enrollment-cp`，Competing）。事件只携带信号，证书本体经 External API HTTP 拉取 PFX（CP 生成随机密码，`X509CertificateLoader.LoadPkcs12` 解析）。
+- **登记不申请直发**（D3）：登记先探测（`GET /download?format=Pem`，200=已有证书直接同步），404 才 POST 申请——避免 LE 限流、存量域名可接入。
+- **幂等键 (DomainName, Thumbprint)**：重复事件/对账重复同步安全；泛域名导入两行（`domain` + `*.domain`），对齐 `CertificateSnapshotPolicy.WildcardCovers` 只认 `*.` 前缀的语义。
+- **事件-first + 对账兜底**：SMB at-most-once 无 DLQ，靠每小时 `CertificateEnrollmentSyncWorker`（`CertManager:SyncIntervalMinutes`，默认 60）遍历登记重放 `SyncAsync`。
+- **配置落库**：`CertManagerSettings` 单行（沿用 CloudflareSettings 模式），ApiKey 用 DataProtection 加密存储（protector `MinGo.CertManagerApiKey`）、读取脱敏（前 4 字符 + `***`）、掩码/空白不回写；broker 地址在 appsettings（`Messaging` 节，默认 Enabled=false）。登记表 `CertificateEnrollments` Domain 唯一（不区分大小写）。
+- **前端**：新页 `/cert-enrollments`「证书接入」（设置卡片 + 登记列表/表单/状态徽标/手动同步/移除），导航位于「证书管理」后。状态机 Unrequested/Pending/Synced/Failed/Disabled（`JsonStringEnumConverter` 全局生效，前端拿字符串）。
+
+验证状态（2026-11-27 本机）：
+- `dotnet build MinGo.ReverseProxy.slnx`：PASS，0 错误。
+- 全量单测 `dotnet test`：PASS，476/476（Core 197 + CP 133 + DP 146；新增 Policy 18 + Service 19）。
+- 前端 `pnpm build`：PASS。
+- 未做浏览器验证：新页面依赖已部署环境（部署侧任务见 tasks.md 第 7 节：CertManager/CP 启用 Messaging 环境变量、联调事件流与泛域名 SAN 行为）。
+
+已知坑：
+- **单测 PFX 往返**：mock `DownloadPfxAsync` 必须用服务传入的密码重导出 PFX（服务每次同步生成随机密码，用固定密码导出的 PFX 会报 password incorrect）。
+- `src/MinGo.ControlPlane.Api/wwwroot/` 是 Vite.AspNetCore 在 `dotnet build` 时拷入的前端产物，勿提交。

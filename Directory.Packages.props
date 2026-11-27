@@ -4,6 +4,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="MinGo.IdentityKit" Version="0.1.0-preview.4" />
+    <!-- MinGo.Messaging（与 CertManager 0.0.4 对齐；broker 复用环境现网 SimpleMessageBroker） -->
+    <PackageVersion Include="MinGo.Messaging.Abstractions" Version="0.0.4" />
+    <PackageVersion Include="MinGo.Messaging.Core" Version="0.0.4" />
+    <PackageVersion Include="MinGo.Messaging.Hosting" Version="0.0.4" />
+    <PackageVersion Include="MinGo.Messaging.SimpleMessageBroker" Version="0.0.4" />
     <!-- Microsoft packages -->
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />

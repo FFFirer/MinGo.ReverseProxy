@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from '@solidjs/router';
 import { type Component } from 'solid-js';
-import { FaSolidTachometer, FaSolidRandom, FaSolidServer, FaSolidDiagramProject, FaSolidShield, FaSolidLock, FaSolidLineChart, FaSolidListAlt, FaSolidCubes, FaSolidPlug, FaSolidCog } from 'solid-icons/fa';
+import { FaSolidTachometer, FaSolidRandom, FaSolidServer, FaSolidDiagramProject, FaSolidShield, FaSolidLock, FaSolidLineChart, FaSolidListAlt, FaSolidCubes, FaSolidPlug, FaSolidCog, FaSolidCertificate } from 'solid-icons/fa';
 import { isOpen, closeSidebar } from '../../store/sidebar';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { path: '/topology', icon: 'fa-diagram-project', label: '网络拓扑' },
   { path: '/security', icon: 'fa-shield', label: '安全管理' },
   { path: '/certificates', icon: 'fa-lock', label: '证书管理' },
+  { path: '/cert-enrollments', icon: 'fa-certificate', label: '证书接入' },
   { path: '/monitoring', icon: 'fa-line-chart', label: '监控' },
   { path: '/logs', icon: 'fa-list-alt', label: '日志管理' },
   { path: '/instances', icon: 'fa-cubes', label: '实例管理' },
@@ -24,6 +25,7 @@ const iconMap: Record<string, Component> = {
   'fa-diagram-project': FaSolidDiagramProject,
   'fa-shield': FaSolidShield,
   'fa-lock': FaSolidLock,
+  'fa-certificate': FaSolidCertificate,
   'fa-line-chart': FaSolidLineChart,
   'fa-list-alt': FaSolidListAlt,
   'fa-cubes': FaSolidCubes,

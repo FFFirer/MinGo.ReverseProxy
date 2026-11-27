@@ -114,3 +114,36 @@ public class CloudflareSettingsEntityConfiguration : IEntityTypeConfiguration<Cl
         builder.Property(e => e.AccountId).HasMaxLength(128);
     }
 }
+
+/// <summary>
+/// CertManager 远程接入配置（单行）
+/// </summary>
+public class CertManagerSettingsEntityConfiguration : IEntityTypeConfiguration<CertManagerSettingsEntity>
+{
+    public void Configure(EntityTypeBuilder<CertManagerSettingsEntity> builder)
+    {
+        builder.ToTable("CertManagerSettings");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(64);
+        builder.Property(e => e.BaseUrl).HasMaxLength(1024);
+        builder.Property(e => e.ApiKey).HasMaxLength(2048);
+    }
+}
+
+/// <summary>
+/// 证书自动接入登记：域名唯一（不区分大小写）
+/// </summary>
+public class CertificateEnrollmentEntityConfiguration : IEntityTypeConfiguration<CertificateEnrollmentEntity>
+{
+    public void Configure(EntityTypeBuilder<CertificateEnrollmentEntity> builder)
+    {
+        builder.ToTable("CertificateEnrollments");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(64);
+        builder.Property(e => e.Domain).HasMaxLength(253).IsRequired();
+        builder.Property(e => e.State).HasConversion<string>().HasMaxLength(32);
+        builder.Property(e => e.LastThumbprint).HasMaxLength(128);
+        builder.Property(e => e.LastError).HasMaxLength(2048);
+        builder.HasIndex(e => e.Domain).IsUnique();
+    }
+}
