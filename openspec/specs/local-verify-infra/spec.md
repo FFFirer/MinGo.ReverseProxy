@@ -1,3 +1,11 @@
+# local-verify-infra Specification
+
+## Purpose
+
+本地自包含验证栈：一条 compose 命令拉起控制面/数据面/前端，数据卷隔离，前端按 Production 托管，日志级别可覆盖，并包含容器健康检查与启动依赖编排。
+
+## Requirements
+
 ### Requirement: Local verification infrastructure SHALL provide self-contained stack
 
 The system SHALL provide a `docker-compose.local.yml` file that starts the complete MinGo stack (ControlPlane + DataPlane + frontend) using locally built images, without dependency on external container registries.
@@ -49,9 +57,27 @@ The DataPlane SHALL expose port 8443 for HTTPS proxy traffic. TLS certificates S
 
 ### Requirement: Containers SHALL NOT auto-restart on failure
 
-All services SHALL use `restart: "no"` policy, ensuring that failures during local development are visible and not silently retried.
+All services SHALL use `restart: "no"` policy, ensuring that failures during local development are visible and not silently retried. This requirement applies regardless of whether health checks are configured.
 
 #### Scenario: Failed container stays stopped
 - **WHEN** a service fails to start
 - **THEN** the container remains in stopped state
 - **AND** the exit code and error logs are visible in logs
+
+### Requirement: Local compose SHALL include healthcheck configuration
+
+The `docker-compose.local.yml` file SHALL define a `healthcheck:` block for the `control-plane` service with the same configuration as the production compose file (`docker-compose.yml`).
+
+#### Scenario: Healthcheck is configured in local compose
+
+- **WHEN** `docker compose -f docker-compose.local.yml up -d` is executed
+- **THEN** the control-plane service has the same healthcheck as the production compose file
+
+### Requirement: Local compose data-plane SHALL depend on control-plane health
+
+The `docker-compose.local.yml` file SHALL define `depends_on` for the `data-plane` service with `condition: service_healthy` targeting the `control-plane` service.
+
+#### Scenario: Data plane waits for control plane readiness in local compose
+
+- **WHEN** `docker compose -f docker-compose.local.yml up -d` is executed
+- **THEN** the data-plane container does not start until the control-plane health check returns `Healthy`

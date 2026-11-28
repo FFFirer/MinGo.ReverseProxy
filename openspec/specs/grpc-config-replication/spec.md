@@ -1,24 +1,83 @@
 # gRPC Config Replication
 
-**Purpose**: Control plane pushes configuration (routes, clusters, certificates) to data planes via gRPC bidirectional streaming.
+## Purpose
+
+Control plane pushes configuration (routes, clusters, certificates) to data planes via gRPC bidirectional streaming, filtered per connection by the data plane's bound node.
+
 ## Requirements
 ### Requirement: Data plane receives config updates via gRPC bidirectional stream
 
-The control plane SHALL expose a gRPC `ConfigReplication` service with a `ReplicateConfig` bidirectional streaming RPC. The data plane SHALL connect to this RPC at startup with a `ConfigSubscription` message containing its instance ID and current config version. The control plane SHALL respond with a full `ConfigSnapshot` containing all routes, clusters, destinations, and certificates. The control plane SHALL push new `ConfigSnapshot` messages whenever configuration changes (routes/clusters/certificates created, updated, or deleted). The ConfigSnapshot pushed on config changes SHALL include the full certificate data, matching the data sent during initial connection. The data plane SHALL apply received config snapshots to its local `IProxyConfigProvider` and trigger YARP hot reload. The data plane MUST NOT access the database directly for configuration.
+The control plane SHALL expose a gRPC `ConfigReplication` service with a `ReplicateConfig` bidirectional streaming RPC. The data plane SHALL connect to this RPC at startup with a `ConfigSubscription` message containing its instance ID and current config version. The data plane MUST NOT access the database directly for configuration.
 
-**ADDED**: The `RouteConfig.transforms_json` field in the ConfigSnapshot SHALL contain the route's transforms serialized as a JSON array of flat dictionaries. The data plane SHALL read this field and set it on the `YarpRouteConfig.Transforms` property.
+The control plane SHALL resolve the connected data plane's bound node and SHALL assemble the `ConfigSnapshot` per connection:
 
-**MODIFIED**: The data plane SHALL NOT block startup waiting for the initial config snapshot. The data plane SHALL start serving requests immediately (with empty configuration) and apply config asynchronously when it arrives. The data plane SHALL validate each received ConfigSnapshot before applying it; invalid snapshots SHALL be discarded and the old configuration SHALL be kept.
+- routes bound to a Cloudflare tunnel SHALL be included for every data plane that is bound to a node (tunnel ingress backhauls to data planes);
+- routes bound to `node:<N>` SHALL be included only when `N` equals the data plane's bound node;
+- a data plane without a bound node SHALL receive **no config at all** — the control plane SHALL NOT send a `ConfigSnapshot` on registration, and SHALL skip it during broadcasts;
+- when a data plane is unbound, the control plane SHALL push an empty snapshot (no routes, no certificates) to clear previously installed rules;
+- certificates SHALL be filtered to domains referenced by the included routes (same wildcard matching rule as the data plane SNI selector); an empty snapshot carries no certificates.
 
-#### Scenario: Data plane receives full config on connect
+Clusters SHALL be included unchanged.
 
-- **WHEN** a data plane instance starts and connects to the control plane gRPC `ConfigReplication.ReplicateConfig` RPC
-- **THEN** the control plane sends a `ConfigSnapshot` with all current routes, clusters, destinations, certificates, and route transforms
+`RouteConfig.transforms_json` in the ConfigSnapshot SHALL carry the route's transforms as a JSON array of flat dictionaries; the data plane SHALL set them on `YarpRouteConfig.Transforms`.
 
-#### Scenario: Config change triggers push to all connected data planes
+The data plane SHALL NOT block startup waiting for the initial config snapshot: it SHALL serve requests immediately with empty configuration and apply config asynchronously. Each received snapshot SHALL be validated before applying; invalid snapshots SHALL be discarded and the old configuration kept.
+
+Snapshot routes SHALL be produced by a shared rule compiler (`DataPlaneRuleCompiler`) for both the initial snapshot and broadcasts. It SHALL emit only enabled routes, order them deterministically by normalized match key then route ID, and emit at most one rule per match key (lowest route ID). Tunnel-bound enabled routes SHALL be included. Suppressed routes SHALL be logged as warnings.
+
+#### Scenario: Data plane receives filtered config on connect
+
+- **WHEN** a data plane bound to node `华东` connects to `ConfigReplication.ReplicateConfig`
+- **THEN** the control plane sends a `ConfigSnapshot` containing all tunnel-bound routes plus `node:华东` routes, and certificates for the referenced domains only
+
+#### Scenario: Unbound data plane receives no config on connect
+
+- **WHEN** a data plane without a bound node connects
+- **THEN** the control plane SHALL NOT send any `ConfigSnapshot` on registration
+
+#### Scenario: Binding change pushes a new snapshot
+
+- **WHEN** an instance is bound to a node via `PUT /api/instances/{id}/node`
+- **THEN** the control plane SHALL push a snapshot assembled for that node if the instance is connected
+
+#### Scenario: Unbinding pushes an empty snapshot
+
+- **WHEN** an instance is unbound via `PUT /api/instances/{id}/node` with `null`
+- **THEN** the control plane SHALL push an empty snapshot (no routes, no certificates) to the connected instance
+
+#### Scenario: Config change pushes per-connection snapshots
 
 - **WHEN** a user creates/updates/deletes a route, cluster, or certificate via the control plane REST API
-- **THEN** the control plane pushes a new `ConfigSnapshot` containing all routes, clusters, destinations, certificates, and route transforms to all connected data planes via the bidirectional stream
+- **THEN** the control plane SHALL assemble and push a `ConfigSnapshot` per connected **bound** data plane, filtered by that plane's node, via the bidirectional stream
+
+#### Scenario: Node-bound route change reaches only the matching node
+
+- **WHEN** a route bound to `node:华东` is created or updated
+- **THEN** data planes bound to node `华东` SHALL receive a snapshot including the route, and data planes of other nodes SHALL receive a snapshot without it
+
+#### Scenario: Certificate snapshot respects node isolation
+
+- **WHEN** the control plane pushes a snapshot to a data plane bound to node `华东`
+- **THEN** the snapshot's certificates SHALL include only certificates whose domain matches a host referenced by the routes in that snapshot
+
+#### Scenario: Tunnel-bound enabled route is compiled into the snapshot
+
+- **WHEN** an enabled route's `ConnectionId` refers to an external Cloudflare tunnel
+- **THEN** the `ConfigSnapshot` routes include that route with its own match host/path and `ClusterId`
+- **AND** the data plane serves the host/path by forwarding to the cluster (the tunnel's next hop is the data plane, not the backend)
+
+#### Scenario: Disabled routes are not compiled into the snapshot
+
+- **WHEN** a route has `Enabled = false`
+- **THEN** the compiled snapshot routes exclude it
+- **AND** the data plane does not create a YARP rule for it
+
+#### Scenario: Duplicate match keys collapse deterministically with a warning
+
+- **WHEN** two enabled routes in the database share the same normalized host and path
+- **THEN** the snapshot carries exactly one rule for that match key: the one with the lowest route ID in lexicographic order
+- **AND** regardless of the order routes are read from the database
+- **AND** the control plane logs a warning naming the suppressed route
 
 #### Scenario: Data plane applies valid config and triggers YARP reload
 

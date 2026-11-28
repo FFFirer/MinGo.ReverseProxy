@@ -44,6 +44,18 @@
 - **WHEN** 路由指向的集群或通道已不存在
 - **THEN** 不生成占位节点、不生成指向它的边，改由配置体检查报
 
+**ADDED**: 路由的 `ingress` 边 SHALL 从该路由的接入通道节点出发（数据面节点或 Cloudflare 隧道），因为转发规则一律装在数据面；拓扑中 SHALL NOT 出现独立的数据面中转实体节点，隧道流量经数据面中转的语义 SHALL 由路由节点的「转发路径」文案说明。
+
+#### Scenario: 隧道路由从隧道节点直达路由
+
+- **WHEN** 启用路由绑定某个 Cloudflare 隧道
+- **THEN** 生成 `conn:{tunnel} → route:{id}` 的 `ingress` 边，且不生成独立的数据面中转节点
+
+#### Scenario: 数据面路由从节点直达路由
+
+- **WHEN** 启用路由的 `ConnectionId` 为 `node:{N}`
+- **THEN** 生成该数据面节点指向该路由的 `ingress` 边
+
 ### Requirement: 配置一致性体检
 
 拓扑服务 SHALL 在返回图数据的同时计算配置问题，并按严重度分级。
@@ -78,6 +90,34 @@
 - **THEN** 产生 `info` 级 `unused-cluster` 问题，节点状态保持 `ok`
 - **WHEN** Cloudflare 隧道状态为 `down`
 - **THEN** 通道节点报 `danger`；状态为 `degraded`/`inactive`/未知时报 `warning`
+
+### Requirement: 路由节点 SHALL 暴露真实转发路径
+
+路由节点的详情 SHALL 包含「转发路径」一项，写明该条路由的流量实际经过哪些进程：绑定隧道的路由为 `{隧道名} → 数据面 → 集群`，数据面节点路由为 `{节点名} → 集群`。该项 SHALL 与底层规则编译行为一致，用于让运维在图上确认「隧道不直连后端」。
+
+#### Scenario: 隧道路由显示两跳
+
+- **WHEN** 拓扑聚合一条绑定隧道「远端隧道」的路由
+- **THEN** 该节点详情的「转发路径」为 `远端隧道 → 数据面 → 集群`
+
+#### Scenario: 数据面路由显示单跳
+
+- **WHEN** 拓扑聚合 `ConnectionId` 为 `node:*` 或空值的路由
+- **THEN** 该节点详情的「转发路径」为该数据面节点名 `→ 集群`
+
+### Requirement: 重复匹配体检 SHALL 与保存闸门同口径
+
+`duplicate-match` 体检 SHALL 使用与保存期去重闸门相同的匹配键（`RouteMatchKey`：域名小写去尾点、空值归一 `*`，路径小写、catch-all 写法归一为任意路径），SHALL 只统计启用路由，并 SHALL 在消息中说明底层只生效一条（按路由 ID 字典序取先者）因此实际命中不可预期。
+
+#### Scenario: 归一化后同键的启用路由被判重
+
+- **WHEN** 两条启用路由分别写作 `API.EXAMPLE.COM /{**catch-all}` 与 `api.example.com. `（空路径）
+- **THEN** 产生 `warning` 级 `duplicate-match` 问题并着色两条路由，消息点明只生效一条
+
+#### Scenario: 通配与精确域名不算重复
+
+- **WHEN** 启用路由 `*.example.com /v1/*` 与 `api.example.com /v1/*` 并存
+- **THEN** 不产生 `duplicate-match` 问题（精确域名优先于通配域名）
 
 #### Scenario: `info` 不改变节点配色
 
