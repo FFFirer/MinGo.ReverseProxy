@@ -5,14 +5,12 @@ namespace MinGo.ControlPlane.Api.Services;
 
 /// <summary>
 /// 路由保存期的域名去重校验：同一匹配键（域名 + 路径）只允许存在一条启用路由。
-/// 纯函数，不碰数据库也不碰 Cloudflare，把 local / 隧道 / 通配的排列组合穷举测一遍就够。
+/// 纯函数，不碰数据库也不碰 Cloudflare。
 /// </summary>
 /// <remarks>
-/// 为什么必须拦在保存期：重复的匹配键下发到数据面就是两条 YARP 规则，命中哪条取决于
-/// 规则表的排列，跨实例还可能不一致；下发到隧道 ingress 时 hostname 规则会合并成一条，
-/// 但指向哪个集群同样说不清。拓扑页的 <c>duplicate-match</c> 只做体检提示，不阻断流量歧义，
-/// 真正的闸门放在这里。
-/// 通配（<c>*.example.com</c>）与具体域名不算重复——实测精确域名优先命中，两者共存是有意的分层设计。
+/// 重复匹配键下发到数据面即两条命中顺序不确定的规则，隧道 ingress 侧还会合并为单条 hostname 规则，
+/// 因此在保存期拦截；拓扑页的 <c>duplicate-match</c> 只做体检，不阻断流量歧义。
+/// 通配（<c>*.example.com</c>）与具体域名不算重复（精确域名优先命中）。
 /// </remarks>
 public static class RouteUniquenessPolicy
 {

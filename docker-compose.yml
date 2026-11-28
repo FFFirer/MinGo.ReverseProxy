@@ -44,7 +44,7 @@ services:
       # 容器名（默认 http://data-plane:8080）只在 cloudflared 加入本 compose 网络时成立；
       # 连接器跑在宿主机或另一台机器时改用宿主地址 + 发布端口，按隧道名逐条覆盖：
       #   Cloudflare__TunnelOrigins__0__TunnelName=home
-      #   Cloudflare__TunnelOrigins__0__Origin=http://192.168.88.134:8080
+      #   Cloudflare__TunnelOrigins__0__Origin=http://192.168.1.10:8080
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz/ready"]
       interval: 15s

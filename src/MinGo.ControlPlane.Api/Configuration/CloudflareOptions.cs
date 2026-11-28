@@ -91,7 +91,7 @@ public sealed class CloudflareTunnelOrigin
     public string TunnelName { get; set; } = string.Empty;
 
     /// <summary>
-    /// 该隧道连接器可达的回源地址，形如 <c>http://192.168.88.134:8080</c>。
+    /// 该隧道连接器可达的回源地址，形如 <c>http://{host}:8080</c>。
     /// </summary>
     public string Origin { get; set; } = string.Empty;
 }

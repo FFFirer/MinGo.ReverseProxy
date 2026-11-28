@@ -30,7 +30,7 @@ public class CertificateEnrollmentService
     }
 
     /// <summary>
-    /// 登记域名（D3）：域名唯一校验 → 探测下载 → 已有证书直接同步；没有才发起申请。
+    /// 登记域名：域名唯一校验 → 探测下载 → 已有证书直接同步；没有才发起申请。
     /// </summary>
     public async Task<CertificateEnrollmentDto> RegisterAsync(
         RegisterCertificateEnrollmentRequest request, CancellationToken ct)

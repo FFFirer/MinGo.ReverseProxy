@@ -33,7 +33,7 @@ public class DataPlaneCertificateSelector
     /// </summary>
     public X509Certificate2? SelectCertificate(string? domainName)
     {
-        // 实测：无 SNI 的握手传入空字符串而非 null，两者必须都走兜底
+        // 无 SNI 的握手传入空字符串而非 null，两者都必须走兜底
         if (string.IsNullOrEmpty(domainName))
             return _defaultCert;
 

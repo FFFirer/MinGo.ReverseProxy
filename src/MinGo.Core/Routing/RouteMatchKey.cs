@@ -5,14 +5,9 @@ namespace MinGo.Core.Routing;
 /// 保存期去重校验、底层配置编译、拓扑体检共用这一把尺子，避免三处口径各写一遍。
 /// </summary>
 /// <remarks>
-/// 归一化规则来自 YARP 实测（<c>tests/MinGo.DataPlane.Tests/YarpMatchPrecedenceTests.cs</c>），不是凭印象定的：
-/// <list type="bullet">
-/// <item>域名与路径字面量都是大小写不敏感匹配，所以两者统一转小写、去尾部点；</item>
-/// <item>通配 <c>*.example.com</c> 与具体 <c>api.example.com</c> 是两条不同规则，精确域名优先命中，
-/// 因此它们<strong>不算</strong>重复，允许共存；</item>
-/// <item>空路径与 YARP 的 catch-all 写法（<c>/{**catch-all}</c> 等）语义相同，都归一为
-/// <see cref="AnyPath"/>，否则「不限路径」和「catch-all」会漏出去重。</item>
-/// </list>
+/// 归一化口径与 YARP 匹配语义一致（<c>tests/MinGo.DataPlane.Tests/YarpMatchPrecedenceTests.cs</c>）：
+/// 域名与路径字面量大小写不敏感；通配 <c>*.example.com</c> 与具体域名是两条规则，不算重复；
+/// 空路径与 catch-all 写法语义相同，统一归一为 <see cref="AnyPath"/>。
 /// </remarks>
 public readonly record struct RouteMatchKey(string Host, string Path)
 {

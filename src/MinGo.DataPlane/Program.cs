@@ -167,7 +167,7 @@ app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
 app.UseForwardedHeaders();
 
 // 明文 → HTTPS：准入 = 域名证书命中（不回退默认证书）；健康检查、localhost、IP 直连豁免。
-// 必须位于 UseRouting 之前 —— 实测端点注册不会提前吞掉请求
+// 必须位于 UseRouting 之前，使跳转分支先于端点匹配执行
 if (httpsRedirectOptions.Enabled)
 {
     app.MapWhen(

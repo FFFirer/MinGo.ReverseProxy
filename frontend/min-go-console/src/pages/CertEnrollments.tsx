@@ -136,7 +136,7 @@ function CertManagerSettingsCard() {
         <div>
           <h3 class="font-semibold">CertManager 连接</h3>
           <p class="text-sm text-secondary mt-1">
-            全托管申请：登记域名后由 CertManager 向 Let's Encrypt 申请并自动续期，事件驱动同步回控制面。
+            由 CertManager 自动申请并续期 Let's Encrypt 证书，签发后同步回控制面。
           </p>
         </div>
         <span class={`badge shrink-0 ${settings()?.configured ? 'badge-success' : 'badge-warning'}`}>
@@ -157,7 +157,7 @@ function CertManagerSettingsCard() {
                 class="input font-mono"
                 value={baseUrl()}
                 onInput={(e) => setBaseUrl(e.currentTarget.value)}
-                placeholder="http://100.102.18.111:5042"
+                placeholder="https://cert-manager.example.com"
               />
               {errors().baseUrl && <p class="text-danger text-xs mt-1">{errors().baseUrl}</p>}
             </div>
@@ -391,8 +391,8 @@ function EnrollmentsCard() {
         <div>
           <h3 class="font-semibold">域名登记</h3>
           <p class="text-sm text-secondary mt-1">
-            登记后自动向 CertManager 申请证书，签发完成后事件驱动同步 PFX 到网关并推送给数据面。
-            数据面通道路由保存后其域名会自动登记；登记不会因路由移除而自动删除，仅可在此页手动移除。
+            登记后由 CertManager 申请证书，签发后自动同步到网关并推送数据面。
+            数据面路由保存时自动登记；移除仅在此页手动操作。
           </p>
         </div>
       </div>
@@ -404,7 +404,7 @@ function EnrollmentsCard() {
             class="input font-mono"
             value={domain()}
             onInput={(e) => { setDomain(e.currentTarget.value); setFormError(''); }}
-            placeholder="example.com（通配符证书登记裸域名）"
+            placeholder="example.com"
           />
         </div>
         <label class="flex items-center gap-2 pb-2">

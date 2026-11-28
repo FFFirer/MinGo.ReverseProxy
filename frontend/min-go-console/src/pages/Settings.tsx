@@ -394,7 +394,7 @@ function InstanceFormModal(props: {
                   class="input font-mono"
                   value={id()}
                   onInput={(e) => setId(e.currentTarget.value)}
-                  placeholder="例如 dc-shanghai"
+                  placeholder="例如 portainer-prod"
                   required
                 />
               }>
@@ -408,7 +408,7 @@ function InstanceFormModal(props: {
                 class="input"
                 value={name()}
                 onInput={(e) => setName(e.currentTarget.value)}
-                placeholder="例如 上海机房 Portainer"
+                placeholder="例如 生产环境 Portainer"
               />
             </div>
           </div>

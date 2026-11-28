@@ -41,7 +41,7 @@ public class GatewayTelemetryMiddleware
             return;
         }
 
-        // YARP 命中时 DisplayName 即 RouteId（实测有界）；未命中时归一为哨兵值
+        // YARP 命中时 DisplayName 即 RouteId；未命中时归一为哨兵值
         var route = ctx.GetEndpoint()?.DisplayName ?? UnmatchedRoute;
         using var activity = Source.StartActivity($"gateway.request: {route}", ActivityKind.Server);
 
